@@ -50,9 +50,17 @@ app = FastAPI(
 )
 
 # Configure CORS Middleware
+origins_list = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
+if settings.FRONTEND_URL and settings.FRONTEND_URL not in origins_list:
+    origins_list.append(settings.FRONTEND_URL.strip())
+if settings.ENVIRONMENT.lower() != "production":
+    for dev_origin in ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"]:
+        if dev_origin not in origins_list:
+            origins_list.append(dev_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restricted in production
+    allow_origins=origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,4 +95,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=(settings.ENVIRONMENT.lower() != "production"))

@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_V1_STR: str = "/api/v1"
 
+    # CORS & Production Origins
+    FRONTEND_URL: str = "http://localhost:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+
     # Security & Auth
     SECRET_KEY: str = "coalintel-super-secret-jwt-signing-key-change-in-production"
     ALGORITHM: str = "HS256"
