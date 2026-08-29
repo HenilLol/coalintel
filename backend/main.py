@@ -2,6 +2,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 
@@ -78,6 +79,25 @@ app.include_router(documents_router, prefix=settings.API_V1_STR)
 app.include_router(query_router, prefix=settings.API_V1_STR)
 app.include_router(validation_router, prefix=settings.API_V1_STR)
 app.include_router(reports_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/", status_code=status.HTTP_200_OK, tags=["Root"])
+async def root_landing():
+    """Root Landing Endpoint providing API Metadata and navigation links."""
+    return {
+        "project": settings.PROJECT_NAME,
+        "status": "healthy",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT,
+        "docs": f"{settings.API_V1_STR}/docs",
+        "health": "/health"
+    }
+
+
+@app.get("/docs", include_in_schema=False)
+async def redirect_docs():
+    """Redirect /docs to /api/v1/docs."""
+    return RedirectResponse(url=f"{settings.API_V1_STR}/docs")
 
 
 @app.get("/health", status_code=status.HTTP_200_OK, tags=["Health"])
