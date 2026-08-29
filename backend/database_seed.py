@@ -67,8 +67,7 @@ def init_db(db: Session) -> None:
             db.add(new_user)
             logger.info(f"Seeded user: {user_data['username']} (Role: {user_data['role']})")
         else:
-            existing_user.hashed_password = get_password_hash(user_data["password"])
-            logger.info(f"Updated password hash for user: {user_data['username']}")
+            logger.info(f"User '{user_data['username']}' already exists. Skipping seed.")
 
     db.commit()
     logger.info("Database seeding completed successfully.")
