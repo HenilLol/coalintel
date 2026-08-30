@@ -1,5 +1,7 @@
+import os
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -52,6 +54,31 @@ def list_reports(
     return [ReportResponse.model_validate(r) for r in reports]
 
 
+@router.get("/reports/{id}/download")
+def download_report_pdf(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Streams generated PDF report file for download.
+    """
+    report = db.query(Report).filter(Report.id == id).first()
+    if not report or not report.file_path or not os.path.exists(report.file_path):
+        # Return fallback ReportLab demo PDF if exact file was created transiently
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report file for ID #{id} not found on server storage."
+        )
+
+    filename = os.path.basename(report.file_path)
+    return FileResponse(
+        path=report.file_path,
+        media_type="application/pdf",
+        filename=filename
+    )
+
+
 @router.post("/reports/{id}/approve", response_model=ReportResponse)
 def approve_report_endpoint(
     id: int,
@@ -83,3 +110,4 @@ def approve_report_endpoint(
     db.refresh(report)
 
     return ReportResponse.model_validate(report)
+

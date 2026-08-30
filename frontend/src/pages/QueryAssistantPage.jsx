@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { MessageSquareQuote, Send, FileText, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, Sparkles } from 'lucide-react';
+import { Send, FileText, ShieldCheck, Sparkles, Filter, CheckCircle2, Eye, X } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
+import { Select } from '../components/common/Select';
 import { Badge } from '../components/common/Badge';
+import { Modal } from '../components/common/Modal';
 import { queryApi } from '../api/queryApi';
 import { useToast } from '../context/ToastContext';
 
 export const QueryAssistantPage = () => {
   const { addToast } = useToast();
   const [prompt, setPrompt] = useState('');
+  const [subsidiaryFilter, setSubsidiaryFilter] = useState('ALL');
   const [loading, setLoading] = useState(false);
   const [activeQueryResponse, setActiveQueryResponse] = useState(null);
+  const [selectedCitation, setSelectedCitation] = useState(null);
 
   const sampleQueries = [
     'What was the total coal production for ECL in FY 2023-24?',
@@ -21,25 +25,25 @@ export const QueryAssistantPage = () => {
 
   const handleQuery = async (queryText) => {
     const queryToRun = queryText || prompt;
-    if (!queryToRun) return;
+    if (!queryToRun || !queryToRun.trim()) return;
 
     setLoading(true);
     try {
-      const data = await queryApi.askQuery(queryToRun);
+      const data = await queryApi.askQuery(queryToRun, {
+        subsidiary_filter: subsidiaryFilter !== 'ALL' ? subsidiaryFilter : null
+      });
       setActiveQueryResponse(data);
+      addToast('Query executed cleanly via Hybrid RAG Citation Gate.', 'success');
     } catch (err) {
-      // Day 2 integration shell contract response
+      addToast(err.response?.data?.detail || 'Query execution failed. Please check backend service.', 'error');
       setActiveQueryResponse({
         query: queryToRun,
-        answer: `According to ingested CIL Annual Reports for FY 2023-24, total coal production for Eastern Coalfields Limited (ECL) reached 42.50 Million Tonnes (MT), representing a 4.2% YoY increase compared to 40.80 MT in FY 2022-23 [ECL_Annual_Report_2023-24.pdf, Page 14]. Overburden Removal (OBR) for Rajmahal OpenCast mine was reported at 120.40 M.Cu.M [ECL_Annual_Report_2023-24.pdf, Page 22].`,
-        citations: [
-          { document_name: 'ECL_Annual_Report_2023-24.pdf', page_number: 14, citation_tag: '[ECL_Annual_Report_2023-24.pdf, Page 14]' },
-          { document_name: 'ECL_Annual_Report_2023-24.pdf', page_number: 22, citation_tag: '[ECL_Annual_Report_2023-24.pdf, Page 22]' }
-        ],
-        degraded_mode: false,
-        provider: 'gemini'
+        answer: 'Backend query service unavailable. Please check backend connection.',
+        citations: [],
+        evidence_chunks: [],
+        degraded_mode: true,
+        provider: 'error'
       });
-      addToast('Query executed cleanly via Hybrid RAG Citation Gate.', 'success');
     } finally {
       setLoading(false);
     }
@@ -48,19 +52,37 @@ export const QueryAssistantPage = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="pb-4 border-b border-slate-800">
-        <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-          Ask COALINTEL — Cited Mining Q&A Assistant
-        </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Evidence-driven natural language query interface enforcing mandatory page-level citations <code className="text-amber-400 font-mono">[Doc.pdf, Page X]</code>
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            Ask COALINTEL — Cited Mining Q&A Assistant
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Evidence-driven natural language query interface enforcing mandatory page-level citations <code className="text-amber-400 font-mono">[Doc.pdf, Page X]</code>
+          </p>
+        </div>
+
+        <div className="w-56">
+          <Select
+            value={subsidiaryFilter}
+            onChange={(e) => setSubsidiaryFilter(e.target.value)}
+            options={[
+              { value: 'ALL', label: 'All Subsidiaries' },
+              { value: 'ECL', label: 'ECL' },
+              { value: 'BCCL', label: 'BCCL' },
+              { value: 'CCL', label: 'CCL' },
+              { value: 'WCL', label: 'WCL' },
+              { value: 'SECL', label: 'SECL' },
+              { value: 'MCL', label: 'MCL' },
+            ]}
+          />
+        </div>
       </div>
 
       {/* Query Input Section */}
       <Card>
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1">
               <Input
                 placeholder="Ask any geological, production, OBR, or parliamentary query..."
@@ -98,7 +120,7 @@ export const QueryAssistantPage = () => {
 
       {/* Response View & Evidence Side Drawer */}
       {activeQueryResponse && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Answer Card */}
           <Card className="lg:col-span-2" title="Generated Cited Answer">
             <div className="space-y-4">
@@ -106,7 +128,7 @@ export const QueryAssistantPage = () => {
                 {activeQueryResponse.answer}
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/60">
+              <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/60 gap-2">
                 <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                   <ShieldCheck className="w-4 h-4" /> Citation Verification Gate: 100% Passed
                 </span>
@@ -118,21 +140,61 @@ export const QueryAssistantPage = () => {
           {/* Evidence Panel & Citations Drawer */}
           <Card title="Source Lineage & Citation Drawer">
             <div className="space-y-3">
-              <p className="text-xs text-slate-400">Click a citation tag to inspect raw bounding box coordinates & text snippet:</p>
-              {activeQueryResponse.citations.map((c, i) => (
-                <div key={i} className="p-3 bg-slate-900/80 border border-slate-700/80 rounded-lg hover:border-amber-500/50 transition-colors cursor-pointer space-y-1">
-                  <div className="flex items-center justify-between text-xs font-medium text-amber-400">
-                    <span className="flex items-center gap-1">
-                      <FileText className="w-3.5 h-3.5" /> {c.document_name}
-                    </span>
-                    <span>Page {c.page_number}</span>
+              <p className="text-xs text-slate-400">Click any citation item to view raw page chunk & text snippet evidence:</p>
+              {activeQueryResponse.citations.map((c, i) => {
+                const chunk = activeQueryResponse.evidence_chunks?.find(
+                  ec => ec.document_name === c.document_name && ec.page_number === c.page_number
+                );
+                return (
+                  <div
+                    key={i}
+                    onClick={() => setSelectedCitation({ ...c, text: chunk?.text || 'No snippet text available.' })}
+                    className="p-3 bg-slate-900/80 border border-slate-700/80 rounded-lg hover:border-amber-500/60 transition-all cursor-pointer space-y-1 group"
+                  >
+                    <div className="flex items-center justify-between text-xs font-medium text-amber-400 group-hover:text-amber-300">
+                      <span className="flex items-center gap-1 truncate max-w-[160px]" title={c.document_name}>
+                        <FileText className="w-3.5 h-3.5 shrink-0" /> {c.document_name}
+                      </span>
+                      <span className="shrink-0">Page {c.page_number}</span>
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400 flex items-center justify-between">
+                      <span>{c.citation_tag}</span>
+                      <Eye className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400" />
+                    </div>
                   </div>
-                  <div className="text-[11px] font-mono text-slate-400">{c.citation_tag}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         </div>
+      )}
+
+      {/* CITATION EVIDENCE MODAL */}
+      {selectedCitation && (
+        <Modal
+          isOpen={!!selectedCitation}
+          onClose={() => setSelectedCitation(null)}
+          title={`Evidence Citation Inspection — ${selectedCitation.document_name} (Page ${selectedCitation.page_number})`}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-800">
+              <div>
+                <span className="text-slate-400">Document:</span>
+                <span className="font-semibold text-white ml-2">{selectedCitation.document_name}</span>
+              </div>
+              <Badge status="VALIDATED" size="xs" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Raw Chunk Text Snippet
+              </label>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono leading-relaxed whitespace-pre-line">
+                {selectedCitation.text}
+              </div>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

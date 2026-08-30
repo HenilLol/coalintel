@@ -73,12 +73,18 @@ from app.api.documents import router as documents_router
 from app.api.query import router as query_router
 from app.api.validation import router as validation_router
 from app.api.reports import router as reports_router
+from app.api.dashboard import router as dashboard_router
+from app.api.analytics import router as analytics_router
+from app.api.audit import router as audit_router
 
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(documents_router, prefix=settings.API_V1_STR)
 app.include_router(query_router, prefix=settings.API_V1_STR)
 app.include_router(validation_router, prefix=settings.API_V1_STR)
 app.include_router(reports_router, prefix=settings.API_V1_STR)
+app.include_router(dashboard_router, prefix=settings.API_V1_STR)
+app.include_router(analytics_router, prefix=settings.API_V1_STR)
+app.include_router(audit_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["Root"])

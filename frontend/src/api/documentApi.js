@@ -21,5 +21,9 @@ export const documentApi = {
   getDocumentPages: async (id) => {
     const response = await apiClient.get(`/documents/${id}/pages`);
     return response.data;
+  },
+  getDocumentLineage: async (id) => {
+    const response = await apiClient.get(`/documents/${id}/lineage`);
+    return response.data;
   }
 };

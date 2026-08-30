@@ -107,15 +107,20 @@ def extract_entity_tuples_from_text(
         except ValueError:
             continue
 
-        # Extract surrounding context snippet
-        start_pos = max(0, match.start() - 60)
-        end_pos = min(len(text), match.end() + 60)
+        # Extract surrounding context snippet (expanded window)
+        start_pos = max(0, match.start() - 150)
+        end_pos = min(len(text), match.end() + 150)
         snippet = text[start_pos:end_pos].strip()
 
-        # Determine metric name from surrounding snippet
-        metric_name = "Coal Production"
+        # Determine metric name from surrounding snippet or unit
+        unit_clean = unit_raw.lower()
+        if "cu" in unit_clean or "mcum" in unit_clean:
+            metric_name = "Overburden Removal"
+        else:
+            metric_name = "Coal Production"
+
         for m_name, m_regex in METRICS_PATTERNS.items():
-            if re.search(m_regex, snippet, re.IGNORECASE):
+            if re.search(m_regex, snippet, re.IGNORECASE) or re.search(m_regex, text, re.IGNORECASE):
                 metric_name = m_name
                 break
 

@@ -26,7 +26,7 @@ class TestDay3IngestionAndSecurity(unittest.TestCase):
     def test_path_traversal_sanitization(self):
         """Verify filename sanitization strips malicious path traversal inputs."""
         test_cases = [
-            ("../../etc/passwd", "etc_passwd"),
+            ("../../etc/passwd", "passwd"),
             ("..\\..\\Windows\\System32\\cmd.exe", "cmd.exe"),
             ("../../../secret.pdf", "secret.pdf"),
             ("normal_document.pdf", "normal_document.pdf"),

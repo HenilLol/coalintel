@@ -130,3 +130,42 @@ def get_document_pages(
         total_pages=doc.total_pages or len(pages),
         pages=pages
     )
+
+
+@router.get("/documents/{id}/lineage")
+def get_document_lineage(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Retrieves document metric lineage and normalization traceability."""
+    doc = db.query(Document).filter(Document.id == id).first()
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID #{id} not found."
+        )
+        
+    metrics = db.query(ExtractedMetric).filter(ExtractedMetric.document_id == id).order_by(ExtractedMetric.id).all()
+    return {
+        "document_id": doc.id,
+        "filename": doc.filename,
+        "subsidiary": doc.subsidiary,
+        "fiscal_year": doc.fiscal_year,
+        "file_hash": doc.file_hash,
+        "metrics": [
+            {
+                "id": m.id,
+                "mine_name": m.mine_name,
+                "metric_name": m.metric_name,
+                "numeric_value": float(m.numeric_value) if m.numeric_value is not None else 0.0,
+                "unit": m.unit,
+                "standard_value": float(m.standard_value) if m.standard_value is not None else 0.0,
+                "standard_unit": m.standard_unit or "MT",
+                "fiscal_year": m.fiscal_year,
+                "validation_status": m.validation_status or "VALIDATED",
+                "raw_snippet": m.raw_snippet or ""
+            }
+            for m in metrics
+        ]
+    }

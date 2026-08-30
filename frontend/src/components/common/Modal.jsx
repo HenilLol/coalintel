@@ -34,7 +34,7 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'ma
           </button>
         </div>
         <div className="p-6 overflow-y-auto flex-1 text-slate-300">{children}</div>
-        {footer && <div className="px-6 py-3 bg-slate-900/60 border-t border-slate-700 flex justify-end gap-3">{footer}</div>}
+        {footer && <div className="px-6 py-3 bg-slate-900/60 border-t border-slate-700 flex flex-wrap sm:flex-nowrap justify-end gap-2.5 sm:gap-3">{footer}</div>}
       </div>
     </div>
   );
