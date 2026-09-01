@@ -1,31 +1,73 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { FileText, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { DocumentTable } from '@/components/documents/DocumentTable';
+import { UploadModal } from '@/components/documents/UploadModal';
+import { documentApi } from '@/lib/api/documentApi';
+import { Upload, FileText, Database, ShieldCheck } from 'lucide-react';
 
 export default function DocumentsPage() {
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [selectedSubsidiary, setSelectedSubsidiary] = useState('ALL');
+
+  // React Query data fetching for document repository list
+  const {
+    data: documentData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ['documents', selectedStatus, selectedSubsidiary],
+    queryFn: () =>
+      documentApi.getDocuments({
+        status_filter: selectedStatus,
+        subsidiary_filter: selectedSubsidiary,
+      }),
+    staleTime: 30000,
+  });
+
+  const documents = documentData?.items || [];
+
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <PageHeader
-        title="Document Repository & Digitization"
-        description="Upload, parse, and inspect geological, mining annual reports, RTI disclosures, and production audit documents."
-        breadcrumbs={[{ label: 'Document Library' }]}
-        badge={<Badge variant="gold">Phase 2 Ready</Badge>}
+        title="Document Repository & Digitization Hub"
+        description="Centralized geological reports, annual performance reviews, RTI disclosures, and production audit files for Coal India Limited and CMPDI."
+        breadcrumbs={[{ label: 'Document Repository' }]}
+        badge={<Badge variant="gold">V2 Intelligence Hub</Badge>}
         actions={
-          <Button variant="primary" leftIcon={<Upload className="h-4 w-4" />}>
-            Upload Document
+          <Button
+            variant="primary"
+            leftIcon={<Upload className="h-4 w-4" />}
+            onClick={() => setIsUploadModalOpen(true)}
+          >
+            Ingest Document
           </Button>
         }
       />
 
-      <EmptyState
-        title="Document Hub & Visual PDF Canvas"
-        description="Multi-format text extraction (PDF, DOCX, CSV, XLSX), SHA-256 hash deduplication, and page-level provenance tracking."
-        icon={<FileText className="h-10 w-10 text-gold-400" />}
+      {/* Main Document Data Table */}
+      <DocumentTable
+        documents={documents}
+        loading={isLoading}
+        onRefresh={() => refetch()}
+        selectedStatus={selectedStatus}
+        onStatusChange={setSelectedStatus}
+        selectedSubsidiary={selectedSubsidiary}
+        onSubsidiaryChange={setSelectedSubsidiary}
+      />
+
+      {/* Ingest Document Modal */}
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploadSuccess={() => refetch()}
       />
     </div>
   );
