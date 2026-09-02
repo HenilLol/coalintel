@@ -217,3 +217,66 @@ def test_phase5b_semantic_logic_reuse():
     assert are_units_compatible("MT", "M.Cu.M") is False
     assert is_generic_mine_name("SECL Mine") is True
     assert is_generic_mine_name("Rajmahal OpenCast") is False
+
+
+def test_analytics_all_cil_scope(auth_headers):
+    """
+    Verifies ALL CIL analytics scope returns aggregate topics.
+    """
+    res = client.get("/api/v1/analytics/wordcloud?subsidiary_filter=ALL%20CIL", headers=auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert "topics" in data
+    assert len(data["topics"]) > 0
+
+
+def test_analytics_specific_subsidiary_scope(db_session: Session, auth_headers):
+    """
+    Verifies specific subsidiary filter queries database records belonging ONLY to that subsidiary.
+    """
+    uid = uuid.uuid4().hex[:8]
+    sub_name = f"SUB_{uid}"
+    doc = Document(
+        filename=f"Report_{uid}.pdf",
+        file_path=f"/storage/uploads/Report_{uid}.pdf",
+        file_hash=f"hash_analytics_{uid}",
+        file_type="pdf",
+        subsidiary=sub_name,
+        fiscal_year="2023-24",
+        status="INDEXED"
+    )
+    db_session.add(doc)
+    db_session.commit()
+
+    metric_name = f"Unique Metric {uid}"
+    m = ExtractedMetric(
+        document_id=doc.id,
+        mine_name=f"Mine_{uid}",
+        metric_name=metric_name,
+        numeric_value=100.0,
+        unit="MT",
+        standard_value=100.0,
+        standard_unit="MT",
+        fiscal_year="2023-24"
+    )
+    db_session.add(m)
+    db_session.commit()
+
+    res = client.get(f"/api/v1/analytics/wordcloud?subsidiary_filter={sub_name}", headers=auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert "topics" in data
+    topic_words = [t["word"] for t in data["topics"]]
+    assert metric_name in topic_words
+
+
+def test_analytics_unknown_subsidiary_scope(auth_headers):
+    """
+    Verifies an unknown/nonexistent subsidiary returns a valid empty response without fabricating fake data.
+    """
+    res = client.get("/api/v1/analytics/wordcloud?subsidiary_filter=NONEXISTENT_SUB_9999", headers=auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert "topics" in data
+    assert data["topics"] == []
+
