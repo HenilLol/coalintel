@@ -79,8 +79,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       <div className="flex-1 flex flex-col min-w-0">
         <Header
           onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
-          selectedSubsidiary={user?.subsidiary || 'CIL HQ'}
-          selectedFiscalYear="2023-24"
           userName={user?.username || 'CMPDI Analyst'}
           userRole={user?.role || 'Analyst'}
         />

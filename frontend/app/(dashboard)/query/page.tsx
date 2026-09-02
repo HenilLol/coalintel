@@ -9,11 +9,12 @@ import { QueryInput } from '@/components/query/QueryInput';
 import { CitedAnswerCard } from '@/components/query/CitedAnswerCard';
 import { CitationDrawer } from '@/components/query/CitationDrawer';
 import { queryApi, QueryResponse, CitationItem, EvidenceChunkItem } from '@/lib/api/queryApi';
+import { useScope } from '@/context/ScopeContext';
 import { Sparkles, Bot, ShieldCheck } from 'lucide-react';
 
 export default function QueryPage() {
+  const { selectedSubsidiary, setSelectedSubsidiary } = useScope();
   const [prompt, setPrompt] = useState('');
-  const [selectedSubsidiary, setSelectedSubsidiary] = useState('ALL');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

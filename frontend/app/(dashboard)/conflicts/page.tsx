@@ -9,9 +9,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ConflictResolveModal } from '@/components/validation/ConflictResolveModal';
 import { validationApi, ConflictItem, ResolveConflictPayload } from '@/lib/api/validationApi';
+import { useScope } from '@/context/ScopeContext';
 import { GitCompare, FileText, CheckCircle2, ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function ConflictsPage() {
+  const { selectedSubsidiary } = useScope();
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [activeConflict, setActiveConflict] = useState<ConflictItem | null>(null);
@@ -23,8 +25,8 @@ export default function ConflictsPage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['conflicts', selectedStatus],
-    queryFn: () => validationApi.getConflicts(selectedStatus),
+    queryKey: ['conflicts', selectedStatus, selectedSubsidiary],
+    queryFn: () => validationApi.getConflicts(selectedStatus, selectedSubsidiary),
     staleTime: 30000,
   });
 

@@ -9,9 +9,11 @@ import { ReportWizardForm } from '@/components/reports/ReportWizardForm';
 import { ReportPreviewCard } from '@/components/reports/ReportPreviewCard';
 import { ReportHistoryTable } from '@/components/reports/ReportHistoryTable';
 import { reportApi, ReportItem } from '@/lib/api/reportApi';
+import { useScope } from '@/context/ScopeContext';
 import { FileSpreadsheet } from 'lucide-react';
 
 export default function ReportsPage() {
+  const { selectedSubsidiary } = useScope();
   const queryClient = useQueryClient();
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
 
@@ -22,8 +24,8 @@ export default function ReportsPage() {
     isError,
     error,
   } = useQuery({
-    queryKey: ['reports'],
-    queryFn: () => reportApi.getReports(),
+    queryKey: ['reports', selectedSubsidiary],
+    queryFn: () => reportApi.getReports(selectedSubsidiary),
     staleTime: 30000,
   });
 
