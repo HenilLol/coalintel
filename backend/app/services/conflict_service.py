@@ -47,8 +47,8 @@ def detect_and_register_cross_document_conflicts(db: Session) -> int:
                 if m_a.document_id == m_b.document_id:
                     continue
 
-                val_a = m_a.standard_value
-                val_b = m_b.standard_value
+                val_a = float(m_a.standard_value) if m_a.standard_value is not None else 0.0
+                val_b = float(m_b.standard_value) if m_b.standard_value is not None else 0.0
 
                 ref_val = max(abs(val_a), abs(val_b))
                 if ref_val == 0:
@@ -68,24 +68,21 @@ def detect_and_register_cross_document_conflicts(db: Session) -> int:
                         DataConflict.metric_name == m_a.metric_name,
                         DataConflict.fiscal_year == m_a.fiscal_year,
                         or_(
-                            (DataConflict.document_a_id == m_a.document_id) & (DataConflict.document_b_id == m_b.document_id),
-                            (DataConflict.document_a_id == m_b.document_id) & (DataConflict.document_b_id == m_a.document_id)
+                            (DataConflict.doc_a_id == m_a.document_id) & (DataConflict.doc_b_id == m_b.document_id),
+                            (DataConflict.doc_a_id == m_b.document_id) & (DataConflict.doc_b_id == m_a.document_id)
                         )
                     ).first()
 
                     if not existing:
                         conflict_rec = DataConflict(
-                            document_a_id=m_a.document_id,
-                            document_b_id=m_b.document_id,
+                            doc_a_id=m_a.document_id,
+                            doc_b_id=m_b.document_id,
                             mine_name=m_a.mine_name,
-                            subsidiary=m_a.subsidiary,
                             metric_name=m_a.metric_name,
                             fiscal_year=m_a.fiscal_year,
-                            document_a_value=val_a,
-                            document_a_unit=m_a.standard_unit,
-                            document_b_value=val_b,
-                            document_b_unit=m_b.standard_unit,
-                            discrepancy_percentage=pct_diff,
+                            doc_a_value=val_a,
+                            doc_b_value=val_b,
+                            discrepancy_pct=pct_diff,
                             status="OPEN"
                         )
                         db.add(conflict_rec)
