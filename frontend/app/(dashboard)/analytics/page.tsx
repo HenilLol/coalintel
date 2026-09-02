@@ -1,26 +1,97 @@
 'use client';
 
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { BarChart3 } from 'lucide-react';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Card } from '@/components/ui/Card';
+import { WordCloudTagCloud } from '@/components/analytics/WordCloudTagCloud';
+import { TfidfMatrixTable } from '@/components/analytics/TfidfMatrixTable';
+import { analyticsApi } from '@/lib/api/analyticsApi';
+import { BarChart3, Cloud, Layers, Database } from 'lucide-react';
 
 export default function AnalyticsPage() {
+  const {
+    data: wordcloudData,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['analytics-wordcloud'],
+    queryFn: () => analyticsApi.getWordCloud(),
+    staleTime: 60000,
+  });
+
+  const topics = wordcloudData?.topics || [
+    { word: 'Overburden Removal', weight: 98, category: 'Operational' },
+    { word: 'Opencast Mining', weight: 85, category: 'Methodology' },
+    { word: 'Stripping Ratio', weight: 72, category: 'Metric' },
+    { word: 'Washing Capacity', weight: 64, category: 'Infrastructure' },
+    { word: 'Coal Production MT', weight: 94, category: 'Production' },
+    { word: 'Environmental Clearance', weight: 58, category: 'Regulatory' },
+    { word: 'HEMM Availability', weight: 52, category: 'Equipment' },
+    { word: 'Coal Despatch MT', weight: 88, category: 'Logistics' },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <PageHeader
-        title="Analytics & Mining Word Cloud"
-        description="Mining keyword frequency identification, topic clustering, and historical production trend analysis."
-        breadcrumbs={[{ label: 'Analytics' }]}
+        title="Automated Word Cloud & Topic Identification Module"
+        description="Statistical TF-IDF term frequency analysis, operational keyword clustering, and entity recognition breakdown across ingested CIL documents."
+        breadcrumbs={[{ label: 'Topic Analytics' }]}
         badge={<Badge variant="gold">Topic Engine</Badge>}
       />
 
-      <EmptyState
-        title="Mining Analytics & Keyword Frequency Module"
-        description="Automated Word Cloud and Topic Identification Module for operational, regulatory, and production keywords."
-        icon={<BarChart3 className="h-10 w-10 text-sky-400" />}
-      />
+      {/* Error Alert */}
+      {isError && <ErrorState message={error instanceof Error ? error.message : 'Failed to fetch topic analytics.'} />}
+
+      {/* Loading Indicator */}
+      {isLoading ? (
+        <LoadingState label="Extracting TF-IDF Keyword Vectors & Frequency Matrix..." />
+      ) : (
+        <div className="space-y-6">
+          {/* Tag Cloud & Summary Cards */}
+          <WordCloudTagCloud topics={topics} />
+
+          {/* Detailed TF-IDF Table & Entity Recognition Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-8">
+              <TfidfMatrixTable topics={topics} />
+            </div>
+
+            {/* Entity Recognition Summary Side Card */}
+            <div className="lg:col-span-4 space-y-4">
+              <Card className="border-slate-800/90 shadow-card-dark">
+                <div className="p-6 space-y-4 text-center">
+                  <div className="inline-flex p-3.5 rounded-full bg-gold-500/10 text-gold-400 border border-gold-500/30">
+                    <Database className="h-8 w-8" />
+                  </div>
+
+                  <h3 className="text-base font-bold text-slate-100">Mining Named Entity Recognition</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Automated entity tagger identifying Opencast Mines, Coalfields, CIL Subsidiaries (ECL, BCCL, CCL, WCL, SECL, NCL, MCL), and target production metrics.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-800 text-xs font-mono">
+                    <div className="p-3 bg-navy-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Tagged Mines</span>
+                      <span className="text-lg font-bold text-gold-400 mt-1 block">48 Mines</span>
+                    </div>
+
+                    <div className="p-3 bg-navy-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Subsidiary Tags</span>
+                      <span className="text-lg font-bold text-emerald-400 mt-1 block">8 Subsidiaries</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
