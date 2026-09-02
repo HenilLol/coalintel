@@ -18,6 +18,8 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
   onApprove,
   isApproving = false,
 }) => {
+  const [isDownloading, setIsDownloading] = React.useState(false);
+
   if (!report) {
     return (
       <Card className="h-full flex items-center justify-center p-12 text-center border-slate-800/90 shadow-card-dark">
@@ -36,9 +38,17 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
 
   const isApproved = report.approval_status === 'APPROVED';
 
-  const handleDownload = () => {
-    const downloadUrl = reportApi.getDownloadUrl(report.id);
-    window.open(downloadUrl, '_blank');
+  const handleDownload = async () => {
+    if (!report?.id) return;
+    setIsDownloading(true);
+    try {
+      const titleClean = report.title ? report.title.replace(/[^a-zA-Z0-9_-]/g, '_') : `Report_${report.id}`;
+      await reportApi.downloadReport(report.id, `${titleClean}.pdf`);
+    } catch (err) {
+      console.error('Failed to download report PDF:', err);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -104,6 +114,7 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
             variant="outline"
             size="md"
             onClick={handleDownload}
+            isLoading={isDownloading}
             leftIcon={<Download className="h-4 w-4" />}
           >
             Download PDF Report
