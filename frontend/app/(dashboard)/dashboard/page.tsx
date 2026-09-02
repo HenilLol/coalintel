@@ -12,11 +12,11 @@ import { ProductionChart } from '@/components/dashboard/ProductionChart';
 import { ValidationFeedWidget } from '@/components/dashboard/ValidationFeedWidget';
 import { dashboardApi } from '@/lib/api/dashboardApi';
 import { DashboardKpis, ProductionSeriesItem, ValidationFeedItem } from '@/types/dashboard';
+import { useScope } from '@/context/ScopeContext';
 import { Upload, FileText, Sparkles, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export default function DashboardPage() {
-  const [selectedSubsidiary, setSelectedSubsidiary] = useState('ALL');
-  const [selectedFiscalYear, setSelectedFiscalYear] = useState('2023-24');
+  const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear, setSelectedFiscalYear } = useScope();
   const [isLoading, setIsLoading] = useState(false);
   const [isApiConnected, setIsApiConnected] = useState(false);
 

@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ router = APIRouter(tags=["Analytics & Topic Intelligence"])
 
 @router.get("/analytics/wordcloud", response_model=WordCloudResponse)
 def get_wordcloud_analytics(
+    subsidiary_filter: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -27,4 +29,9 @@ def get_wordcloud_analytics(
         WordCloudTopicItem(word="HEMM Availability", weight=52, category="Equipment"),
         WordCloudTopicItem(word="Coal Despatch MT", weight=88, category="Logistics"),
     ]
+
+    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
+        # Boost subsidiary specific operational tags
+        topics.insert(0, WordCloudTopicItem(word=f"{subsidiary_filter} Operations", weight=100, category="Subsidiary"))
+
     return WordCloudResponse(topics=topics)

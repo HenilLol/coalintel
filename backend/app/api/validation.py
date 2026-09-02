@@ -33,6 +33,7 @@ def get_validation_feed(
 @router.get("/conflicts", response_model=List[ConflictResponse])
 def list_conflicts(
     status_filter: Optional[str] = None,
+    subsidiary_filter: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -45,6 +46,8 @@ def list_conflicts(
     query = db.query(DataConflict)
     if status_filter:
         query = query.filter(DataConflict.status == status_filter.upper())
+    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
+        query = query.filter(DataConflict.subsidiary == subsidiary_filter)
     
     conflicts = query.order_by(DataConflict.created_at.desc()).all()
 

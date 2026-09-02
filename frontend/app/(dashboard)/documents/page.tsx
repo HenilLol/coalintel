@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/Button';
 import { DocumentTable } from '@/components/documents/DocumentTable';
 import { UploadModal } from '@/components/documents/UploadModal';
 import { documentApi } from '@/lib/api/documentApi';
+import { useScope } from '@/context/ScopeContext';
 import { Upload, FileText, Database, ShieldCheck } from 'lucide-react';
 
 export default function DocumentsPage() {
+  const { selectedSubsidiary, setSelectedSubsidiary } = useScope();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('ALL');
-  const [selectedSubsidiary, setSelectedSubsidiary] = useState('ALL');
 
   // React Query data fetching for document repository list
   const {

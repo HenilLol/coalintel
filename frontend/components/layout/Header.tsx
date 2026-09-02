@@ -4,22 +4,22 @@ import React from 'react';
 import { Menu, Bell, Shield, Database, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
+import { useScope } from '@/context/ScopeContext';
+import { CIL_SUBSIDIARIES } from '@/lib/constants';
 
 interface HeaderProps {
   onMobileMenuToggle?: () => void;
-  selectedSubsidiary?: string;
-  selectedFiscalYear?: string;
   userName?: string;
   userRole?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onMobileMenuToggle,
-  selectedSubsidiary = 'CIL HQ',
-  selectedFiscalYear = '2023-24',
   userName = 'CMPDI Analyst',
   userRole = 'Analyst',
 }) => {
+  const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear } = useScope();
+
   return (
     <header className="sticky top-0 z-20 h-16 bg-navy-950/80 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 flex items-center justify-between shadow-sm">
       {/* Left: Mobile Toggle & Context Indicator */}
@@ -34,10 +34,21 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Global Operational Context Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-navy-900/90 border border-slate-800 text-xs font-mono">
-          <Database className="h-3.5 w-3.5 text-gold-400" />
-          <span className="text-slate-400">Target:</span>
-          <span className="text-slate-200 font-semibold">{selectedSubsidiary}</span>
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-navy-900/90 border border-gold-500/30 text-xs font-mono shadow-sm">
+          <Database className="h-3.5 w-3.5 text-gold-400 shrink-0" />
+          <span className="text-slate-400">Target Scope:</span>
+          <select
+            value={selectedSubsidiary}
+            onChange={(e) => setSelectedSubsidiary(e.target.value)}
+            className="bg-navy-950 border border-slate-700/80 text-gold-400 font-bold rounded px-2 py-0.5 focus:outline-none focus:border-gold-500 text-xs"
+          >
+            <option value="ALL CIL">ALL CIL (Corporate)</option>
+            {CIL_SUBSIDIARIES.filter((s) => s.value !== 'ALL').map((sub) => (
+              <option key={sub.value} value={sub.value}>
+                {sub.value}
+              </option>
+            ))}
+          </select>
           <span className="text-slate-600">|</span>
           <span className="text-gold-400 font-semibold">{selectedFiscalYear}</span>
         </div>

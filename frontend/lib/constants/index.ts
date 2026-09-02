@@ -28,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Executive Dashboard', icon: 'LayoutDashboard' },
   { href: '/documents', label: 'Document Library', icon: 'FileText' },
   { href: '/query', label: 'Ask COALINTEL', icon: 'Sparkles' },
+  { href: '/comparison', label: 'Metric Comparison', icon: 'GitCompare' },
   { href: '/analytics', label: 'Analytics & Cloud', icon: 'BarChart3' },
   { href: '/validation', label: 'Validation Feed', icon: 'ShieldCheck' },
   { href: '/conflicts', label: 'Conflict Resolver', icon: 'GitCompare', roles: ['Admin', 'Reviewer'] },

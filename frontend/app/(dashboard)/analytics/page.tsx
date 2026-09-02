@@ -10,17 +10,19 @@ import { Card } from '@/components/ui/Card';
 import { WordCloudTagCloud } from '@/components/analytics/WordCloudTagCloud';
 import { TfidfMatrixTable } from '@/components/analytics/TfidfMatrixTable';
 import { analyticsApi } from '@/lib/api/analyticsApi';
+import { useScope } from '@/context/ScopeContext';
 import { BarChart3, Cloud, Layers, Database } from 'lucide-react';
 
 export default function AnalyticsPage() {
+  const { selectedSubsidiary } = useScope();
   const {
     data: wordcloudData,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ['analytics-wordcloud'],
-    queryFn: () => analyticsApi.getWordCloud(),
+    queryKey: ['analytics-wordcloud', selectedSubsidiary],
+    queryFn: () => analyticsApi.getWordCloud(selectedSubsidiary),
     staleTime: 60000,
   });
 

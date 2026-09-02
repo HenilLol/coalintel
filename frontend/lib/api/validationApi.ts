@@ -51,10 +51,11 @@ export const validationApi = {
     return response.data;
   },
 
-  getConflicts: async (status_filter?: string): Promise<ConflictItem[]> => {
+  getConflicts: async (status_filter?: string, subsidiary_filter?: string): Promise<ConflictItem[]> => {
     const response = await apiClient.get<ConflictItem[]>('/conflicts', {
       params: {
         status_filter: status_filter && status_filter !== 'ALL' ? status_filter : undefined,
+        subsidiary_filter: subsidiary_filter && subsidiary_filter !== 'ALL' && subsidiary_filter !== 'ALL CIL' ? subsidiary_filter : undefined,
       },
     });
     return response.data;

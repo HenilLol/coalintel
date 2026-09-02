@@ -30,11 +30,14 @@ export const reportApi = {
     return response.data;
   },
 
-  getReports: async (params?: ReportListParams): Promise<ReportItem[]> => {
+  getReports: async (params?: ReportListParams | string): Promise<ReportItem[]> => {
+    const subFilter = typeof params === 'string' ? params : params?.subsidiary_filter;
+    const appFilter = typeof params === 'object' ? params?.approval_status_filter : undefined;
+
     const response = await apiClient.get<ReportItem[]>('/reports', {
       params: {
-        subsidiary_filter: params?.subsidiary_filter && params.subsidiary_filter !== 'ALL' ? params.subsidiary_filter : undefined,
-        approval_status_filter: params?.approval_status_filter,
+        subsidiary_filter: subFilter && subFilter !== 'ALL' && subFilter !== 'ALL CIL' ? subFilter : undefined,
+        approval_status_filter: appFilter,
       },
     });
     return response.data;

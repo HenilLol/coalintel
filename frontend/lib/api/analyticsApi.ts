@@ -11,8 +11,12 @@ export interface WordCloudResponse {
 }
 
 export const analyticsApi = {
-  getWordCloud: async (): Promise<WordCloudResponse> => {
-    const response = await apiClient.get<WordCloudResponse>('/analytics/wordcloud');
+  getWordCloud: async (subsidiary_filter?: string): Promise<WordCloudResponse> => {
+    const response = await apiClient.get<WordCloudResponse>('/analytics/wordcloud', {
+      params: {
+        subsidiary_filter: subsidiary_filter && subsidiary_filter !== 'ALL' && subsidiary_filter !== 'ALL CIL' ? subsidiary_filter : undefined,
+      },
+    });
     return response.data;
   },
 };
