@@ -1,26 +1,55 @@
 'use client';
 
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { History } from 'lucide-react';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { AuditLogsTable } from '@/components/audit/AuditLogsTable';
+import { auditApi } from '@/lib/api/auditApi';
+import { History, ShieldAlert } from 'lucide-react';
 
 export default function AuditPage() {
+  const {
+    data: logs = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['audit-logs'],
+    queryFn: () => auditApi.getAuditLogs(),
+    staleTime: 60000,
+  });
+
+  const isForbidden = (error as any)?.response?.status === 403;
+
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <PageHeader
-        title="System Audit & Traceability Logs"
-        description="Immutable audit trail tracking user authentication, document uploads, conflict resolutions, and report generations."
+        title="System Security & Audit Trail Ledger"
+        description="Immutable audit trail tracking user authentication events, document ingestions, conflict resolutions, and report approvals."
         breadcrumbs={[{ label: 'Audit Logs' }]}
         badge={<Badge variant="gold">Restricted: Admin</Badge>}
       />
 
-      <EmptyState
-        title="System Audit & Security Logs"
-        description="View timestamped user actions, IP addresses, resource IDs, and structured JSON detail payloads."
-        icon={<History className="h-10 w-10 text-slate-400" />}
-      />
+      {/* 403 Forbidden RBAC Notice */}
+      {isForbidden ? (
+        <div className="p-8 rounded-2xl bg-navy-900 border border-amber-500/30 text-center space-y-3 max-w-xl mx-auto my-8">
+          <div className="p-3 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 w-fit mx-auto">
+            <ShieldAlert className="h-8 w-8" />
+          </div>
+          <h3 className="text-base font-bold text-slate-100">RBAC Authorization Notice</h3>
+          <p className="text-xs text-slate-400">
+            System security audit logs are restricted to users with <code className="text-gold-400">Admin</code> role authorization.
+          </p>
+        </div>
+      ) : isError ? (
+        <ErrorState message={error instanceof Error ? error.message : 'Failed to fetch audit log ledger.'} />
+      ) : (
+        /* Main Audit Logs Data Table */
+        <AuditLogsTable logs={logs} loading={isLoading} />
+      )}
     </div>
   );
 }
