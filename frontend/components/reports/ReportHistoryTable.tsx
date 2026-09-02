@@ -18,10 +18,19 @@ export const ReportHistoryTable: React.FC<ReportHistoryTableProps> = ({
   loading = false,
   onSelectReport,
 }) => {
-  const handleDownload = (id: number, e: React.MouseEvent) => {
+  const [downloadingId, setDownloadingId] = React.useState<number | null>(null);
+
+  const handleDownload = async (id: number, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const downloadUrl = reportApi.getDownloadUrl(id);
-    window.open(downloadUrl, '_blank');
+    setDownloadingId(id);
+    try {
+      const titleClean = title ? title.replace(/[^a-zA-Z0-9_-]/g, '_') : `Report_${id}`;
+      await reportApi.downloadReport(id, `${titleClean}.pdf`);
+    } catch (err) {
+      console.error('Failed to download report PDF:', err);
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   return (
@@ -109,7 +118,8 @@ export const ReportHistoryTable: React.FC<ReportHistoryTableProps> = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={(e) => handleDownload(r.id, e)}
+                        onClick={(e) => handleDownload(r.id, r.title, e)}
+                        isLoading={downloadingId === r.id}
                         leftIcon={<Download className="h-3.5 w-3.5" />}
                       >
                         Download PDF

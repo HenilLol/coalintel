@@ -49,4 +49,19 @@ export const reportApi = {
     const baseURL = apiClient.defaults.baseURL || '/api/v1';
     return `${baseURL}/reports/${id}/download`;
   },
+
+  downloadReport: async (id: number, filename?: string): Promise<void> => {
+    const response = await apiClient.get<Blob>(`/reports/${id}/download`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename || `Report_${id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
 };

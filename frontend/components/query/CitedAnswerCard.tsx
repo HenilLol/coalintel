@@ -51,9 +51,19 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
 
           {/* Verification Footer Banner */}
           <div className="flex flex-wrap items-center justify-between pt-3 border-t border-slate-800 text-xs text-slate-400 gap-2 font-mono">
-            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-              <ShieldCheck className="h-4 w-4" /> Citation Verification Gate: 100% Verified
-            </span>
+            {response.degraded_mode ? (
+              <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                <AlertTriangle className="h-4 w-4" /> Degraded Mode
+              </span>
+            ) : response.citations && response.citations.length > 0 ? (
+              <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <ShieldCheck className="h-4 w-4" /> Evidence Grounded
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-slate-400 font-semibold">
+                <AlertTriangle className="h-4 w-4 text-slate-500" /> No Evidence Found
+              </span>
+            )}
             <span className="text-slate-500">
               {response.citations?.length || 0} Grounded Citations Provided
             </span>
