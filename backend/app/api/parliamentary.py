@@ -139,7 +139,7 @@ def generate_parliamentary_briefing(
     # 5. Check for Cross-Document Discrepancies relevant to scope
     discrepancies: List[FlaggedDiscrepancyItem] = []
     conflicts_query = db.query(DataConflict).filter(DataConflict.status.in_(["ACTIVE", "OPEN"]))
-    active_conflicts = conflicts_query.limit(5).all()
+    active_conflicts = conflicts_query.order_by(DataConflict.id.desc()).all()
 
     for c in active_conflicts:
         doc_a_name = c.doc_a.filename if c.doc_a else f"Document #{c.doc_a_id}"
