@@ -77,6 +77,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.analytics import router as analytics_router
 from app.api.audit import router as audit_router
 from app.api.comparison import router as comparison_router
+from app.api.parliamentary import router as parliamentary_router
 
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(documents_router, prefix=settings.API_V1_STR)
@@ -87,6 +88,7 @@ app.include_router(dashboard_router, prefix=settings.API_V1_STR)
 app.include_router(analytics_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
 app.include_router(comparison_router, prefix=settings.API_V1_STR)
+app.include_router(parliamentary_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["Root"])
