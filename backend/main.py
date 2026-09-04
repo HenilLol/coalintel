@@ -32,6 +32,26 @@ async def lifespan(app: FastAPI):
         import app.models  # Registers all 7 models with Base metadata
         Base.metadata.create_all(bind=engine)
         logger.info("PostgreSQL database tables verified and created successfully.")
+
+        # Idempotent default users bootstrap
+        from database import SessionLocal
+        from app.models.user import User
+        from database_seed import seed_default_users
+
+        db_bootstrap = SessionLocal()
+        try:
+            user_count = db_bootstrap.query(User).count()
+            if user_count == 0:
+                logger.info("No users found; bootstrapping default users.")
+                seed_default_users(db_bootstrap)
+                logger.info("Default users bootstrapped successfully.")
+            else:
+                logger.info("Existing users detected; skipping user bootstrap.")
+        except Exception as seed_err:
+            db_bootstrap.rollback()
+            logger.error(f"Error during user bootstrap: {seed_err}")
+        finally:
+            db_bootstrap.close()
     except Exception as e:
         logger.warning(f"PostgreSQL connection note during startup: {e}")
 
