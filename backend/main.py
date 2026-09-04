@@ -33,10 +33,11 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("PostgreSQL database tables verified and created successfully.")
 
-        # Idempotent default users bootstrap
+        # Idempotent default users bootstrap & Stale processing recovery
         from database import SessionLocal
         from app.models.user import User
         from database_seed import seed_default_users
+        from app.services.processing_pipeline import recover_stale_processing_documents
 
         db_bootstrap = SessionLocal()
         try:
@@ -47,9 +48,12 @@ async def lifespan(app: FastAPI):
                 logger.info("Default users bootstrapped successfully.")
             else:
                 logger.info("Existing users detected; skipping user bootstrap.")
-        except Exception as seed_err:
+
+            # Recover any orphaned processing documents from prior crashes/restarts
+            recover_stale_processing_documents(db_bootstrap, stale_minutes=15)
+        except Exception as startup_err:
             db_bootstrap.rollback()
-            logger.error(f"Error during user bootstrap: {seed_err}")
+            logger.error(f"Error during startup bootstrap / recovery: {startup_err}")
         finally:
             db_bootstrap.close()
     except Exception as e:

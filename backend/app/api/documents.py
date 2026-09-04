@@ -15,6 +15,19 @@ from app.services.processing_pipeline import execute_document_processing_pipelin
 router = APIRouter(tags=["Documents"])
 
 
+def run_background_document_processing(document_id: int) -> None:
+    """Executes document processing in background with an isolated database session."""
+    import logging
+    from database import SessionLocal
+    bg_db = SessionLocal()
+    try:
+        execute_document_processing_pipeline(bg_db, document_id)
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Background processing task failed for Document #{document_id}: {e}")
+    finally:
+        bg_db.close()
+
+
 @router.post("/documents/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -28,9 +41,10 @@ async def upload_document(
     Ingests a raw document file (.pdf, .docx, .xlsx, .csv up to 100MB).
     - Enforces max size limit (100MB) and extension whitelist.
     - Computes SHA-256 digest and blocks duplicate uploads with HTTP 409 Conflict.
-    - Saves file safely to encapsulated storage path (/storage/uploads/).
+    - Saves file safely via storage abstraction.
     - Inserts document record with status 'PENDING' and logs audit event.
-    - Triggers Day 4 Document Processing Pipeline (Parsing, Chunking, Extraction, Unit Normalization).
+    - Dispatches Document Processing Pipeline (parsing, chunking, extraction, vector indexing)
+      asynchronously via BackgroundTasks, returning HTTP 201 immediately.
     """
     file_bytes = await file.read()
     
@@ -43,9 +57,8 @@ async def upload_document(
         fiscal_year=fiscal_year or "2023-24"
     )
 
-    # Synchronously execute Day 4 pipeline for instant parsing and DB metric extraction
-    execute_document_processing_pipeline(db, doc.id)
-    db.refresh(doc)
+    # Schedule background processing decoupled from HTTP request lifecycle
+    background_tasks.add_task(run_background_document_processing, doc.id)
     
     return DocumentResponse.model_validate(doc)
 

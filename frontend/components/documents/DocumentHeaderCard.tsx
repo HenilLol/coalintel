@@ -48,11 +48,13 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
   // Determine status steps based on document status
   const isParsed = document.status === 'PARSED' || document.status === 'INDEXED';
   const isIndexed = document.status === 'INDEXED' || document.status === 'PARSED';
+  const isPending = document.status === 'PENDING';
+  const isProcessing = document.status === 'PROCESSING';
   const isFailed = document.status === 'FAILED';
 
   const pipelineSteps = [
-    { label: 'Ingestion', completed: true, active: false },
-    { label: 'Parsing', completed: isParsed, active: document.status === 'PROCESSING' },
+    { label: 'Ingestion', completed: !isPending && !isFailed, active: isPending },
+    { label: 'Parsing', completed: isParsed, active: isProcessing },
     { label: 'Chunking', completed: isParsed, active: false },
     { label: 'Metric Normalization', completed: isParsed, active: false },
     { label: 'Vector Indexing', completed: isIndexed, active: false },
@@ -72,7 +74,9 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
               <h2 className="text-xl font-extrabold text-slate-100 tracking-tight font-sans">
                 {document.filename}
               </h2>
-              <Badge variant={isFailed ? 'danger' : 'success'}>{document.status}</Badge>
+              <Badge variant={isFailed ? 'danger' : isPending || isProcessing ? 'warning' : 'success'}>
+                {document.status}
+              </Badge>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-400 pt-0.5">
@@ -135,6 +139,17 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
           })}
         </div>
       </div>
+
+      {/* Failure Alert Banner */}
+      {isFailed && (
+        <div className="p-3.5 rounded-lg bg-red-950/40 border border-red-500/30 text-xs text-red-200 flex items-start gap-2.5">
+          <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-semibold text-red-300">Processing Interrupted:</span>
+            <p className="text-slate-300">{document.error_message || 'The document processing pipeline encountered an error. Please try re-uploading the file.'}</p>
+          </div>
+        </div>
+      )}
     </Card>
   );
 };

@@ -98,18 +98,12 @@ def process_file_ingestion(
             detail=f"Duplicate document detected. Document '{existing_doc.filename}' with identical content (SHA-256: {file_hash[:16]}...) already exists in database (ID #{existing_doc.id})."
         )
 
-    # 2. Determine target physical storage path
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    storage_filename = f"{file_hash}_{sanitized_name}"
-    target_file_path = os.path.join(settings.UPLOAD_DIR, storage_filename)
-
-    # 3. Write physical file to storage
+    # 2. Persist file bytes via storage abstraction
+    from app.services.storage_service import save_uploaded_file, delete_uploaded_file
     try:
-        with open(target_file_path, "wb") as f:
-            f.write(file_bytes)
-        logger.info(f"File written to storage path: {target_file_path}")
+        target_file_path = save_uploaded_file(file_bytes, file_hash, sanitized_name)
     except Exception as e:
-        logger.error(f"Failed to write file to storage: {e}")
+        logger.error(f"Failed to persist file to storage: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to persist file to server storage."
@@ -156,9 +150,7 @@ def process_file_ingestion(
     except Exception as e:
         db.rollback()
         # Transactional Cleanup: Remove physical file if DB commit failed
-        if os.path.exists(target_file_path):
-            os.remove(target_file_path)
-            logger.info(f"Cleaned up physical file after DB transaction rollback: {target_file_path}")
+        delete_uploaded_file(target_file_path)
         logger.error(f"Database error during document ingestion: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

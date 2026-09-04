@@ -24,7 +24,7 @@ export default function DocumentDetailPage() {
   const [activePage, setActivePage] = useState<number>(1);
   const [selectedMetric, setSelectedMetric] = useState<ExtractedMetricItem | null>(null);
 
-  // Fetch document metadata
+  // Fetch document metadata with live polling while processing or pending
   const {
     data: document,
     isLoading: isDocLoading,
@@ -34,7 +34,13 @@ export default function DocumentDetailPage() {
     queryKey: ['document', docId],
     queryFn: () => documentApi.getDocumentById(docId),
     enabled: !isNaN(docId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'PROCESSING' || status === 'PENDING' ? 3000 : false;
+    },
   });
+
+  const isDocumentProcessing = document?.status === 'PROCESSING' || document?.status === 'PENDING';
 
   // Fetch document page breakdown
   const {
@@ -43,7 +49,8 @@ export default function DocumentDetailPage() {
   } = useQuery({
     queryKey: ['document-pages', docId],
     queryFn: () => documentApi.getDocumentPages(docId),
-    enabled: !isNaN(docId),
+    enabled: !isNaN(docId) && !!document && document.status !== 'FAILED',
+    refetchInterval: isDocumentProcessing ? 3000 : false,
   });
 
   // Fetch document metric lineage
@@ -53,7 +60,8 @@ export default function DocumentDetailPage() {
   } = useQuery({
     queryKey: ['document-lineage', docId],
     queryFn: () => documentApi.getDocumentLineage(docId),
-    enabled: !isNaN(docId),
+    enabled: !isNaN(docId) && !!document && document.status !== 'FAILED',
+    refetchInterval: isDocumentProcessing ? 3000 : false,
   });
 
   if (isDocLoading) {
