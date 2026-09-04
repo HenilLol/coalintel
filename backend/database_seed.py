@@ -112,20 +112,11 @@ def ensure_sample_documents_exist():
             logger.warning(f"Could not generate MCL sample XLSX on disk: {e}")
 
 
-def init_db(db: Session) -> None:
+def seed_default_users(db: Session) -> dict:
     """
-    Creates all 7 PostgreSQL database tables if they do not exist and seeds initial default users,
-    documents, extracted metrics, conflicts, and audit logs.
+    Idempotently seeds default institutional user accounts if not present.
+    Returns mapping of username -> user_id.
     """
-    logger.info("Creating database tables if not present...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created successfully.")
-
-    # Ensure physical sample files exist in storage/uploads
-    ensure_sample_documents_exist()
-    upload_dir = os.path.abspath(settings.UPLOAD_DIR)
-
-    # 1. Seed Default Users
     default_users = [
         {
             "username": "admin",
@@ -177,9 +168,28 @@ def init_db(db: Session) -> None:
             db.commit()
             db.refresh(new_user)
             user_map[user_data["username"]] = new_user.id
-            logger.info(f"Seeded user: {user_data['username']} (Role: {user_data['role']})")
+            logger.info(f"Seeded default user: {user_data['username']} (Role: {user_data['role']})")
         else:
             user_map[user_data["username"]] = existing_user.id
+
+    return user_map
+
+
+def init_db(db: Session) -> None:
+    """
+    Creates all 7 PostgreSQL database tables if they do not exist and seeds initial default users,
+    documents, extracted metrics, conflicts, and audit logs.
+    """
+    logger.info("Creating database tables if not present...")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created successfully.")
+
+    # Ensure physical sample files exist in storage/uploads
+    ensure_sample_documents_exist()
+    upload_dir = os.path.abspath(settings.UPLOAD_DIR)
+
+    # 1. Seed Default Users
+    user_map = seed_default_users(db)
 
     # 2. Seed Default Mining Documents
     default_docs = [
