@@ -117,7 +117,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
-              label="Username or Email"
+              label="Username"
               type="text"
               placeholder="Enter your username"
               value={username}
