@@ -29,7 +29,7 @@ export const documentApi = {
     const response = await apiClient.get<DocumentListResponse>('/documents', {
       params: {
         status_filter: params?.status_filter && params.status_filter !== 'ALL' ? params.status_filter : undefined,
-        subsidiary_filter: params?.subsidiary_filter && params.subsidiary_filter !== 'ALL' ? params.subsidiary_filter : undefined,
+        subsidiary_filter: params?.subsidiary_filter && params.subsidiary_filter !== 'ALL' && params.subsidiary_filter !== 'ALL CIL' ? params.subsidiary_filter : undefined,
         skip: params?.skip ?? 0,
         limit: params?.limit ?? 50,
       },

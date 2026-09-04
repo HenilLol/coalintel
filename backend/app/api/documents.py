@@ -63,9 +63,9 @@ def list_documents(
     """
     query = db.query(Document)
     
-    if status_filter:
+    if status_filter and status_filter.upper() != "ALL":
         query = query.filter(Document.status == status_filter.upper())
-    if subsidiary_filter and subsidiary_filter != "ALL":
+    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
         query = query.filter(Document.subsidiary == subsidiary_filter)
         
     total = query.count()
