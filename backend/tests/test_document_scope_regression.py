@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from main import app
 from database import Base, get_db
 from app.models.document import Document
+from app.models.extracted_metric import ExtractedMetric
 from app.models.user import User
 from app.core.rbac import get_current_user
 
@@ -188,3 +189,55 @@ def test_documents_filtered_by_status(client):
     assert res_parsed.json()["total"] == 2
     for item in res_parsed.json()["items"]:
         assert item["status"] == "PARSED"
+
+
+def test_document_by_id_detail(client):
+    """GET /api/v1/documents/{id} returns document metadata."""
+    res = client.get("/api/v1/documents/1")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["id"] == 1
+    assert data["filename"] == "ECL_Production_Report.pdf"
+    assert data["subsidiary"] == "ECL"
+
+
+def test_document_pages_endpoint(client):
+    """GET /api/v1/documents/{id}/pages returns pages structure."""
+    res = client.get("/api/v1/documents/1/pages")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["document_id"] == 1
+    assert data["filename"] == "ECL_Production_Report.pdf"
+
+
+def test_document_lineage_endpoint_with_extracted_metric(client, test_db_session):
+    """GET /api/v1/documents/{id}/lineage queries ExtractedMetric without NameError."""
+    metric = ExtractedMetric(
+        id=1,
+        document_id=1,
+        page_number=14,
+        mine_name="Rajmahal OC",
+        subsidiary="ECL",
+        metric_name="Coal Production",
+        numeric_value=42.50,
+        unit="Lakh Tonnes",
+        raw_unit="Lakh Tonnes",
+        standard_value=4.25,
+        standard_unit="MT",
+        fiscal_year="2023-24",
+        confidence_score=0.98,
+        validation_status="VALIDATED",
+        raw_snippet="Total production reached 42.50 Lakh Tonnes."
+    )
+    test_db_session.add(metric)
+    test_db_session.commit()
+
+    res = client.get("/api/v1/documents/1/lineage")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["document_id"] == 1
+    assert len(data["metrics"]) == 1
+    assert data["metrics"][0]["mine_name"] == "Rajmahal OC"
+    assert data["metrics"][0]["standard_value"] == 4.25
+    assert data["metrics"][0]["standard_unit"] == "MT"
+
