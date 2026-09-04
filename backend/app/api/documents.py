@@ -6,6 +6,7 @@ from database import get_db
 from app.models.user import User
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
+from app.models.extracted_metric import ExtractedMetric
 from app.core.rbac import get_current_user, require_roles
 from app.schemas.document import DocumentResponse, DocumentListResponse, DocumentPagesResponse, DocumentPageItem
 from app.services.ingestion_service import process_file_ingestion
