@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   FileText,
@@ -15,6 +15,10 @@ import {
   Layers,
   Database,
   RefreshCw,
+  Trash2,
+  AlertTriangle,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
@@ -22,6 +26,7 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CIL_SUBSIDIARIES } from '@/lib/constants';
+import { documentApi } from '@/lib/api/documentApi';
 import { DocumentItem, DocumentStatus } from '@/types/document';
 
 interface DocumentTableProps {
@@ -82,7 +87,26 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<DocumentItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const pageSize = 10;
+
+  // Detect Admin role on mount from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('coalintel_user');
+      if (stored) {
+        try {
+          const user = JSON.parse(stored);
+          setIsAdmin(user?.role === 'Admin');
+        } catch (e) {
+          setIsAdmin(false);
+        }
+      }
+    }
+  }, []);
 
   const statusTabs = [
     { value: 'ALL', label: 'All Documents' },
@@ -109,6 +133,25 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
     const start = (currentPage - 1) * pageSize;
     return filteredDocuments.slice(start, start + pageSize);
   }, [filteredDocuments, currentPage]);
+
+  const handleDeleteConfirm = async () => {
+    if (!documentToDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await documentApi.deleteDocument(documentToDelete.id);
+      setDocumentToDelete(null);
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'Failed to delete document.';
+      setDeleteError(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -268,15 +311,31 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
-                      <Link href={`/documents/${doc.id}`}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          leftIcon={<Eye className="h-3.5 w-3.5" />}
-                        >
-                          View Intelligence
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/documents/${doc.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<Eye className="h-3.5 w-3.5" />}
+                          >
+                            View Intelligence
+                          </Button>
+                        </Link>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDeleteError(null);
+                              setDocumentToDelete(doc);
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-950/40 border border-transparent hover:border-red-500/30"
+                            leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -315,6 +374,84 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Admin Document Deletion Confirmation Modal */}
+      {documentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg p-6 rounded-2xl bg-navy-900 border border-red-500/40 shadow-2xl space-y-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100">Delete this document?</h3>
+                  <p className="text-xs text-slate-400 font-mono">Document #{documentToDelete.id}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setDocumentToDelete(null)}
+                disabled={isDeleting}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-navy-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Error Banner */}
+            {deleteError && (
+              <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-red-400" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {/* Modal Body */}
+            <div className="space-y-3 text-xs text-slate-300">
+              <p>
+                Are you sure you want to permanently delete{' '}
+                <strong className="text-slate-100 font-semibold">{documentToDelete.filename}</strong>?
+              </p>
+              <div className="p-3.5 rounded-xl bg-navy-950/80 border border-slate-800 space-y-1.5 font-mono text-[11px] text-slate-400">
+                <p className="text-amber-400 font-sans font-semibold text-xs">This operation will permanently remove:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-300">
+                  <li>Stored source document file from storage</li>
+                  <li>All extracted metrics and unit normalizations</li>
+                  <li>Document text chunks and token metadata</li>
+                  <li>Semantic vector embeddings in ChromaDB</li>
+                </ul>
+                <p className="text-red-400/90 pt-1 font-sans text-[11px] font-semibold">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => setDocumentToDelete(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                onClick={handleDeleteConfirm}
+                isLoading={isDeleting}
+                leftIcon={<Trash2 className="h-4 w-4" />}
+              >
+                Delete Permanently
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

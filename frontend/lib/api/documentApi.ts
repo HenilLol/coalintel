@@ -51,4 +51,10 @@ export const documentApi = {
     const response = await apiClient.get<DocumentLineageResponse>(`/documents/${id}/lineage`);
     return response.data;
   },
+
+  deleteDocument: async (id: number): Promise<{ message: string; document_id: number; filename: string }> => {
+    const response = await apiClient.delete<{ message: string; document_id: number; filename: string }>(`/documents/${id}`);
+    return response.data;
+  },
 };
+
