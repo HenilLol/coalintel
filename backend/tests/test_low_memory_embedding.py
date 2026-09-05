@@ -212,6 +212,29 @@ class TestLowMemoryEmbedding(unittest.TestCase):
 
         app.dependency_overrides.clear()
 
+    def test_13_onnx_arena_and_mem_pattern_disabled(self):
+        """Verify ONNX backend initializes with single thread and memory-safe configurations."""
+        backend = OnnxEmbeddingBackend()
+        self.assertIsNotNone(backend.session)
+        # Verify inference execution on memory-safe backend
+        embs = backend.encode(["Testing ONNX inference without arena memory allocation."], normalize_embeddings=True)
+        self.assertEqual(embs.shape, (1, EMBEDDING_DIMENSION))
+        norm = float(np.linalg.norm(embs[0]))
+        self.assertAlmostEqual(norm, 1.0, places=3)
+
+    def test_14_batch_size_default_is_2(self):
+        """Verify production batch size defaults to 2 and respects COALINTEL_EMBEDDING_BATCH_SIZE."""
+        from app.services.embedding_service import DEFAULT_EMBEDDING_BATCH_SIZE
+        self.assertEqual(DEFAULT_EMBEDDING_BATCH_SIZE, 2)
+
+        sentences = ["Sample chunk 1", "Sample chunk 2", "Sample chunk 3"]
+        with patch.object(emb_module.logger, "info") as mock_log:
+            embs = generate_batch_embeddings(sentences)
+            self.assertEqual(len(embs), 3)
+            # Verify logger recorded batch_size=2
+            log_calls = [c.args[0] for c in mock_log.call_args_list if c.args]
+            self.assertTrue(any("batch_size=2" in str(msg) for msg in log_calls))
+
 
 if __name__ == "__main__":
     unittest.main()

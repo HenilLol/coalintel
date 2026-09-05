@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBEDDING_DIMENSION = 384
+DEFAULT_EMBEDDING_BATCH_SIZE = int(os.getenv("COALINTEL_EMBEDDING_BATCH_SIZE", "2"))
 
 # Global cached model instance and thread lock
 _model_instance = None
@@ -61,6 +62,11 @@ class OnnxEmbeddingBackend:
         opts.inter_op_num_threads = 1
         opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+        # Disable ONNX Runtime CPU memory arena and memory pattern to prevent
+        # large retained native allocations on low-memory deployments (512MB RAM).
+        opts.enable_cpu_mem_arena = False
+        opts.enable_mem_pattern = False
 
         self.session = ort.InferenceSession(
             self.model_path,
@@ -212,20 +218,22 @@ def generate_embedding(text: str) -> List[float]:
         return _generate_deterministic_mock_vector(text)
 
 
-def generate_batch_embeddings(texts: List[str], batch_size: int = 4) -> List[List[float]]:
+def generate_batch_embeddings(texts: List[str], batch_size: Optional[int] = None) -> List[List[float]]:
     """
     Generates 384-dimensional embeddings for a batch list of text strings.
-    Processes in bounded batches (default batch_size=4) to conserve memory during inference.
+    Processes in bounded batches (default batch_size=2) to conserve memory during inference.
     """
     if not texts:
         return []
+
+    actual_batch_size = batch_size if (batch_size is not None and batch_size > 0) else DEFAULT_EMBEDDING_BATCH_SIZE
 
     t_batch_start = time.time()
     model = get_embedding_model()
     engine_name = "ONNX" if isinstance(model, OnnxEmbeddingBackend) else ("MOCK" if model == "MOCK" else "PYTORCH")
     logger.info(
         f"Starting batch embedding generation for {len(texts)} chunks using {engine_name} engine "
-        f"(batch_size={batch_size}, dimension={EMBEDDING_DIMENSION})."
+        f"(batch_size={actual_batch_size}, dimension={EMBEDDING_DIMENSION})."
     )
 
     if model == "MOCK" or model is None:
@@ -233,8 +241,8 @@ def generate_batch_embeddings(texts: List[str], batch_size: int = 4) -> List[Lis
 
     all_embeddings: List[List[float]] = []
 
-    for i in range(0, len(texts), batch_size):
-        batch_slice = texts[i : i + batch_size]
+    for i in range(0, len(texts), actual_batch_size):
+        batch_slice = texts[i : i + actual_batch_size]
         t_slice_start = time.time()
         try:
             if isinstance(model, OnnxEmbeddingBackend):
