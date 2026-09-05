@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch, MagicMock
 import os
 import sys
 import tracemalloc
@@ -7,6 +8,7 @@ import numpy as np
 # Ensure backend directory is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import app.services.embedding_service as emb_module
 from app.services.embedding_service import (
     get_embedding_model,
     generate_embedding,
@@ -17,6 +19,14 @@ from app.services.embedding_service import (
 
 
 class TestLowMemoryEmbedding(unittest.TestCase):
+
+    def setUp(self):
+        # Reset singleton state before each test
+        emb_module._model_instance = None
+
+    def tearDown(self):
+        # Reset singleton state after each test
+        emb_module._model_instance = None
 
     def test_01_onnx_backend_singleton(self):
         """Verify low-memory ONNX backend loads as thread-safe singleton and preserves 384 dimensions."""
@@ -79,6 +89,69 @@ class TestLowMemoryEmbedding(unittest.TestCase):
         model = get_embedding_model()
         if isinstance(model, OnnxEmbeddingBackend):
             self.assertTrue(os.path.exists(model.model_path))
+
+    @patch("app.services.embedding_service.OnnxEmbeddingBackend", side_effect=RuntimeError("Simulated ONNX init failure"))
+    @patch.dict(os.environ, {"COALINTEL_ENABLE_PYTORCH_EMBEDDING_FALLBACK": "false"}, clear=False)
+    def test_06_onnx_failure_does_not_instantiate_pytorch_in_production(self, mock_onnx):
+        """Verify ONNX failure defaults to memory-safe fallback without importing SentenceTransformer."""
+        with patch.dict("sys.modules", {"sentence_transformers": MagicMock()}):
+            model = get_embedding_model()
+            self.assertEqual(model, "MOCK")
+            # SentenceTransformer was never imported/called
+            mock_st = sys.modules["sentence_transformers"].SentenceTransformer
+            mock_st.assert_not_called()
+
+    @patch("app.services.embedding_service.OnnxEmbeddingBackend", side_effect=RuntimeError("Simulated ONNX init failure"))
+    @patch.dict(os.environ, {"COALINTEL_ENABLE_PYTORCH_EMBEDDING_FALLBACK": "true"}, clear=False)
+    def test_07_explicit_pytorch_opt_in_activates_pytorch(self, mock_onnx):
+        """Verify explicit COALINTEL_ENABLE_PYTORCH_EMBEDDING_FALLBACK=true allows PyTorch for dev/tests."""
+        mock_instance = MagicMock()
+        mock_st_class = MagicMock(return_value=mock_instance)
+        with patch.dict("sys.modules", {"sentence_transformers": MagicMock(SentenceTransformer=mock_st_class)}):
+            model = get_embedding_model()
+            self.assertEqual(model, mock_instance)
+            mock_st_class.assert_called_once_with("all-MiniLM-L6-v2")
+
+    def test_08_deterministic_mock_vector_contract(self):
+        """Verify deterministic fallback produces finite 384-dimensional unit vectors."""
+        emb_module._model_instance = "MOCK"
+        text = "Coal India annual performance report"
+        emb = generate_embedding(text)
+        self.assertEqual(len(emb), 384)
+        arr = np.array(emb, dtype=np.float32)
+        self.assertTrue(np.all(np.isfinite(arr)))
+        norm = float(np.linalg.norm(arr))
+        self.assertAlmostEqual(norm, 1.0, places=3)
+
+    def test_09_list_documents_does_not_invoke_stale_recovery(self):
+        """Verify GET /api/v1/documents is a pure read endpoint and never invokes recover_stale_processing_documents."""
+        from fastapi.testclient import TestClient
+        from main import app
+        from database import get_db
+        from app.core.rbac import get_current_user
+        from app.models.user import User
+
+        mock_user = User(id=1, username="test_analyst", role="Analyst", subsidiary="CIL HQ")
+        mock_db = MagicMock()
+        mock_query = MagicMock()
+        mock_db.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.count.return_value = 0
+        mock_query.order_by.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = []
+
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+
+        with patch("app.services.processing_pipeline.recover_stale_processing_documents") as mock_recover:
+            client = TestClient(app)
+            response = client.get("/api/v1/documents")
+            self.assertEqual(response.status_code, 200)
+            mock_recover.assert_not_called()
+
+        app.dependency_overrides.clear()
 
 
 if __name__ == "__main__":

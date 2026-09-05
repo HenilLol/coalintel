@@ -90,30 +90,47 @@ class OnnxEmbeddingBackend:
 def get_embedding_model():
     """
     Lazy-loads and caches the thread-safe singleton embedding engine.
-    1. Primary: Low-memory ONNX Runtime backend (<60 MB RAM).
-    2. Fallback: Standard PyTorch SentenceTransformer.
-    3. Tertiary: Deterministic 384-d mock vector for test environments.
+    1. Primary (Production Default): Low-memory ONNX Runtime backend (<60 MB RAM).
+    2. Fallback: Memory-safe deterministic 384-d mock vector backend ("MOCK").
+       NOTE: PyTorch SentenceTransformer is strictly prohibited in the automatic production
+       fallback path to prevent fatal OOM crashes on memory-constrained (512MB) instances.
+       PyTorch can ONLY be explicitly enabled for local dev/testing via:
+       COALINTEL_ENABLE_PYTORCH_EMBEDDING_FALLBACK="true"
     """
     global _model_instance
     if _model_instance is None:
         with _model_lock:
             if _model_instance is None:
-                # 1. Attempt low-memory ONNX backend
+                # 1. Primary: Low-memory ONNX Runtime backend
                 try:
                     _model_instance = OnnxEmbeddingBackend(EMBEDDING_MODEL_NAME)
                     return _model_instance
                 except Exception as onnx_err:
-                    logger.warning(f"ONNX backend init note: {onnx_err}. Trying standard sentence_transformers...")
+                    logger.warning(
+                        f"ONNX embedding engine initialization failed: {onnx_err}."
+                    )
 
-                # 2. Fallback to standard PyTorch SentenceTransformer
-                try:
-                    from sentence_transformers import SentenceTransformer
-                    _model_instance = SentenceTransformer("all-MiniLM-L6-v2")
-                    logger.info("Standard SentenceTransformer loaded successfully as fallback.")
-                    return _model_instance
-                except Exception as st_err:
-                    logger.warning(f"SentenceTransformer fallback init note: {st_err}. Fallback mock active.")
-                    _model_instance = "MOCK"
+                # 2. Check for explicit local/test PyTorch opt-in flag (default: disabled in production)
+                enable_pytorch_fallback = os.getenv(
+                    "COALINTEL_ENABLE_PYTORCH_EMBEDDING_FALLBACK", "false"
+                ).lower() in ("true", "1", "yes")
+
+                if enable_pytorch_fallback:
+                    try:
+                        from sentence_transformers import SentenceTransformer
+                        _model_instance = SentenceTransformer("all-MiniLM-L6-v2")
+                        logger.info("Explicit PyTorch SentenceTransformer loaded successfully via opt-in flag.")
+                        return _model_instance
+                    except Exception as st_err:
+                        logger.warning(f"PyTorch SentenceTransformer init failed: {st_err}. Falling back to mock.")
+                else:
+                    logger.warning(
+                        "PyTorch SentenceTransformer fallback is DISABLED by default to prevent OOM termination. "
+                        "Using memory-safe deterministic fallback."
+                    )
+
+                # 3. Memory-safe deterministic fallback
+                _model_instance = "MOCK"
 
     return _model_instance
 
