@@ -13,10 +13,10 @@ class ExtractedMetric(Base):
     mine_name = Column(String(100), nullable=False, index=True)
     subsidiary = Column(String(100), nullable=True, index=True)
     metric_name = Column(String(100), nullable=False, index=True)  # 'Production', 'Dispatch', 'Overburden', etc.
-    numeric_value = Column(Numeric(14, 2), nullable=False)
+    numeric_value = Column(Numeric(16, 4), nullable=False)
     unit = Column(String(30), nullable=False)  # Raw extracted unit (e.g. 'Lakh Tonnes', 'MT', 'MCuM')
     raw_unit = Column(String(30), nullable=True)
-    standard_value = Column(Numeric(14, 2), nullable=True)  # Standardized value in Million Tonnes (MT)
+    standard_value = Column(Numeric(16, 6), nullable=True)  # Standardized value in Million Tonnes (MT) (up to 6 decimals)
     standard_unit = Column(String(10), default="MT", nullable=True)
     fiscal_year = Column(String(20), nullable=False, index=True)
     confidence_score = Column(Numeric(4, 3), nullable=True)  # 0.000 to 1.000

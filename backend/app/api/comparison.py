@@ -96,16 +96,24 @@ def get_comparison_matrix(
 
     results = query.all()
 
-    # Group metrics by entity (mine_name or subsidiary)
+    # Group metrics by specific verified entity
     grouped_rows = {}
     for metric, doc in results:
         # Re-verify metric domain matches target domain
         if get_metric_domain(metric.metric_name, metric.raw_snippet) != target_domain:
             continue
 
-        entity_key = metric.mine_name if (metric.mine_name and not is_generic_mine_name(metric.mine_name)) else doc.subsidiary
+        # Exclude historical records from operational current-year comparison matrix
+        if metric.validation_status == "HISTORICAL" or (metric.fiscal_year and "historical" in str(metric.fiscal_year).lower()):
+            continue
+
+        # Exclude generic fallback placeholders from false cross-document comparison
+        if is_generic_mine_name(metric.mine_name):
+            continue
+
+        entity_key = metric.mine_name
         if not entity_key:
-            entity_key = "CIL Corporate"
+            continue
 
         if entity_key not in grouped_rows:
             grouped_rows[entity_key] = []
