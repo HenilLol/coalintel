@@ -74,6 +74,7 @@ def list_documents(
 ):
     """
     Retrieves paginated list of uploaded documents with status and subsidiary filter options.
+    Pure read operation with zero side-effects or mutations.
     """
     query = db.query(Document)
     
