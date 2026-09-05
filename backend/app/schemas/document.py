@@ -36,3 +36,10 @@ class DocumentPagesResponse(BaseModel):
     filename: str
     total_pages: int
     pages: List[DocumentPageItem]
+
+
+class DocumentDeleteResponse(BaseModel):
+    message: str
+    document_id: int
+    filename: str
+

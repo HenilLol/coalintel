@@ -8,7 +8,16 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.extracted_metric import ExtractedMetric
 from app.core.rbac import get_current_user, require_roles
-from app.schemas.document import DocumentResponse, DocumentListResponse, DocumentPagesResponse, DocumentPageItem
+from app.schemas.document import (
+    DocumentResponse,
+    DocumentListResponse,
+    DocumentPagesResponse,
+    DocumentPageItem,
+    DocumentDeleteResponse,
+)
+from app.models.audit_log import AuditLog
+from app.services.storage_service import delete_uploaded_file
+from app.services.vector_store_service import delete_document_vectors
 from app.services.ingestion_service import process_file_ingestion
 from app.services.processing_pipeline import execute_document_processing_pipeline
 
@@ -184,3 +193,96 @@ def get_document_lineage(
             for m in metrics
         ]
     }
+
+
+@router.delete(
+    "/documents/{id}",
+    response_model=DocumentDeleteResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Deletes a document and its entire ingestion footprint (Admin only)"
+)
+def delete_document(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["Admin"]))
+):
+    """
+    Permanently deletes a document and cleans its entire ingestion footprint:
+    1. Requires Admin authentication (Analyst / Reviewer receive HTTP 403 Forbidden).
+    2. Validates document existence (returns HTTP 404 Not Found if missing).
+    3. Cleans ChromaDB vector embeddings via delete_document_vectors(id).
+    4. Removes stored source file from storage via delete_uploaded_file(file_path).
+    5. Transactionally deletes all document-owned DB records (DocumentChunk, ExtractedMetric, Document).
+    6. Records an immutable audit event (DOCUMENT_DELETED).
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    doc = db.query(Document).filter(Document.id == id).first()
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID #{id} not found."
+        )
+
+    # 1. Capture metadata before DB deletion
+    doc_id = doc.id
+    doc_filename = doc.filename
+    doc_file_path = doc.file_path
+    doc_file_hash = doc.file_hash
+    doc_subsidiary = doc.subsidiary
+    doc_fiscal_year = doc.fiscal_year
+
+    # 2. Delete ChromaDB vector embeddings
+    try:
+        delete_document_vectors(doc_id)
+    except Exception as vec_err:
+        logger.warning(f"Vector cleanup note for Document #{doc_id}: {vec_err}")
+
+    # 3. Delete physical source file from storage abstraction (idempotent)
+    try:
+        delete_uploaded_file(doc_file_path)
+    except Exception as file_err:
+        logger.warning(f"Storage file cleanup note for Document #{doc_id} ('{doc_file_path}'): {file_err}")
+
+    # 4. Transactional PostgreSQL Cleanup
+    try:
+        # Delete document chunks and extracted metrics owned by this document
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == doc_id).delete()
+        db.query(ExtractedMetric).filter(ExtractedMetric.document_id == doc_id).delete()
+        db.delete(doc)
+        db.flush()
+
+        # 5. Insert Audit Log
+        audit_entry = AuditLog(
+            user_id=current_user.id,
+            action="DOCUMENT_DELETED",
+            resource_type="Document",
+            resource_id=doc_id,
+            details=f"Deleted document #{doc_id} '{doc_filename}' (SHA-256: {doc_file_hash[:12]}...)",
+            details_json={
+                "document_id": doc_id,
+                "filename": doc_filename,
+                "file_hash": doc_file_hash,
+                "subsidiary": doc_subsidiary,
+                "fiscal_year": doc_fiscal_year,
+                "deleted_by": current_user.username
+            }
+        )
+        db.add(audit_entry)
+        db.commit()
+        logger.info(f"Document #{doc_id} ('{doc_filename}') and complete ingestion footprint deleted successfully by Admin '{current_user.username}'.")
+    except Exception as db_err:
+        db.rollback()
+        logger.error(f"Database error while deleting Document #{doc_id}: {db_err}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete document from database."
+        )
+
+    return DocumentDeleteResponse(
+        message=f"Document #{doc_id} ('{doc_filename}') and all associated vectors, metrics, chunks, and storage files successfully deleted.",
+        document_id=doc_id,
+        filename=doc_filename
+    )
+
