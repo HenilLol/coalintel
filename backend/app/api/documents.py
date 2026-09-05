@@ -75,6 +75,13 @@ def list_documents(
     """
     Retrieves paginated list of uploaded documents with status and subsidiary filter options.
     """
+    # Lightweight stale processing recovery for orphaned records (> 15 minutes)
+    try:
+        from app.services.processing_pipeline import recover_stale_processing_documents
+        recover_stale_processing_documents(db, stale_minutes=15)
+    except Exception as rec_err:
+        pass
+
     query = db.query(Document)
     
     if status_filter and status_filter.upper() != "ALL":

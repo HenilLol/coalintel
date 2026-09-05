@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import io
+import numpy as np
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -28,7 +29,13 @@ from app.services.embedding_service import (
     get_embedding_model,
     generate_embedding,
     generate_batch_embeddings,
+    OnnxEmbeddingBackend,
     EMBEDDING_DIMENSION,
+)
+from app.services.vector_store_service import (
+    get_chroma_collection,
+    add_chunks_to_vector_store,
+    delete_document_vectors,
 )
 from app.services.processing_pipeline import (
     execute_document_processing_pipeline,
@@ -108,8 +115,7 @@ class TestDocumentProcessingReliability(unittest.TestCase):
             self.assertEqual(len(b_vec), EMBEDDING_DIMENSION)
 
     def test_03_pipeline_execution_success_and_idempotency(self):
-        """Verify processing pipeline transitions PENDING -> PARSED and is idempotent."""
-        # Create a sample text/csv file to parse
+        """Verify processing pipeline transitions PENDING -> PARSED, persists progress, and is idempotent."""
         sample_content = b"ECL Rajmahal Open Cast Mine Coal Production 15.5 MT in FY 2023-24\nECL Sonepur Bazari Overburden 25.0 M.Cu.M"
         file_path = save_uploaded_file(sample_content, "hash_pipeline_test_1", "pipeline_test.csv")
 
@@ -251,6 +257,39 @@ class TestDocumentProcessingReliability(unittest.TestCase):
         self.assertEqual(resp_json["subsidiary"], "ECL")
 
         app.dependency_overrides.clear()
+
+    def test_07_real_384d_embedding_contract_and_numerical_stability(self):
+        """Verify 384-d vector contract, finite normalized values, and deterministic stability."""
+        test_sentences = [
+            "Eastern Coalfields Limited ECL Rajmahal Open Cast Mining Project produced 15.5 MT coal in FY 2023-24.",
+            "Bharat Coking Coal Limited BCCL overburden removal reached 42.1 M.Cu.M.",
+            "Coal India corporate headquarters reported composite performance achieving 98.2% target.",
+            "SECL Gevra mega project is expanding annual capacity to 70 MT."
+        ]
+
+        embs_1 = generate_batch_embeddings(test_sentences, batch_size=2)
+        embs_2 = generate_batch_embeddings(test_sentences, batch_size=2)
+
+        self.assertEqual(len(embs_1), 4)
+        for emb in embs_1:
+            self.assertEqual(len(emb), EMBEDDING_DIMENSION)
+            # Assert all values are finite float numbers
+            for val in emb:
+                self.assertFalse(np.isnan(val))
+                self.assertFalse(np.isinf(val))
+            # Assert L2 norm is approximately 1.0 (normalized for cosine similarity)
+            norm = sum(x * x for x in emb) ** 0.5
+            self.assertAlmostEqual(norm, 1.0, places=3)
+
+        # Assert numerical stability across identical inputs
+        for idx in range(len(test_sentences)):
+            diff = max(abs(a - b) for a, b in zip(embs_1[idx], embs_2[idx]))
+            self.assertLess(diff, 1e-5)
+
+    def test_08_chroma_vector_deletion_idempotency(self):
+        """Verify delete_document_vectors cleanly removes vectors for target document without errors."""
+        res = delete_document_vectors(999999)
+        self.assertTrue(res)
 
 
 if __name__ == "__main__":

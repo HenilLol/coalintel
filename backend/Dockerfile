@@ -17,6 +17,9 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-cache low-memory all-MiniLM-L6-v2 ONNX model weights and tokenizer during image build
+RUN python -c "from huggingface_hub import hf_hub_download; from transformers import AutoTokenizer; hf_hub_download(repo_id='sentence-transformers/all-MiniLM-L6-v2', filename='onnx/model.onnx'); AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
+
 # Copy backend source code
 COPY . .
 

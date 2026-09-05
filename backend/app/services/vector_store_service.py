@@ -78,6 +78,24 @@ def add_chunks_to_vector_store(chunks: List[Any], filename: str, subsidiary: Opt
         return False
 
 
+def delete_document_vectors(document_id: int) -> bool:
+    """
+    Deletes all vector embeddings belonging to a specific document_id from ChromaDB.
+    Guarantees clean idempotency when reprocessing documents without leaving stale vectors.
+    """
+    collection = get_chroma_collection()
+    if collection == "MOCK" or collection is None:
+        return True
+
+    try:
+        collection.delete(where={"document_id": document_id})
+        logger.info(f"Deleted existing Chroma vectors for Document #{document_id}.")
+        return True
+    except Exception as e:
+        logger.warning(f"Note deleting Chroma vectors for Document #{document_id}: {e}")
+        return False
+
+
 def search_vector_store(
     query_text: str,
     top_k: int = 5,
