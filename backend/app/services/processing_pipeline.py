@@ -110,7 +110,7 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
                     standard_unit=m["standard_unit"],
                     fiscal_year=m["fiscal_year"],
                     confidence_score=m["confidence_score"],
-                    validation_status="VALIDATED",
+                    validation_status=m.get("validation_status", "VALIDATED"),
                     raw_snippet=m["raw_snippet"]
                 ))
 

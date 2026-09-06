@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { CitationDrawer } from '@/components/query/CitationDrawer';
 import { useScope } from '@/context/ScopeContext';
+import { formatStandardValue } from '@/lib/utils/cn';
 import {
   fetchComparisonMatrix,
   fetchComparisonOptions,
@@ -350,7 +351,7 @@ export default function ComparisonPage() {
 
                         {/* Normalized Standard Value */}
                         <td className="py-3 px-3 text-right font-bold text-gold-400">
-                          {src.standard_value.toLocaleString(undefined, { minimumFractionDigits: 2 })} {src.standard_unit}
+                          {formatStandardValue(src.standard_value)} {src.standard_unit}
                         </td>
 
                         {/* Provenance Tag */}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Pickaxe, ShieldCheck, AlertTriangle, Layers, ExternalLink, ArrowRight } from 'lucide-react';
 import { ExtractedMetricItem, MetricValidationStatus } from '@/types/document';
+import { formatStandardValue } from '@/lib/utils/cn';
 
 interface ExtractedMetricsTableProps {
   metrics: ExtractedMetricItem[];
@@ -108,7 +109,7 @@ export const ExtractedMetricsTable: React.FC<ExtractedMetricsTableProps> = ({
 
                       {/* Standard Normalized Value */}
                       <td className="py-3.5 px-4">
-                        <span className="font-bold text-gold-400">{m.standard_value}</span>{' '}
+                        <span className="font-bold text-gold-400">{formatStandardValue(m.standard_value)}</span>{' '}
                         <span className="text-[11px] text-gold-500 font-semibold">{m.standard_unit || 'MT'}</span>
                         {isConverted && (
                           <span className="ml-1 text-[9px] px-1 py-0.2 rounded bg-gold-500/10 text-gold-400 border border-gold-500/30">

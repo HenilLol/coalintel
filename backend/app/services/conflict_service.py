@@ -17,7 +17,7 @@ GENERIC_MINE_NAMES = {
     "cil mine", "ecl mine", "bccl mine", "secl mine", "cmpdi mine",
     "ccl mine", "wcl mine", "ncl mine", "mcl mine", "nec mine",
     "ministry_of_coal mine", "ministry of coal mine", "mine", "unknown mine",
-    "fmc project", "project", "coal project"
+    "fmc project", "project", "coal project", "unspecified mine", "unspecified"
 }
 
 
@@ -26,9 +26,9 @@ def is_generic_mine_name(mine_name: str) -> bool:
     if not mine_name:
         return True
     m_clean = mine_name.strip().lower()
-    if m_clean in GENERIC_MINE_NAMES:
+    if m_clean in GENERIC_MINE_NAMES or "unspecified" in m_clean:
         return True
-    if re.match(r"^(?:cil|ecl|bccl|secl|cmpdi|ccl|wcl|ncl|mcl|nec|ministry_of_coal|ministry of coal|fmc)\s+(?:mine|project)$", m_clean):
+    if re.match(r"^(?:cil|ecl|bccl|secl|cmpdi|ccl|wcl|ncl|mcl|nec|ministry_of_coal|ministry of coal|fmc)\s+(?:mine|project|\(unspecified\))$", m_clean):
         return True
     return False
 

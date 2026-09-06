@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { CitationDrawer } from '@/components/query/CitationDrawer';
 import { useScope } from '@/context/ScopeContext';
+import { formatStandardValue } from '@/lib/utils/cn';
 import {
   generateBriefing,
   exportBriefingPdf,
@@ -316,7 +317,7 @@ export default function ParliamentaryPage() {
                           <td className="py-3 px-4 text-gold-400 font-bold">{m.subsidiary}</td>
                           <td className="py-3 px-4 text-slate-300">{m.metric_name}</td>
                           <td className="py-3 px-4 text-slate-200">{m.numeric_value} {m.unit}</td>
-                          <td className="py-3 px-4 font-bold text-emerald-400">{m.standard_value.toFixed(2)} {m.standard_unit}</td>
+                          <td className="py-3 px-4 font-bold text-emerald-400">{formatStandardValue(m.standard_value)} {m.standard_unit}</td>
                           <td className="py-3 px-4 text-slate-400">{m.fiscal_year}</td>
                         </tr>
                       ))}
