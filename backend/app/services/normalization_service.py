@@ -36,6 +36,91 @@ METRICS_PATTERNS = {
     "Production": r"\b(?:raw\s+coal|coal|opencast|underground)\s+production\b|\bproduction\s+of\s+coal\b|\bmined\s+coal\b|\bcoal\s+output\b|\bproduction\b|\boutput\b",
 }
 
+# Metric Domain Definitions for Specificity-First Query & Database Matching
+METRIC_DOMAINS = [
+    {
+        "domain_key": "STRIPPING_RATIO",
+        "canonical_name": "Stripping Ratio",
+        "patterns": [r"\bstripping\s+ratio\b"],
+        "db_metric_names": ["Stripping Ratio"],
+    },
+    {
+        "domain_key": "OVERBURDEN_REMOVAL",
+        "canonical_name": "Overburden Removal",
+        "patterns": [r"\boverburden(?:\s+removal)?\b", r"\bobr\b", r"\bcomposite\s+obr\b"],
+        "db_metric_names": ["Overburden Removal", "OBR", "Composite OBR"],
+    },
+    {
+        "domain_key": "WASHING_CAPACITY",
+        "canonical_name": "Washing Capacity",
+        "patterns": [r"\bwash(?:ing)?\s+capacity\b", r"\bwashery(?:\s+capacity)?\b", r"\bclean\s+coal\s+yield\b"],
+        "db_metric_names": ["Washing Capacity", "Washery", "Clean Coal Yield"],
+    },
+    {
+        "domain_key": "EXPLORATION_DRILLING",
+        "canonical_name": "Exploration / Core Drilling",
+        "patterns": [r"\b(?:core\s+)?drill(?:ing)?\b", r"\bmeterage\b", r"\bborehole\b"],
+        "db_metric_names": ["Exploration / Core Drilling", "Core Drilling", "Drilling"],
+    },
+    {
+        "domain_key": "COAL_DESPATCH",
+        "canonical_name": "Coal Despatch",
+        "patterns": [r"\b(?:coal\s+)?despatch\b", r"\b(?:coal\s+)?dispatch\b", r"\bofftake\b"],
+        "db_metric_names": ["Coal Despatch", "Despatch", "Dispatch", "Offtake"],
+    },
+    {
+        "domain_key": "COAL_PRODUCTION",
+        "canonical_name": "Coal Production",
+        "patterns": [
+            r"\b(?:raw\s+coal|coal|opencast|underground)\s+production\b",
+            r"\bproduction\s+of\s+coal\b",
+            r"\bmined\s+coal\b",
+            r"\bcoal\s+output\b",
+            r"\braw\s+coal\b",
+            r"\bproduction\b",
+            r"\boutput\b",
+        ],
+        "db_metric_names": [
+            "Coal Production",
+            "Production",
+            "Coal Output",
+            "Raw Coal Production",
+            "Annual Production",
+        ],
+    },
+]
+
+
+def normalize_subsidiary_scope(scope: Optional[str]) -> Optional[str]:
+    """
+    Normalizes subsidiary scope strings into either:
+    - None: representing unrestricted/global scope ("ALL", "ALL CIL", "", None, "NULL", "NONE")
+    - Normalized uppercase subsidiary name (e.g. "SECL", "ECL", "WCL")
+    """
+    if not scope:
+        return None
+    s = str(scope).strip()
+    if not s or s.upper() in ["ALL", "ALL CIL", "NONE", "NULL"]:
+        return None
+    return s.upper()
+
+
+def detect_query_metric_domain(query_text: str) -> Optional[Dict[str, Any]]:
+    """
+    Evaluates query string against specificity-first metric domains.
+    Returns domain dictionary with canonical name and matching database metric names,
+    or None if no recognized metric domain pattern matches.
+    """
+    if not query_text or not query_text.strip():
+        return None
+    q_lower = query_text.lower()
+    for domain in METRIC_DOMAINS:
+        for pat in domain["patterns"]:
+            if re.search(pat, q_lower):
+                return domain
+    return None
+
+
 # Unit Multipliers to convert raw units to Million Tonnes (MT) or M.Cu.M
 UNIT_MULTIPLIERS_TO_MT = {
     "lakh tonnes": 0.1,

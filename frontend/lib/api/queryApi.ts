@@ -37,7 +37,12 @@ export const queryApi = {
     const response = await apiClient.post<QueryResponse>('/query/ask', {
       query,
       top_k: params?.top_k ?? 5,
-      subsidiary_filter: params?.subsidiary_filter && params.subsidiary_filter !== 'ALL' ? params.subsidiary_filter : null,
+      subsidiary_filter:
+        params?.subsidiary_filter &&
+        params.subsidiary_filter !== 'ALL' &&
+        params.subsidiary_filter !== 'ALL CIL'
+          ? params.subsidiary_filter
+          : null,
     });
     return response.data;
   },
