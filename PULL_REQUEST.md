@@ -1,8 +1,8 @@
 # Pull Request: Implement COALINTEL — Professional Industrial UI Palette
 
-**Source Branch:** `frontend`  
+**Source Branch:** `the-color-pallet`  
 **Target Branch:** `main`  
-**PR Creation URL:** `https://github.com/HenilLol/coalintel/compare/main...frontend?expand=1`
+**PR Creation URL:** `https://github.com/HenilLol/coalintel/compare/main...the-color-pallet?expand=1`
 
 ---
 
