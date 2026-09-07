@@ -39,14 +39,14 @@ export const ProductionChart: React.FC<ProductionChartProps> = ({
   const chartSeries = data && data.length > 0 ? data : defaultData;
 
   return (
-    <Card className="col-span-1 lg:col-span-2 bg-[#17232D] border-[#2C3D49]">
+    <Card className="col-span-1 lg:col-span-2 bg-[#1C2226] border-[#30383D]">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>
-            <BarChart3 className="h-5 w-5 text-[#18B6B2]" />
+            <BarChart3 className="h-5 w-5 text-[#C58B3A]" />
             <span>Subsidiary Coal Production vs Annual Target (MT)</span>
           </CardTitle>
-          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#20313D] text-[#9EADB7] border border-[#2C3D49]">
+          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#242C30] text-[#9BA5A8] border border-[#30383D]">
             {isApiConnected ? 'Live API Data' : 'Preview Data'}
           </span>
         </div>
@@ -57,28 +57,28 @@ export const ProductionChart: React.FC<ProductionChartProps> = ({
 
       <CardContent>
         {loading ? (
-          <div className="h-72 w-full animate-pulse rounded-lg bg-[#20313D]" />
+          <div className="h-72 w-full animate-pulse rounded-lg bg-[#242C30]" />
         ) : (
           <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2C3D49" opacity={0.7} />
-                <XAxis dataKey="subsidiary" stroke="#9EADB7" fontSize={12} tickLine={false} />
-                <YAxis stroke="#9EADB7" fontSize={12} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#30383D" opacity={0.7} />
+                <XAxis dataKey="subsidiary" stroke="#9BA5A8" fontSize={12} tickLine={false} />
+                <YAxis stroke="#9BA5A8" fontSize={12} tickLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#111B24',
-                    borderColor: '#2C3D49',
+                    backgroundColor: '#151A1D',
+                    borderColor: '#30383D',
                     borderRadius: '8px',
-                    color: '#F1F5F7',
+                    color: '#E8ECEB',
                     fontSize: '12px',
-                    boxShadow: '0 10px 25px -5px rgba(11, 17, 23, 0.5)',
+                    boxShadow: '0 4px 12px 0 rgba(0, 0, 0, 0.45)',
                   }}
-                  cursor={{ fill: 'rgba(24, 182, 178, 0.08)' }}
+                  cursor={{ fill: 'rgba(197, 139, 58, 0.08)' }}
                 />
-                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px', color: '#9EADB7' }} />
-                <Bar dataKey="actual" name="Actual Production (MT)" fill="#18B6B2" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="target" name="Target Plan (MT)" fill="#F2A900" radius={[4, 4, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px', color: '#9BA5A8' }} />
+                <Bar dataKey="actual" name="Actual Production (MT)" fill="#C58B3A" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="target" name="Target Plan (MT)" fill="#54788A" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

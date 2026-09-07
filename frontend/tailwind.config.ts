@@ -10,135 +10,183 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // CoalIntel Dark Theme Core Palette
-        deepMine: '#0B1117',
-        coalNavy: '#111B24',
-        graphite: '#17232D',
-        steelSlate: '#20313D',
-        darkSteel: '#2C3D49',
-        frost: '#F1F5F7',
-        ashGray: '#9EADB7',
+        // COALINTEL — Professional Industrial UI Palette
+        mine: {
+          bg: '#0E1113',      // Primary Background
+          sidebar: '#151A1D', // Sidebar / Navigation
+          card: '#1C2226',    // Dashboard Cards / Flat surfaces
+          hover: '#242C30',   // Card Hover / Elevated surfaces
+          border: '#30383D',  // Thin 1px borders
+        },
+        industrial: {
+          text: '#E8ECEB',       // Primary Text / Main headings
+          muted: '#9BA5A8',      // Secondary Text / Descriptions
+        },
 
-        // Structure & Surfaces
+        // Structure & Surfaces (with backwards-compatible aliases)
         coal: {
-          50: '#F1F5F7',
-          100: '#9EADB7',
-          700: '#2C3D49', // Dark Steel (Borders)
-          800: '#20313D', // Steel Slate (Elevated surface)
-          850: '#17232D', // Graphite (Cards)
-          900: '#111B24', // Coal Navy (Navigation)
-          950: '#0B1117', // Deep Mine (Main background)
-          DEFAULT: '#0B1117',
+          50: '#E8ECEB',
+          100: '#9BA5A8',
+          700: '#30383D', // Borders
+          800: '#242C30', // Card hover / Elevated surface
+          850: '#1C2226', // Cards
+          900: '#151A1D', // Sidebar / Navigation
+          950: '#0E1113', // Primary background
+          DEFAULT: '#0E1113',
         },
         ash: {
-          DEFAULT: '#0B1117', // Main background alias
-          50: '#111B24',
-          100: '#17232D',
-          200: '#20313D',
-          300: '#2C3D49',
+          DEFAULT: '#0E1113',
+          50: '#151A1D',
+          100: '#1C2226',
+          200: '#242C30',
+          300: '#30383D',
         },
         surface: {
-          DEFAULT: '#17232D', // Graphite
-          dark: '#111B24',    // Coal Navy
-          elevated: '#20313D', // Steel Slate
+          DEFAULT: '#1C2226', // Cards
+          dark: '#151A1D',    // Sidebar
+          elevated: '#242C30', // Card hover
         },
         steel: {
-          DEFAULT: '#2C3D49', // Dark Steel
-          100: '#111B24',
-          200: '#17232D',
-          300: '#20313D',
-          400: '#2C3D49',
-          500: '#9EADB7',
+          DEFAULT: '#30383D', // Borders
+          100: '#151A1D',
+          200: '#1C2226',
+          300: '#242C30',
+          400: '#30383D',
+          500: '#9BA5A8',
         },
 
-        // Brand Accents
-        teal: {
-          DEFAULT: '#18B6B2', // Intelligence Teal
-          50: '#E6F9F9',
-          100: '#C2F3F2',
-          200: '#8CEAE7',
-          300: '#35D3CE',     // Bright Teal (Hover/Active)
-          400: '#22C4C0',
-          500: '#18B6B2',     // Main Accent
-          600: '#123C43',     // Active navigation background
-          700: '#0D2D32',
-          800: '#0A2226',
-          900: '#07181A',
+        // Primary Brand / Accent: #C58B3A (Hover: #D6A052)
+        amber: {
+          DEFAULT: '#C58B3A', // Primary Brand / Accent
+          hover: '#D6A052',   // Accent Hover
+          300: '#E4B774',
+          400: '#D6A052',
+          500: '#C58B3A',
+          600: '#B0782C',
+          700: '#8A5D20',
+          900: '#2E2214',
         },
         brand: {
-          50: '#E6F9F9',
-          100: '#C2F3F2',
-          300: '#35D3CE',
-          500: '#18B6B2',
-          600: '#123C43',
-          900: '#111B24',
-        },
-        amber: {
-          DEFAULT: '#F2A900', // Ember Amber
-          300: '#FFC83B',
-          400: '#FFBA1A',
-          500: '#F2A900',
-          600: '#D97706',
-          700: '#92400E',
-          900: '#3A2C0A',     // KPI highlight background
+          DEFAULT: '#C58B3A',
+          hover: '#D6A052',
+          50: '#FAF4EB',
+          100: '#F2E4CF',
+          300: '#E4B774',
+          400: '#D6A052',
+          500: '#C58B3A',
+          600: '#B0782C',
+          900: '#151A1D',
         },
         gold: {
-          400: '#FFC83B',
-          500: '#F2A900',
-          600: '#D97706',
-          900: '#3A2C0A',
+          DEFAULT: '#C58B3A',
+          400: '#D6A052',
+          500: '#C58B3A',
+          600: '#B0782C',
+          900: '#2E2214',
         },
 
-        // Status Colors
+        // Secondary Charts & Technical Info: #54788A
+        info: {
+          DEFAULT: '#54788A',
+          400: '#688FA3',
+          500: '#54788A',
+          600: '#436170',
+          900: '#142026',
+        },
+        teal: {
+          DEFAULT: '#54788A', // Mapped to industrial info slate
+          50: '#F0F5F7',
+          100: '#DCE8EE',
+          200: '#B5CDD8',
+          300: '#688FA3',
+          400: '#54788A',
+          500: '#54788A',
+          600: '#436170',
+          700: '#344B57',
+          800: '#22323A',
+          900: '#142026',
+        },
+
+        // Positive Metrics / Success: #4F8A62
+        success: {
+          DEFAULT: '#4F8A62',
+          400: '#62A578',
+          500: '#4F8A62',
+          600: '#3E6F4E',
+          900: '#13261A',
+        },
         green: {
-          DEFAULT: '#39B978', // Mine Green
-          400: '#52C78D',
-          500: '#39B978',
-          600: '#2E9762',
-          900: '#0D331E',
-        },
-        warning: {
-          DEFAULT: '#F08A24', // Caution Orange
-          400: '#F5A14B',
-          500: '#F08A24',
-          600: '#D47112',
-          900: '#421E03',
-        },
-        danger: {
-          DEFAULT: '#F05B5B', // Signal Red
-          400: '#F57878',
-          500: '#F05B5B',
-          600: '#D43D3D',
-          900: '#421010',
+          DEFAULT: '#4F8A62',
+          400: '#62A578',
+          500: '#4F8A62',
+          600: '#3E6F4E',
+          900: '#13261A',
         },
 
-        // Typography
+        // Warnings: #D6A23A
+        warning: {
+          DEFAULT: '#D6A23A',
+          400: '#E2B558',
+          500: '#D6A23A',
+          600: '#BA8829',
+          900: '#33240A',
+        },
+
+        // Critical Anomalies / Error: #C94B45
+        danger: {
+          DEFAULT: '#C94B45',
+          400: '#D96660',
+          500: '#C94B45',
+          600: '#A93833',
+          900: '#331211',
+        },
+        error: {
+          DEFAULT: '#C94B45',
+          400: '#D96660',
+          500: '#C94B45',
+          600: '#A93833',
+          900: '#331211',
+        },
+
+        // Typography Tokens
         ink: {
-          DEFAULT: '#F1F5F7', // Frost White
-          primary: '#F1F5F7',
-          muted: '#9EADB7',   // Ash Gray
+          DEFAULT: '#E8ECEB', // Primary text
+          primary: '#E8ECEB',
+          muted: '#9BA5A8',   // Secondary text
         },
         slateText: {
-          DEFAULT: '#9EADB7', // Ash Gray
+          DEFAULT: '#9BA5A8',
         },
         navy: {
-          800: '#20313D',
-          900: '#17232D',
-          950: '#111B24',
+          800: '#242C30',
+          900: '#1C2226',
+          950: '#151A1D',
         },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
+      borderRadius: {
+        DEFAULT: '8px',
+        sm: '4px',
+        md: '6px',
+        lg: '8px',
+        xl: '10px',
+        '2xl': '10px',
+        '3xl': '10px',
+      },
       boxShadow: {
-        'glow-amber': '0 0 20px -5px rgba(242, 169, 0, 0.35)',
-        'glow-gold': '0 0 20px -5px rgba(242, 169, 0, 0.35)',
-        'glow-teal': '0 0 20px -5px rgba(24, 182, 178, 0.35)',
-        'glow-red': '0 0 20px -5px rgba(240, 91, 91, 0.35)',
-        'glow-emerald': '0 0 20px -5px rgba(57, 185, 120, 0.35)',
-        'card-light': '0 4px 20px -2px rgba(11, 17, 23, 0.5)',
-        'card-dark': '0 4px 20px -2px rgba(11, 17, 23, 0.7)',
+        subtle: '0 1px 2px 0 rgba(0, 0, 0, 0.35)',
+        card: '0 2px 4px 0 rgba(0, 0, 0, 0.3)',
+        dropdown: '0 4px 12px 0 rgba(0, 0, 0, 0.45)',
+        'glow-amber': '0 0 0 1px rgba(197, 139, 58, 0.35)',
+        'glow-gold': '0 0 0 1px rgba(197, 139, 58, 0.35)',
+        'glow-teal': '0 0 0 1px rgba(84, 120, 138, 0.35)',
+        'glow-red': '0 0 0 1px rgba(201, 75, 69, 0.35)',
+        'glow-emerald': '0 0 0 1px rgba(79, 138, 98, 0.35)',
+        'card-light': '0 1px 3px 0 rgba(0, 0, 0, 0.3)',
+        'card-dark': '0 2px 6px 0 rgba(0, 0, 0, 0.4)',
       },
     },
   },

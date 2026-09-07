@@ -18,7 +18,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
         title="Coal Production"
         value={kpis?.total_production_mt ?? (isApiConnected ? '0.00' : '773.60')}
         unit="MT"
-        icon={<Pickaxe className="h-5 w-5 text-[#F2A900]" />}
+        icon={<Pickaxe className="h-5 w-5 text-[#C58B3A]" />}
         subtitle={isApiConnected ? 'Verified Extracted Value' : 'Preview Data'}
         loading={loading}
       />
@@ -27,7 +27,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
         title="Overburden Removal"
         value={kpis?.total_obr_mcum ?? (isApiConnected ? '0.00' : '1,650.40')}
         unit="M.Cu.M"
-        icon={<Layers className="h-5 w-5 text-[#F2A900]" />}
+        icon={<Layers className="h-5 w-5 text-[#C58B3A]" />}
         subtitle={isApiConnected ? 'Normalized Stripping Volume' : 'Preview Data'}
         loading={loading}
       />
@@ -36,7 +36,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
         title="Ingested Documents"
         value={kpis?.total_documents ?? (isApiConnected ? 0 : 142)}
         unit="Docs"
-        icon={<FileText className="h-5 w-5 text-[#18B6B2]" />}
+        icon={<FileText className="h-5 w-5 text-[#54788A]" />}
         subtitle="Parsed & Chunked PDF/XLSX"
         loading={loading}
       />
@@ -45,7 +45,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
         title="Active Conflicts"
         value={kpis?.active_conflicts ?? (isApiConnected ? 0 : 5)}
         unit="Open"
-        icon={<AlertTriangle className="h-5 w-5 text-[#F05B5B]" />}
+        icon={<AlertTriangle className="h-5 w-5 text-[#C94B45]" />}
         subtitle="Discrepancy > 1% Flagged"
         trend={{ value: 'Requires Review', isPositive: false }}
         loading={loading}
@@ -54,7 +54,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
       <StatCard
         title="Entity Accuracy"
         value={kpis?.entity_accuracy_rate ?? '98.5%'}
-        icon={<CheckCircle2 className="h-5 w-5 text-[#39B978]" />}
+        icon={<CheckCircle2 className="h-5 w-5 text-[#4F8A62]" />}
         subtitle="Regex & ML Entity Normalization"
         loading={loading}
       />
@@ -62,7 +62,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
       <StatCard
         title="Citation Coverage"
         value={kpis?.citation_coverage_rate ?? '100%'}
-        icon={<ShieldCheck className="h-5 w-5 text-[#18B6B2]" />}
+        icon={<ShieldCheck className="h-5 w-5 text-[#4F8A62]" />}
         subtitle="RAG Grounding Verification"
         loading={loading}
       />

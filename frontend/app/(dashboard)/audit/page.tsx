@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { AuditLogsTable } from '@/components/audit/AuditLogsTable';
 import { auditApi } from '@/lib/api/auditApi';
-import { History, ShieldAlert } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 
 export default function AuditPage() {
   const {
@@ -35,13 +35,13 @@ export default function AuditPage() {
 
       {/* 403 Forbidden RBAC Notice */}
       {isForbidden ? (
-        <div className="p-8 rounded-2xl bg-[#17232D] border border-[#2C3D49] shadow-card-dark text-center space-y-3 max-w-xl mx-auto my-8">
-          <div className="p-3 rounded-full bg-[#3A2C0A] text-[#F2A900] border border-[#F2A900]/40 w-fit mx-auto">
+        <div className="p-8 rounded-lg bg-[#1C2226] border border-[#30383D] text-center space-y-3 max-w-xl mx-auto my-8">
+          <div className="p-3 rounded-lg bg-[#D6A23A]/10 text-[#D6A23A] border border-[#D6A23A]/30 w-fit mx-auto">
             <ShieldAlert className="h-8 w-8" />
           </div>
-          <h3 className="text-base font-bold text-[#F1F5F7]">RBAC Authorization Notice</h3>
-          <p className="text-xs text-[#9EADB7]">
-            System security audit logs are restricted to users with <code className="text-[#35D3CE] font-semibold">Admin</code> role authorization.
+          <h3 className="text-base font-bold text-[#E8ECEB]">RBAC Authorization Notice</h3>
+          <p className="text-xs text-[#9BA5A8]">
+            System security audit logs are restricted to users with <code className="text-[#C58B3A] font-semibold">Admin</code> role authorization.
           </p>
         </div>
       ) : isError ? (

@@ -67,14 +67,14 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
   const displayItems = items && items.length > 0 ? items : defaultFeed;
 
   return (
-    <Card className="col-span-1 bg-[#17232D] border-[#2C3D49]">
+    <Card className="col-span-1 bg-[#1C2226] border-[#30383D]">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>
-            <ShieldCheck className="h-5 w-5 text-[#39B978]" />
+            <ShieldCheck className="h-5 w-5 text-[#4F8A62]" />
             <span>Validation & Data Quality Feed</span>
           </CardTitle>
-          <Link href="/validation" className="text-xs text-[#35D3CE] hover:text-[#18B6B2] font-mono flex items-center gap-1">
+          <Link href="/validation" className="text-xs text-[#C58B3A] hover:text-[#D6A052] font-mono flex items-center gap-1">
             View All <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
@@ -87,7 +87,7 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 w-full animate-pulse rounded-lg bg-[#20313D]" />
+              <div key={i} className="h-20 w-full animate-pulse rounded-lg bg-[#242C30]" />
             ))}
           </div>
         ) : (
@@ -99,10 +99,10 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
               return (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-lg bg-[#20313D] border border-[#2C3D49] hover:border-[#18B6B2]/40 transition-colors space-y-1.5"
+                  className="p-3.5 rounded-lg bg-[#242C30] border border-[#30383D] hover:border-[#C58B3A]/40 transition-colors space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#F1F5F7]">{item.mine_name}</span>
+                    <span className="text-xs font-bold text-[#E8ECEB]">{item.mine_name}</span>
                     <Badge
                       variant={isConflict ? 'danger' : isWarning ? 'warning' : 'success'}
                       size="sm"
@@ -111,13 +111,13 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
                     </Badge>
                   </div>
 
-                  <p className="text-[11px] text-[#9EADB7] line-clamp-2 leading-relaxed">
+                  <p className="text-[11px] text-[#9BA5A8] line-clamp-2 leading-relaxed">
                     {item.message}
                   </p>
 
-                  <div className="flex items-center justify-between text-[10px] font-mono text-[#9EADB7] pt-1">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-[#9BA5A8] pt-1">
                     <span>Metric: {item.metric_name}</span>
-                    <span className="text-[#F2A900] font-bold">{item.reported_value} {item.standard_unit}</span>
+                    <span className="text-[#C58B3A] font-bold">{item.reported_value} {item.standard_unit}</span>
                   </div>
                 </div>
               );

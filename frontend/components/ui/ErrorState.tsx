@@ -19,7 +19,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   return (
     <div
       className={cn(
-        'p-5 rounded-xl bg-danger/10 border border-danger/30 text-danger flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4',
+        'p-4 rounded-lg bg-danger/10 border border-danger/30 text-danger flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4',
         className
       )}
     >

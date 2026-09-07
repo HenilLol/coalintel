@@ -5,17 +5,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ConflictResolveModal } from '@/components/validation/ConflictResolveModal';
 import { validationApi, ConflictItem, ResolveConflictPayload } from '@/lib/api/validationApi';
 import { useScope } from '@/context/ScopeContext';
-import { GitCompare, FileText, CheckCircle2, ShieldCheck, RefreshCw } from 'lucide-react';
+import { GitCompare, RefreshCw } from 'lucide-react';
 
 export default function ConflictsPage() {
   const { selectedSubsidiary } = useScope();
   const queryClient = useQueryClient();
-  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [selectedStatus] = useState('ALL');
   const [activeConflict, setActiveConflict] = useState<ConflictItem | null>(null);
 
   const {
@@ -58,11 +58,11 @@ export default function ConflictsPage() {
       {isError && <ErrorState message={error instanceof Error ? error.message : 'Failed to fetch conflict list.'} />}
 
       {/* Main Conflicts Data Table Card */}
-      <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
-        <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
+      <Card className="border-[#30383D] bg-[#1C2226]">
+        <CardHeader className="py-3.5 px-4 bg-[#242C30] border-b border-[#30383D]">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-[#F1F5F7] flex items-center gap-2">
-              <GitCompare className="h-4 w-4 text-[#18B6B2]" />
+            <CardTitle className="text-sm font-semibold text-[#E8ECEB] flex items-center gap-2">
+              <GitCompare className="h-4 w-4 text-[#C58B3A]" />
               <span>Cross-Document Metric Discrepancies</span>
             </CardTitle>
             <Badge variant="amber" size="sm">
@@ -75,7 +75,7 @@ export default function ConflictsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#2C3D49] bg-[#20313D] text-[11px] font-mono text-[#F1F5F7] uppercase tracking-wider">
+                <tr className="border-b border-[#30383D] bg-[#242C30] text-[11px] font-mono text-[#E8ECEB] uppercase tracking-wider">
                   <th className="py-3 px-4">Mine & Metric Entity</th>
                   <th className="py-3 px-4">Document A Value</th>
                   <th className="py-3 px-4">Document B Value</th>
@@ -85,53 +85,53 @@ export default function ConflictsPage() {
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-[#2C3D49] text-xs font-mono">
+              <tbody className="divide-y divide-[#30383D] text-xs font-mono">
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, idx) => (
                     <tr key={idx} className="animate-pulse">
-                      <td className="py-3.5 px-4"><div className="h-4 w-36 bg-[#20313D] rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-[#20313D] rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-[#20313D] rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-16 bg-[#20313D] rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-20 bg-[#20313D] rounded" /></td>
-                      <td className="py-3.5 px-4 text-right"><div className="h-6 w-20 bg-[#20313D] rounded ml-auto" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-36 bg-[#242C30] rounded-md" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-[#242C30] rounded-md" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-[#242C30] rounded-md" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-16 bg-[#242C30] rounded-md" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-20 bg-[#242C30] rounded-md" /></td>
+                      <td className="py-3.5 px-4 text-right"><div className="h-6 w-20 bg-[#242C30] rounded-md ml-auto" /></td>
                     </tr>
                   ))
                 ) : conflicts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-[#9EADB7] text-xs">
+                    <td colSpan={6} className="py-8 text-center text-[#9BA5A8] text-xs">
                       No cross-document metric discrepancies detected.
                     </td>
                   </tr>
                 ) : (
                   conflicts.map((c) => (
-                    <tr key={c.id} className="hover:bg-[#20313D]/40 transition-colors">
-                      <td className="py-3.5 px-4 font-sans font-semibold text-[#F1F5F7]">
+                    <tr key={c.id} className="hover:bg-[#242C30]/50 transition-colors">
+                      <td className="py-3.5 px-4 font-sans font-semibold text-[#E8ECEB]">
                         {c.mine_name}
-                        <span className="block text-[11px] text-[#9EADB7] font-mono font-normal">
+                        <span className="block text-[11px] text-[#9BA5A8] font-mono font-normal">
                           {c.metric_name} ({c.fiscal_year})
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 text-[#9EADB7]">
-                        <span className="font-bold text-[#F1F5F7] block">
+                      <td className="py-3.5 px-4 text-[#9BA5A8]">
+                        <span className="font-bold text-[#E8ECEB] block">
                           {c.document_a_value} {c.document_a_unit}
                         </span>
-                        <span className="text-[10px] text-[#9EADB7] truncate block max-w-xs" title={c.document_a_filename}>
+                        <span className="text-[10px] text-[#9BA5A8] truncate block max-w-xs" title={c.document_a_filename}>
                           {c.document_a_filename}
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 text-[#9EADB7]">
-                        <span className="font-bold text-[#F1F5F7] block">
+                      <td className="py-3.5 px-4 text-[#9BA5A8]">
+                        <span className="font-bold text-[#E8ECEB] block">
                           {c.document_b_value} {c.document_b_unit}
                         </span>
-                        <span className="text-[10px] text-[#9EADB7] truncate block max-w-xs" title={c.document_b_filename}>
+                        <span className="text-[10px] text-[#9BA5A8] truncate block max-w-xs" title={c.document_b_filename}>
                           {c.document_b_filename}
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 font-bold text-[#F08A24]">
+                      <td className="py-3.5 px-4 font-bold text-[#D6A23A]">
                         {c.discrepancy_percentage?.toFixed(2)}%
                       </td>
 

@@ -13,8 +13,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 }) => {
   return (
     <div className={cn('flex flex-col items-center justify-center p-8 text-center space-y-3', className)}>
-      <Loader2 className="h-8 w-8 animate-spin text-[#18B6B2]" />
-      <p className="text-xs font-mono text-[#9EADB7] uppercase tracking-widest">{label}</p>
+      <Loader2 className="h-8 w-8 animate-spin text-[#C58B3A]" />
+      <p className="text-xs font-mono text-[#9BA5A8] uppercase tracking-widest">{label}</p>
     </div>
   );
 };

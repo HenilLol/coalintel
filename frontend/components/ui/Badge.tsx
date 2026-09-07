@@ -14,15 +14,15 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const variants = {
-    default: 'bg-[#20313D] text-[#F1F5F7] border-[#2C3D49]',
-    secondary: 'bg-[#20313D] text-[#9EADB7] border-[#2C3D49]',
-    success: 'bg-[#39B978]/15 text-[#39B978] border-[#39B978]/30 font-semibold',
-    warning: 'bg-[#F08A24]/15 text-[#F08A24] border-[#F08A24]/35 font-semibold',
-    danger: 'bg-[#F05B5B]/15 text-[#F05B5B] border-[#F05B5B]/35 font-semibold',
-    info: 'bg-[#18B6B2]/15 text-[#35D3CE] border-[#18B6B2]/35 font-semibold',
-    gold: 'bg-[#3A2C0A] text-[#F2A900] border-[#F2A900]/40 font-semibold',
-    amber: 'bg-[#3A2C0A] text-[#F2A900] border-[#F2A900]/40 font-semibold',
-    teal: 'bg-[#123C43] text-[#35D3CE] border-[#18B6B2]/40 font-semibold',
+    default: 'bg-[#242C30] text-[#E8ECEB] border-[#30383D]',
+    secondary: 'bg-[#242C30] text-[#9BA5A8] border-[#30383D]',
+    success: 'bg-[#4F8A62]/15 text-[#4F8A62] border-[#4F8A62]/30 font-semibold',
+    warning: 'bg-[#D6A23A]/15 text-[#D6A23A] border-[#D6A23A]/30 font-semibold',
+    danger: 'bg-[#C94B45]/15 text-[#C94B45] border-[#C94B45]/30 font-semibold',
+    info: 'bg-[#54788A]/15 text-[#54788A] border-[#54788A]/30 font-semibold',
+    gold: 'bg-[#C58B3A]/15 text-[#C58B3A] border-[#C58B3A]/30 font-semibold',
+    amber: 'bg-[#C58B3A]/15 text-[#C58B3A] border-[#C58B3A]/30 font-semibold',
+    teal: 'bg-[#54788A]/15 text-[#54788A] border-[#54788A]/30 font-semibold',
   };
 
   const sizes = {
@@ -33,7 +33,7 @@ export const Badge: React.FC<BadgeProps> = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center font-medium rounded-md border tracking-wide uppercase font-mono select-none',
+        'inline-flex items-center font-medium rounded border tracking-wide uppercase font-mono select-none',
         variants[variant],
         sizes[size],
         className

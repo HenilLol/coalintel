@@ -13,7 +13,7 @@ import { ValidationFeedWidget } from '@/components/dashboard/ValidationFeedWidge
 import { dashboardApi } from '@/lib/api/dashboardApi';
 import { DashboardKpis, ProductionSeriesItem, ValidationFeedItem } from '@/types/dashboard';
 import { useScope } from '@/context/ScopeContext';
-import { Upload, FileText, Sparkles, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, Activity } from 'lucide-react';
 
 export default function DashboardPage() {
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear, setSelectedFiscalYear } = useScope();
@@ -101,10 +101,10 @@ export default function DashboardPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>
-              <Activity className="h-5 w-5 text-[#18B6B2]" />
+              <Activity className="h-5 w-5 text-[#C58B3A]" />
               <span>Recent Ingestion & Evidence Traceability Stream</span>
             </CardTitle>
-            <Link href="/documents" className="text-xs text-[#18B6B2] hover:text-[#35D3CE] font-mono">
+            <Link href="/documents" className="text-xs text-[#C58B3A] hover:text-[#D6A052] font-mono">
               View Repository →
             </Link>
           </div>
@@ -114,15 +114,15 @@ export default function DashboardPage() {
         </CardHeader>
 
         <CardContent>
-          <div className="divide-y divide-[#2C3D49]">
+          <div className="divide-y divide-[#30383D]">
             <div className="py-3 flex items-center justify-between text-xs">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#20313D] border border-[#2C3D49] text-[#18B6B2]">
+                <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C58B3A]">
                   <FileText className="h-4 w-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#F1F5F7] block">ECL_Annual_Report_2023-24.pdf</span>
-                  <span className="text-[#9EADB7] text-[11px]">84 Pages • PDF • SHA-256 Verified • ECL</span>
+                  <span className="font-bold text-[#E8ECEB] block">ECL_Annual_Report_2023-24.pdf</span>
+                  <span className="text-[#9BA5A8] text-[11px]">84 Pages • PDF • SHA-256 Verified • ECL</span>
                 </div>
               </div>
               <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
@@ -130,12 +130,12 @@ export default function DashboardPage() {
 
             <div className="py-3 flex items-center justify-between text-xs">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#20313D] border border-[#2C3D49] text-[#F05B5B]">
+                <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C94B45]">
                   <FileText className="h-4 w-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#F1F5F7] block">BCCL_Production_Audit_Q4.pdf</span>
-                  <span className="text-[#9EADB7] text-[11px]">42 Pages • PDF • SHA-256 Verified • BCCL</span>
+                  <span className="font-bold text-[#E8ECEB] block">BCCL_Production_Audit_Q4.pdf</span>
+                  <span className="text-[#9BA5A8] text-[11px]">42 Pages • PDF • SHA-256 Verified • BCCL</span>
                 </div>
               </div>
               <Badge variant="danger" size="sm">CONFLICT DISCOVERED</Badge>
@@ -143,12 +143,12 @@ export default function DashboardPage() {
 
             <div className="py-3 flex items-center justify-between text-xs">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#20313D] border border-[#2C3D49] text-[#39B978]">
+                <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#4F8A62]">
                   <FileText className="h-4 w-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#F1F5F7] block">MCL_Samaleswari_Performance.xlsx</span>
-                  <span className="text-[#9EADB7] text-[11px]">12 Pages • XLSX • SHA-256 Verified • MCL</span>
+                  <span className="font-bold text-[#E8ECEB] block">MCL_Samaleswari_Performance.xlsx</span>
+                  <span className="text-[#9BA5A8] text-[11px]">12 Pages • XLSX • SHA-256 Verified • MCL</span>
                 </div>
               </div>
               <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
