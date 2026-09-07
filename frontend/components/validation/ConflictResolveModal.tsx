@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, GitCompare, CheckCircle2, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, GitCompare, CheckCircle2, FileText, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
@@ -25,6 +25,14 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
   const [overrideValue, setOverrideValue] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, isLoading]);
+
   if (!conflict) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -37,8 +45,17 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1113]/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl p-6 rounded-lg bg-[#1C2226] border border-[#30383D] shadow-xl space-y-6 overflow-y-auto max-h-[90vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1113]/80 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Cross-Document Conflict Resolution Modal"
+    >
+      <div
+        className="relative w-full max-w-2xl p-6 rounded-lg bg-[#1C2226] border border-[#30383D] shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#30383D] pb-4">
           <div className="flex items-center gap-3">
@@ -57,6 +74,7 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
             onClick={onClose}
             disabled={isLoading}
             className="p-1.5 rounded-lg text-[#9BA5A8] hover:text-[#E8ECEB] hover:bg-[#242C30] transition-colors"
+            aria-label="Close modal"
           >
             <X className="h-5 w-5" />
           </button>
@@ -75,7 +93,7 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
               <span className="truncate" title={conflict.document_a_filename}>{conflict.document_a_filename}</span>
             </div>
             <div className="pt-2 border-t border-[#30383D] flex items-baseline justify-between font-mono">
-              <span className="text-xs text-[#9BA5A8]">Reported Metric:</span>
+              <span className="text-xs text-[#9BA5A8]">Reported Value:</span>
               <span className="text-base font-bold text-[#E8ECEB]">
                 {conflict.document_a_value} {conflict.document_a_unit}
               </span>
@@ -93,7 +111,7 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
               <span className="truncate" title={conflict.document_b_filename}>{conflict.document_b_filename}</span>
             </div>
             <div className="pt-2 border-t border-[#30383D] flex items-baseline justify-between font-mono">
-              <span className="text-xs text-[#9BA5A8]">Reported Metric:</span>
+              <span className="text-xs text-[#9BA5A8]">Reported Value:</span>
               <span className="text-base font-bold text-[#E8ECEB]">
                 {conflict.document_b_value} {conflict.document_b_unit}
               </span>
@@ -103,7 +121,10 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
 
         {/* Discrepancy Banner */}
         <div className="p-3 rounded-lg bg-[#D6A23A]/10 border border-[#D6A23A]/30 text-[#D6A23A] text-xs flex items-center justify-between font-semibold">
-          <span>Calculated Discrepancy Percentage:</span>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-[#D6A23A] shrink-0" />
+            <span>Calculated Multi-Source Discrepancy:</span>
+          </div>
           <Badge variant="danger" size="md">
             {conflict.discrepancy_percentage?.toFixed(2)}% Discrepancy
           </Badge>
@@ -118,14 +139,14 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
             options={[
               { value: 'ACCEPT_DOC_A', label: `Accept Document A Value (${conflict.document_a_value} ${conflict.document_a_unit})` },
               { value: 'ACCEPT_DOC_B', label: `Accept Document B Value (${conflict.document_b_value} ${conflict.document_b_unit})` },
-              { value: 'OVERRIDE', label: 'Manual Custom Override Value' },
-              { value: 'FLAG_UNRESOLVED', label: 'Flag for Auditor Investigation' },
+              { value: 'OVERRIDE', label: 'Manual Authoritative Override Value' },
+              { value: 'FLAG_UNRESOLVED', label: 'Flag for On-Site Mine Audit' },
             ]}
           />
 
           {action === 'OVERRIDE' && (
             <Input
-              label="Custom Override Metric Value"
+              label="Custom Authoritative Metric Value"
               type="number"
               step="0.01"
               placeholder="Enter authoritative metric value"
@@ -136,7 +157,7 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
           )}
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-[#E8ECEB]">Resolution Auditor Notes</label>
+            <label className="text-xs font-semibold text-[#E8ECEB]">Resolution Audit Justification Notes</label>
             <textarea
               rows={3}
               placeholder="Provide technical justification or audit rationale for conflict resolution..."
@@ -157,7 +178,7 @@ export const ConflictResolveModal: React.FC<ConflictResolveModalProps> = ({
               isLoading={isLoading}
               leftIcon={<CheckCircle2 className="h-4 w-4" />}
             >
-              Resolve & Update Audit Ledger
+              Resolve & Record in Audit Ledger
             </Button>
           </div>
         </form>

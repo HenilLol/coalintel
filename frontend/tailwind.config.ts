@@ -188,6 +188,30 @@ const config: Config = {
         'card-light': '0 1px 3px 0 rgba(0, 0, 0, 0.3)',
         'card-dark': '0 2px 6px 0 rgba(0, 0, 0, 0.4)',
       },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideInRight: {
+          from: { transform: 'translateX(100%)' },
+          to: { transform: 'translateX(0)' },
+        },
+        pulseSubtle: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.6' },
+        },
+      },
+      animation: {
+        'fade-in': 'fadeIn 200ms ease-out forwards',
+        'slide-up': 'slideUp 250ms ease-out forwards',
+        'slide-in-right': 'slideInRight 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'pulse-subtle': 'pulseSubtle 2s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

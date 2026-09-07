@@ -130,14 +130,22 @@ export default function ParliamentaryPage() {
           <Card
             key={idx}
             onClick={() => handlePresetSelect(p)}
-            className="p-4 cursor-pointer hover:border-[#C58B3A]/50 hover:bg-[#242C30] transition-all border-[#30383D] group bg-[#1C2226]"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handlePresetSelect(p);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            className="p-4 cursor-pointer hover:border-[#C58B3A]/60 hover:bg-[#242C30] hover:-translate-y-0.5 transition-all duration-150 border-[#30383D] group bg-[#1C2226] focus:outline-none focus:border-[#C58B3A]"
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono text-[#C58B3A] font-bold uppercase tracking-wider">{p.type}</span>
-              <ArrowRight className="h-3.5 w-3.5 text-[#9BA5A8] group-hover:text-[#C58B3A] transition-colors" />
+              <ArrowRight className="h-3.5 w-3.5 text-[#9BA5A8] group-hover:text-[#C58B3A] group-hover:translate-x-0.5 transition-all" />
             </div>
-            <h4 className="text-sm font-semibold text-[#E8ECEB] group-hover:text-[#C58B3A] mb-1">{p.title}</h4>
-            <p className="text-xs text-[#9BA5A8] line-clamp-2">{p.question}</p>
+            <h4 className="text-sm font-semibold text-[#E8ECEB] group-hover:text-[#C58B3A] mb-1 transition-colors">{p.title}</h4>
+            <p className="text-xs text-[#9BA5A8] line-clamp-2 leading-relaxed">{p.question}</p>
           </Card>
         ))}
       </div>

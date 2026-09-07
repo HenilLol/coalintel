@@ -31,6 +31,67 @@ const defaultData: ProductionSeriesItem[] = [
   { subsidiary: 'MCL', actual: 193.3, target: 190.0, obr: 435.6 },
 ];
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}
+
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const actualItem = payload.find((p) => p.dataKey === 'actual');
+  const targetItem = payload.find((p) => p.dataKey === 'target');
+
+  const actualVal = actualItem ? Number(actualItem.value) : 0;
+  const targetVal = targetItem ? Number(targetItem.value) : 0;
+  const variance = actualVal - targetVal;
+  const variancePercent = targetVal > 0 ? (variance / targetVal) * 100 : 0;
+  const isSurplus = variance >= 0;
+
+  return (
+    <div className="bg-[#151A1D] border border-[#30383D] rounded-lg p-3 shadow-dropdown text-xs space-y-2 min-w-[200px]">
+      <div className="flex items-center justify-between border-b border-[#30383D] pb-1.5">
+        <span className="font-bold text-[#E8ECEB] font-mono">{label} Subsidiary</span>
+        <span
+          className={`font-mono font-semibold text-[10px] px-1.5 py-0.5 rounded ${
+            isSurplus
+              ? 'text-[#4F8A62] bg-[#4F8A62]/15 border border-[#4F8A62]/30'
+              : 'text-[#D6A23A] bg-[#D6A23A]/15 border border-[#D6A23A]/30'
+          }`}
+        >
+          {isSurplus ? '+' : ''}{variancePercent.toFixed(1)}% vs Target
+        </span>
+      </div>
+
+      <div className="space-y-1 font-mono text-[11px]">
+        <div className="flex items-center justify-between">
+          <span className="text-[#9BA5A8] flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-sm bg-[#C58B3A]" />
+            Actual Production:
+          </span>
+          <span className="font-bold text-[#E8ECEB]">{actualVal.toFixed(1)} MT</span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-[#9BA5A8] flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-sm bg-[#54788A]" />
+            Annual Target:
+          </span>
+          <span className="font-bold text-[#E8ECEB]">{targetVal.toFixed(1)} MT</span>
+        </div>
+
+        <div className="flex items-center justify-between pt-1 border-t border-[#30383D]/60 text-[10px]">
+          <span className="text-[#9BA5A8]">Net Delta:</span>
+          <span className={`font-semibold ${isSurplus ? 'text-[#4F8A62]' : 'text-[#D6A23A]'}`}>
+            {isSurplus ? '+' : ''}{variance.toFixed(1)} MT
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ProductionChart: React.FC<ProductionChartProps> = ({
   data = defaultData,
   loading = false,
@@ -44,14 +105,14 @@ export const ProductionChart: React.FC<ProductionChartProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle>
             <BarChart3 className="h-5 w-5 text-[#C58B3A]" />
-            <span>Subsidiary Coal Production vs Annual Target (MT)</span>
+            <span>Subsidiary Coal Production vs Target (MT)</span>
           </CardTitle>
           <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#242C30] text-[#9BA5A8] border border-[#30383D]">
-            {isApiConnected ? 'Live API Data' : 'Preview Data'}
+            {isApiConnected ? 'Live API Data' : 'Preview Baseline'}
           </span>
         </div>
         <CardDescription>
-          Comparison of extracted actual coal production figures against operational target plans across CIL subsidiaries.
+          Deterministic comparison of extracted actual coal production figures against operational target plans across CIL subsidiaries.
         </CardDescription>
       </CardHeader>
 
@@ -61,24 +122,50 @@ export const ProductionChart: React.FC<ProductionChartProps> = ({
         ) : (
           <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#30383D" opacity={0.7} />
-                <XAxis dataKey="subsidiary" stroke="#9BA5A8" fontSize={12} tickLine={false} />
-                <YAxis stroke="#9BA5A8" fontSize={12} tickLine={false} />
+              <BarChart
+                data={chartSeries}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#30383D" opacity={0.6} vertical={false} />
+                <XAxis
+                  dataKey="subsidiary"
+                  stroke="#9BA5A8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: '#30383D' }}
+                  dy={4}
+                />
+                <YAxis
+                  stroke="#9BA5A8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: '#30383D' }}
+                />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#151A1D',
-                    borderColor: '#30383D',
-                    borderRadius: '8px',
-                    color: '#E8ECEB',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 12px 0 rgba(0, 0, 0, 0.45)',
-                  }}
+                  content={<CustomTooltip />}
                   cursor={{ fill: 'rgba(197, 139, 58, 0.08)' }}
                 />
-                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px', color: '#9BA5A8' }} />
-                <Bar dataKey="actual" name="Actual Production (MT)" fill="#C58B3A" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="target" name="Target Plan (MT)" fill="#54788A" radius={[4, 4, 0, 0]} />
+                <Legend
+                  wrapperStyle={{ fontSize: '11px', paddingTop: '12px', color: '#9BA5A8' }}
+                  iconSize={10}
+                  iconType="rect"
+                />
+                <Bar
+                  dataKey="actual"
+                  name="Actual Production (MT)"
+                  fill="#C58B3A"
+                  radius={[3, 3, 0, 0]}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                />
+                <Bar
+                  dataKey="target"
+                  name="Target Plan (MT)"
+                  fill="#54788A"
+                  radius={[3, 3, 0, 0]}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>

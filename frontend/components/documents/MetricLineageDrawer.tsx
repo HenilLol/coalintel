@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Bookmark, ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -17,14 +17,31 @@ export const MetricLineageDrawer: React.FC<MetricLineageDrawerProps> = ({
   onClose,
   onJumpToPage,
 }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!metric) return null;
 
   const isLakhTonnes = metric.unit?.toLowerCase().includes('lakh');
   const conf = metric.confidence_score ?? 0.95;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[#0E1113]/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg h-full bg-[#1C2226] border-l border-[#30383D] p-6 flex flex-col justify-between space-y-6 shadow-xl overflow-y-auto text-[#E8ECEB]">
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-[#0E1113]/80 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Metric Evidence and Lineage Drawer"
+    >
+      <div
+        className="w-full max-w-lg h-full bg-[#1C2226] border-l border-[#30383D] p-6 flex flex-col justify-between space-y-6 shadow-2xl overflow-y-auto text-[#E8ECEB] animate-slide-in-right"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-[#30383D] pb-4">
@@ -41,6 +58,7 @@ export const MetricLineageDrawer: React.FC<MetricLineageDrawerProps> = ({
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-[#9BA5A8] hover:text-[#E8ECEB] hover:bg-[#242C30] transition-colors"
+              aria-label="Close drawer"
             >
               <X className="h-5 w-5" />
             </button>

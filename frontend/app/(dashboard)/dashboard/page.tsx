@@ -13,7 +13,7 @@ import { ValidationFeedWidget } from '@/components/dashboard/ValidationFeedWidge
 import { dashboardApi } from '@/lib/api/dashboardApi';
 import { DashboardKpis, ProductionSeriesItem, ValidationFeedItem } from '@/types/dashboard';
 import { useScope } from '@/context/ScopeContext';
-import { Upload, FileText, Activity } from 'lucide-react';
+import { Upload, FileText, Activity, ArrowRight, Database } from 'lucide-react';
 
 export default function DashboardPage() {
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear, setSelectedFiscalYear } = useScope();
@@ -83,79 +83,87 @@ export default function DashboardPage() {
         isLoading={isLoading}
       />
 
-      {/* KPI Overview Grid */}
-      <KpiGrid kpis={kpis} loading={isLoading} isApiConnected={isApiConnected} />
+      {/* KPI Overview Grid with visual hierarchy */}
+      <section aria-label="Key Performance Indicators">
+        <KpiGrid kpis={kpis} loading={isLoading} isApiConnected={isApiConnected} />
+      </section>
 
-      {/* Charts & Validation Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Charts & Validation Feed Grid */}
+      <section aria-label="Production Charts and Validation Feed" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
         <ProductionChart
           data={productionData}
           loading={isLoading}
           isApiConnected={isApiConnected}
         />
         <ValidationFeedWidget items={validationItems} loading={isLoading} />
-      </div>
+      </section>
 
       {/* Recent Ingestion & Evidence Activity Stream */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>
-              <Activity className="h-5 w-5 text-[#C58B3A]" />
-              <span>Recent Ingestion & Evidence Traceability Stream</span>
-            </CardTitle>
-            <Link href="/documents" className="text-xs text-[#C58B3A] hover:text-[#D6A052] font-mono">
-              View Repository →
-            </Link>
-          </div>
-          <CardDescription>
-            Audit stream of recently ingested documents, parsed vector chunks, and extracted mining metrics.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <div className="divide-y divide-[#30383D]">
-            <div className="py-3 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C58B3A]">
-                  <FileText className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="font-bold text-[#E8ECEB] block">ECL_Annual_Report_2023-24.pdf</span>
-                  <span className="text-[#9BA5A8] text-[11px]">84 Pages • PDF • SHA-256 Verified • ECL</span>
-                </div>
-              </div>
-              <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
+      <section aria-label="Recent Ingestion Stream">
+        <Card className="border-[#30383D] bg-[#1C2226]">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                <Activity className="h-5 w-5 text-[#C58B3A]" />
+                <span>Recent Ingestion & Evidence Traceability Stream</span>
+              </CardTitle>
+              <Link
+                href="/documents"
+                className="text-xs text-[#C58B3A] hover:text-[#D6A052] font-mono flex items-center gap-1 transition-colors"
+              >
+                <span>View Full Repository</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
+            <CardDescription>
+              Audit stream of recently ingested documents, parsed vector chunks, and extracted mining metrics across CIL subsidiaries.
+            </CardDescription>
+          </CardHeader>
 
-            <div className="py-3 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C94B45]">
-                  <FileText className="h-4 w-4" />
+          <CardContent>
+            <div className="divide-y divide-[#30383D]">
+              <div className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C58B3A]">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#E8ECEB] block font-sans">ECL_Annual_Report_2023-24.pdf</span>
+                    <span className="text-[#9BA5A8] text-[11px] font-mono">84 Pages • PDF • SHA-256 Verified • ECL</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-bold text-[#E8ECEB] block">BCCL_Production_Audit_Q4.pdf</span>
-                  <span className="text-[#9BA5A8] text-[11px]">42 Pages • PDF • SHA-256 Verified • BCCL</span>
-                </div>
+                <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
               </div>
-              <Badge variant="danger" size="sm">CONFLICT DISCOVERED</Badge>
-            </div>
 
-            <div className="py-3 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#4F8A62]">
-                  <FileText className="h-4 w-4" />
+              <div className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C94B45]">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#E8ECEB] block font-sans">BCCL_Production_Audit_Q4.pdf</span>
+                    <span className="text-[#9BA5A8] text-[11px] font-mono">42 Pages • PDF • SHA-256 Verified • BCCL</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-bold text-[#E8ECEB] block">MCL_Samaleswari_Performance.xlsx</span>
-                  <span className="text-[#9BA5A8] text-[11px]">12 Pages • XLSX • SHA-256 Verified • MCL</span>
-                </div>
+                <Badge variant="danger" size="sm">DISCREPANCY DETECTED</Badge>
               </div>
-              <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
+
+              <div className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#4F8A62]">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#E8ECEB] block font-sans">MCL_Samaleswari_Performance.xlsx</span>
+                    <span className="text-[#9BA5A8] text-[11px] font-mono">12 Pages • XLSX • SHA-256 Verified • MCL</span>
+                  </div>
+                </div>
+                <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

@@ -104,6 +104,16 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && documentToDelete && !isDeleting) {
+        setDocumentToDelete(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [documentToDelete, isDeleting]);
+
   const statusTabs = [
     { value: 'ALL', label: 'All Documents' },
     { value: 'PARSED', label: 'Parsed' },
@@ -373,8 +383,17 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 
       {/* Admin Document Deletion Confirmation Modal */}
       {documentToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1113]/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg p-6 rounded-lg bg-[#1C2226] border border-[#C94B45]/40 shadow-xl space-y-6">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1113]/80 backdrop-blur-sm animate-fade-in"
+          onClick={() => !isDeleting && setDocumentToDelete(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Delete document confirmation"
+        >
+          <div
+            className="relative w-full max-w-lg p-6 rounded-lg bg-[#1C2226] border border-[#C94B45]/40 shadow-2xl space-y-6 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-[#30383D] pb-4">
               <div className="flex items-center gap-3">

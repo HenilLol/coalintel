@@ -58,6 +58,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               onChange={(e) => onSubsidiaryChange(e.target.value)}
               options={CIL_SUBSIDIARIES}
               className="bg-[#151A1D] border-[#30383D] text-[#E8ECEB] text-xs py-2.5 w-48"
+              aria-label="Filter Query Subsidiary Scope"
             />
 
             <Button
@@ -74,9 +75,9 @@ export const QueryInput: React.FC<QueryInputProps> = ({
         </div>
 
         {/* Sample Query Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#30383D]">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#30383D]">
           <span className="text-[10px] font-mono text-[#9BA5A8] uppercase tracking-widest font-semibold shrink-0">
-            Sample Queries:
+            Sample Inquiries:
           </span>
           {SAMPLE_QUERIES.map((sq, i) => (
             <button
@@ -86,7 +87,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
                 onPromptChange(sq);
                 onSubmit(sq);
               }}
-              className="px-3 py-1 rounded-full bg-[#242C30] border border-[#30383D] hover:border-[#C58B3A]/50 hover:bg-[#C58B3A]/10 text-[#E8ECEB] text-xs transition-colors text-left truncate max-w-xs"
+              className="px-2.5 py-1 rounded-md bg-[#242C30] border border-[#30383D] hover:border-[#C58B3A]/60 hover:text-[#C58B3A] text-[#E8ECEB] text-xs font-mono transition-all duration-150 text-left truncate max-w-xs"
             >
               {sq}
             </button>
