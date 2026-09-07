@@ -33,13 +33,13 @@ export default function ValidationPage() {
         title="Arithmetic Validation Feed"
         description="Deterministic unit normalization (Lakh Tonnes → MT) and arithmetic discrepancy monitoring (> 5% calculation threshold)."
         breadcrumbs={[{ label: 'Validation Feed' }]}
-        badge={<Badge variant="gold">Deterministic Engine</Badge>}
+        badge={<Badge variant="amber">Deterministic Engine</Badge>}
         actions={
           <Select
             value={selectedSubsidiary}
             onChange={(e) => setSelectedSubsidiary(e.target.value)}
             options={CIL_SUBSIDIARIES}
-            className="w-48 bg-white text-xs py-1.5"
+            className="w-48 text-xs py-1.5"
           />
         }
       />

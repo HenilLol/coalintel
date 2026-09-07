@@ -11,13 +11,13 @@ interface WordCloudTagCloudProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Operational: 'text-amber-700 bg-amber-500/15 border-amber-500/30',
-  Production: 'text-green-700 bg-green-500/15 border-green-500/30',
-  Infrastructure: 'text-teal-700 bg-teal-500/15 border-teal-500/30',
-  Metric: 'text-teal-800 bg-teal-500/10 border-teal-500/30',
-  Regulatory: 'text-danger bg-danger/15 border-danger/30',
-  Equipment: 'text-coal-800 bg-steel/20 border-steel',
-  Logistics: 'text-teal-600 bg-teal-500/15 border-teal-500/30',
+  Operational: 'text-[#F2A900] bg-[#3A2C0A] border-[#F2A900]/40',
+  Production: 'text-[#39B978] bg-[#39B978]/15 border-[#39B978]/40',
+  Infrastructure: 'text-[#35D3CE] bg-[#123C43] border-[#18B6B2]/40',
+  Metric: 'text-[#18B6B2] bg-[#18B6B2]/10 border-[#18B6B2]/30',
+  Regulatory: 'text-[#F05B5B] bg-[#F05B5B]/15 border-[#F05B5B]/40',
+  Equipment: 'text-[#9EADB7] bg-[#20313D] border-[#2C3D49]',
+  Logistics: 'text-[#35D3CE] bg-[#123C43]/60 border-[#18B6B2]/30',
 };
 
 export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) => {
@@ -41,12 +41,12 @@ export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) 
   };
 
   return (
-    <Card className="border-steel shadow-card-light bg-white">
-      <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
+    <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
+      <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Cloud className="h-4 w-4 text-amber-500" />
-            <CardTitle className="text-sm font-bold text-ink">TF-IDF Mining Word Cloud Visualization</CardTitle>
+            <Cloud className="h-4 w-4 text-[#18B6B2]" />
+            <CardTitle className="text-sm font-bold text-[#F1F5F7]">TF-IDF Mining Word Cloud Visualization</CardTitle>
           </div>
 
           {/* Category Filter Pills */}
@@ -57,8 +57,8 @@ export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) 
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-2.5 py-1 text-xs font-mono rounded-lg transition-all whitespace-nowrap select-none ${
                   selectedCategory === cat
-                    ? 'bg-amber-500/20 text-amber-700 border border-amber-500/40 font-bold'
-                    : 'text-slateText hover:text-ink hover:bg-steel/20'
+                    ? 'bg-[#123C43] text-[#35D3CE] border border-[#18B6B2]/50 font-bold'
+                    : 'text-[#9EADB7] hover:text-[#F1F5F7] hover:bg-[#111B24]'
                 }`}
               >
                 {cat}
@@ -71,7 +71,7 @@ export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) 
       <CardContent className="p-8">
         <div className="flex flex-wrap items-center justify-center gap-4 min-h-[220px]">
           {filteredTopics.map((item, idx) => {
-            const colorClass = CATEGORY_COLORS[item.category] || 'text-amber-600 bg-amber-500/10 border-amber-500/30';
+            const colorClass = CATEGORY_COLORS[item.category] || 'text-[#18B6B2] bg-[#123C43]/50 border-[#18B6B2]/30';
             const fontSize = getFontSize(item.weight);
 
             return (

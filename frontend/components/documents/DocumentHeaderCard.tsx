@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Database,
   Hash,
-  Layers,
   Sparkles,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
@@ -61,17 +60,17 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
   ];
 
   return (
-    <Card className="space-y-6">
+    <Card className="space-y-6 bg-[#17232D] border-[#2C3D49]">
       {/* Primary Document Metadata Row */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div className="flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-ash border border-steel shrink-0">
+          <div className="p-3 rounded-xl bg-[#20313D] border border-[#2C3D49] shrink-0">
             {getFileTypeIcon(document.file_type)}
           </div>
 
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-extrabold text-ink tracking-tight font-sans">
+              <h2 className="text-xl font-extrabold text-[#F1F5F7] tracking-tight font-sans">
                 {document.filename}
               </h2>
               <Badge variant={isFailed ? 'danger' : isPending || isProcessing ? 'warning' : 'success'}>
@@ -79,13 +78,13 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
               </Badge>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slateText pt-0.5">
-              <span className="flex items-center gap-1 text-ink font-semibold">
-                <Database className="h-3.5 w-3.5 text-amber-500" />
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[#9EADB7] pt-0.5">
+              <span className="flex items-center gap-1 text-[#F1F5F7] font-semibold">
+                <Database className="h-3.5 w-3.5 text-[#18B6B2]" />
                 {document.subsidiary || 'CIL HQ'}
               </span>
               <span>•</span>
-              <span className="text-amber-600 font-semibold">{document.fiscal_year || '2023-24'}</span>
+              <span className="text-[#F2A900] font-semibold">{document.fiscal_year || '2023-24'}</span>
               <span>•</span>
               <span>{document.total_pages || 1} Pages</span>
               <span>•</span>
@@ -95,19 +94,19 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
         </div>
 
         {/* File Hash Badge */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ash border border-steel text-xs font-mono text-slateText shrink-0">
-          <Hash className="h-3.5 w-3.5 text-slateText" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#20313D] border border-[#2C3D49] text-xs font-mono text-[#9EADB7] shrink-0">
+          <Hash className="h-3.5 w-3.5 text-[#9EADB7]" />
           <span>SHA-256:</span>
-          <span className="text-ink select-all" title={document.file_hash}>
+          <span className="text-[#F1F5F7] select-all" title={document.file_hash}>
             {document.file_hash ? document.file_hash.substring(0, 18) : 'N/A'}...
           </span>
         </div>
       </div>
 
       {/* Document Processing Pipeline Stepper */}
-      <div className="pt-4 border-t border-steel space-y-2">
-        <p className="text-[10px] font-mono uppercase tracking-widest text-slateText font-semibold flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+      <div className="pt-4 border-t border-[#2C3D49] space-y-2">
+        <p className="text-[10px] font-mono uppercase tracking-widest text-[#9EADB7] font-semibold flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 text-[#18B6B2]" />
           <span>Document Processing Pipeline Traceability</span>
         </p>
 
@@ -118,21 +117,21 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
                 key={idx}
                 className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition-colors ${
                   step.completed
-                    ? 'bg-green-500/10 border-green-500/30 text-green-700'
+                    ? 'bg-[#39B978]/10 border-[#39B978]/30 text-[#39B978]'
                     : step.active
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 animate-pulse'
+                    ? 'bg-[#18B6B2]/10 border-[#18B6B2]/30 text-[#35D3CE] animate-pulse'
                     : isFailed
-                    ? 'bg-danger/10 border-danger/20 text-slateText'
-                    : 'bg-ash border-steel text-slateText'
+                    ? 'bg-[#F05B5B]/10 border-[#F05B5B]/20 text-[#9EADB7]'
+                    : 'bg-[#111B24] border-[#2C3D49] text-[#9EADB7]'
                 }`}
               >
                 <span className="font-medium text-[11px] truncate">{step.label}</span>
                 {step.completed ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#39B978] shrink-0" />
                 ) : step.active ? (
-                  <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0 animate-spin" />
+                  <Clock className="h-3.5 w-3.5 text-[#35D3CE] shrink-0 animate-spin" />
                 ) : (
-                  <div className="h-2 w-2 rounded-full bg-steel shrink-0" />
+                  <div className="h-2 w-2 rounded-full bg-[#2C3D49] shrink-0" />
                 )}
               </div>
             );
@@ -142,11 +141,11 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
 
       {/* Failure Alert Banner */}
       {isFailed && (
-        <div className="p-3.5 rounded-lg bg-danger/10 border border-danger/30 text-xs text-danger flex items-start gap-2.5">
-          <AlertCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-lg bg-[#F05B5B]/10 border border-[#F05B5B]/30 text-xs text-[#F05B5B] flex items-start gap-2.5">
+          <AlertCircle className="h-4 w-4 text-[#F05B5B] shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <span className="font-semibold text-danger">Processing Interrupted:</span>
-            <p className="text-slateText">{document.error_message || 'The document processing pipeline encountered an error. Please try re-uploading the file.'}</p>
+            <span className="font-semibold text-[#F05B5B]">Processing Interrupted:</span>
+            <p className="text-[#9EADB7]">{document.error_message || 'The document processing pipeline encountered an error. Please try re-uploading the file.'}</p>
           </div>
         </div>
       )}

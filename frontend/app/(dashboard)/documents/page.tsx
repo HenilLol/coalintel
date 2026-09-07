@@ -41,7 +41,7 @@ export default function DocumentsPage() {
         title="Document Repository & Digitization Hub"
         description="Centralized geological reports, annual performance reviews, RTI disclosures, and production audit files for Coal India Limited and CMPDI."
         breadcrumbs={[{ label: 'Document Repository' }]}
-        badge={<Badge variant="gold">V2 Intelligence Hub</Badge>}
+        badge={<Badge variant="amber">V2 Intelligence Hub</Badge>}
         actions={
           <Button
             variant="primary"

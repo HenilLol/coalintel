@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, X, FileText, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Upload, X, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
@@ -88,53 +88,56 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
-      setErrorMessage('Please select a valid document to upload.');
-      return;
-    }
+    if (!selectedFile) return;
 
     setIsUploading(true);
     setUploadProgress(10);
     setErrorMessage(null);
     setDuplicateDocInfo(null);
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('subsidiary', subsidiary);
-    formData.append('fiscal_year', fiscalYear);
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 85) {
+          clearInterval(interval);
+          return 85;
+        }
+        return prev + 15;
+      });
+    }, 300);
 
     try {
-      const doc = await documentApi.uploadDocument(formData, (progressEvent) => {
-        if (progressEvent.total) {
-          const pct = Math.round((progressEvent.loaded * 90) / progressEvent.total);
-          setUploadProgress(Math.max(10, pct));
-        }
-      });
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('subsidiary', subsidiary);
+      formData.append('fiscal_year', fiscalYear);
 
+      const result = await documentApi.uploadDocument(formData);
+      clearInterval(interval);
       setUploadProgress(100);
+
       setTimeout(() => {
-        setIsUploading(false);
-        setSelectedFile(null);
-        if (onUploadSuccess) onUploadSuccess(doc);
+        if (onUploadSuccess && result) {
+          onUploadSuccess(result);
+        }
         onClose();
       }, 500);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      clearInterval(interval);
       setIsUploading(false);
       setUploadProgress(0);
 
-      const status = err.response?.status;
-      const detail = err.response?.data?.detail;
+      const error = err as { response?: { status?: number; data?: { detail?: string; error?: string; existing_document?: { id: number; filename: string } } }; message?: string };
 
-      if (status === 409) {
-        setDuplicateDocInfo(
-          detail || 'Duplicate document detected. An identical document file (SHA-256 hash match) already exists in the database.'
-        );
-      } else if (status === 400) {
-        setErrorMessage(detail || 'Validation error: Invalid file format or size limits exceeded.');
-      } else if (status === 401 || status === 403) {
-        setErrorMessage('Authorization required: You must be logged in as an Admin or Analyst to upload documents.');
+      if (error.response?.status === 409) {
+        const detail = error.response.data?.detail || error.response.data?.error || 'A document with identical content (SHA-256 hash) already exists.';
+        setDuplicateDocInfo(detail);
       } else {
-        setErrorMessage(detail || 'Upload failed due to a server error. Please try again.');
+        setErrorMessage(
+          error.response?.data?.detail ||
+          error.response?.data?.error ||
+          error.message ||
+          'Failed to upload and parse document. Please check connection and try again.'
+        );
       }
     }
   };
@@ -146,24 +149,24 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-coal-900/60 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl p-6 rounded-2xl bg-white border border-steel shadow-2xl space-y-6 text-ink">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B1117]/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl p-6 rounded-2xl bg-[#17232D] border border-[#2C3D49] shadow-2xl space-y-6 text-[#F1F5F7]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-steel pb-4">
+        <div className="flex items-center justify-between border-b border-[#2C3D49] pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 border border-amber-500/30">
+            <div className="p-2 rounded-lg bg-[#123C43] text-[#35D3CE] border border-[#18B6B2]/40">
               <Upload className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-ink">Ingest Mining Document</h3>
-              <p className="text-xs text-slateText">PDF, DOCX, XLSX, CSV up to 100 MB</p>
+              <h3 className="text-lg font-bold text-[#F1F5F7]">Ingest Mining Document</h3>
+              <p className="text-xs text-[#9EADB7]">PDF, DOCX, XLSX, CSV up to 100 MB</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
             disabled={isUploading}
-            className="p-1.5 rounded-lg text-slateText hover:text-ink hover:bg-ash transition-colors"
+            className="p-1.5 rounded-lg text-[#9EADB7] hover:text-[#F1F5F7] hover:bg-[#20313D] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -171,15 +174,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
         {/* Banners */}
         {errorMessage && (
-          <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/40 text-danger text-xs flex items-start gap-2.5">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-danger" />
+          <div className="p-3.5 rounded-xl bg-[#F05B5B]/10 border border-[#F05B5B]/40 text-[#F05B5B] text-xs flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[#F05B5B]" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {duplicateDocInfo && (
-          <div className="p-3.5 rounded-xl bg-warning/10 border border-warning/40 text-warning text-xs flex items-start gap-2.5">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-warning" />
+          <div className="p-3.5 rounded-xl bg-[#F08A24]/10 border border-[#F08A24]/40 text-[#F08A24] text-xs flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[#F08A24]" />
             <div className="space-y-1">
               <span className="font-semibold block">Duplicate SHA-256 Hash Detected</span>
               <span>{duplicateDocInfo}</span>
@@ -197,10 +200,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             onClick={() => fileInputRef.current?.click()}
             className={`relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-150 text-center ${
               dragActive
-                ? 'border-amber-500 bg-amber-500/10'
+                ? 'border-[#18B6B2] bg-[#18B6B2]/10'
                 : selectedFile
-                ? 'border-green-500/50 bg-green-500/5'
-                : 'border-steel bg-ash/50 hover:border-steel/80 hover:bg-ash'
+                ? 'border-[#39B978]/50 bg-[#39B978]/10'
+                : 'border-[#2C3D49] bg-[#111B24] hover:border-[#18B6B2]/60 hover:bg-[#20313D]'
             }`}
           >
             <input
@@ -213,26 +216,26 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
             {selectedFile ? (
               <div className="flex flex-col items-center space-y-2">
-                <div className="p-3 rounded-full bg-green-500/20 text-green-600 border border-green-500/30">
+                <div className="p-3 rounded-full bg-[#39B978]/20 text-[#39B978] border border-[#39B978]/30">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
-                <span className="text-sm font-semibold text-ink max-w-xs truncate">
+                <span className="text-sm font-semibold text-[#F1F5F7] max-w-xs truncate">
                   {selectedFile.name}
                 </span>
                 <Badge variant="gold" size="sm">
                   {formatFileSize(selectedFile.size)}
                 </Badge>
-                <span className="text-[11px] text-slateText">Click or drag another file to replace</span>
+                <span className="text-[11px] text-[#9EADB7]">Click or drag another file to replace</span>
               </div>
             ) : (
               <div className="flex flex-col items-center space-y-2">
-                <div className="p-3 rounded-full bg-white text-amber-600 border border-steel shadow-sm">
+                <div className="p-3 rounded-full bg-[#20313D] text-[#35D3CE] border border-[#2C3D49] shadow-sm">
                   <FileText className="h-8 w-8" />
                 </div>
-                <div className="text-xs text-slateText">
-                  <span className="font-semibold text-amber-600">Click to browse</span> or drag and drop document here
+                <div className="text-xs text-[#9EADB7]">
+                  <span className="font-semibold text-[#35D3CE]">Click to browse</span> or drag and drop document here
                 </div>
-                <span className="text-[10px] text-slateText font-mono uppercase tracking-wider">
+                <span className="text-[10px] text-[#9EADB7] font-mono uppercase tracking-wider">
                   Supported formats: PDF, DOCX, XLSX, CSV (Max 100 MB)
                 </span>
               </div>
@@ -259,13 +262,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           {/* Upload Progress Bar */}
           {isUploading && (
             <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between text-xs font-mono text-slateText">
+              <div className="flex items-center justify-between text-xs font-mono text-[#9EADB7]">
                 <span>Ingesting & Parsing Document...</span>
-                <span className="text-amber-600 font-semibold">{uploadProgress}%</span>
+                <span className="text-[#35D3CE] font-semibold">{uploadProgress}%</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-ash border border-steel overflow-hidden">
+              <div className="h-2 w-full rounded-full bg-[#111B24] border border-[#2C3D49] overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-300 rounded-full"
+                  className="h-full bg-gradient-to-r from-[#18B6B2] to-[#35D3CE] transition-all duration-300 rounded-full"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -273,7 +276,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           )}
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-steel">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#2C3D49]">
             <Button variant="ghost" size="md" onClick={onClose} disabled={isUploading}>
               Cancel
             </Button>

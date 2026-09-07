@@ -61,7 +61,7 @@ export default function QueryPage() {
         title="Ask COALINTEL — Cited Mining Q&A Assistant"
         description="Evidence-driven natural language retrieval enforcing page-level citation verification [Doc_Name.pdf, Page X] against ChromaDB vector embeddings."
         breadcrumbs={[{ label: 'Ask COALINTEL' }]}
-        badge={<Badge variant="gold">Hybrid RAG Engine</Badge>}
+        badge={<Badge variant="amber">Hybrid RAG Engine</Badge>}
       />
 
       {/* Query Input & Sample Pills */}

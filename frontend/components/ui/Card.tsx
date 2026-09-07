@@ -9,10 +9,10 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, children, variant = 'default', glow = false, ...props }, ref) => {
     const variants = {
-      default: 'bg-white border border-steel shadow-card-light text-ink',
-      elevated: 'bg-white border border-steel shadow-md text-ink',
-      bordered: 'bg-ash/70 border border-steel shadow-sm text-ink',
-      dark: 'bg-coal-800 text-slate-100 border border-coal-700 shadow-lg',
+      default: 'bg-[#17232D] border border-[#2C3D49] shadow-lg text-[#F1F5F7]',
+      elevated: 'bg-[#20313D] border border-[#2C3D49] shadow-xl text-[#F1F5F7]',
+      bordered: 'bg-[#17232D] border border-[#2C3D49] shadow-md text-[#F1F5F7]',
+      dark: 'bg-[#111B24] border border-[#2C3D49] text-[#F1F5F7] shadow-xl',
     };
 
     return (
@@ -21,7 +21,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
         className={cn(
           'rounded-xl p-5 transition-all duration-200',
           variants[variant],
-          glow && 'shadow-glow-amber border-amber-500/40',
+          glow && 'shadow-glow-teal border-[#18B6B2]/40',
           className
         )}
         {...props}
@@ -38,7 +38,7 @@ export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   children,
   ...props
 }) => (
-  <div className={cn('flex flex-col space-y-1.5 pb-4 border-b border-steel/60', className)} {...props}>
+  <div className={cn('flex flex-col space-y-1.5 pb-4 border-b border-[#2C3D49]', className)} {...props}>
     {children}
   </div>
 );
@@ -48,7 +48,7 @@ export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>> = ({
   children,
   ...props
 }) => (
-  <h3 className={cn('text-base font-bold text-ink tracking-tight flex items-center gap-2', className)} {...props}>
+  <h3 className={cn('text-base font-bold text-[#F1F5F7] tracking-tight flex items-center gap-2', className)} {...props}>
     {children}
   </h3>
 );
@@ -58,7 +58,7 @@ export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement
   children,
   ...props
 }) => (
-  <p className={cn('text-xs text-slateText font-normal', className)} {...props}>
+  <p className={cn('text-xs text-[#9EADB7] font-normal', className)} {...props}>
     {children}
   </p>
 );

@@ -122,7 +122,7 @@ export default function ParliamentaryPage() {
         title="Parliamentary Question & Executive Briefing Intelligence Engine"
         description="Multi-subsidiary evidence synthesis, deterministic metric validation, and institutional briefing note compilation."
         breadcrumbs={[{ label: 'Parliamentary Intelligence' }]}
-        badge={<Badge variant="gold">Parliamentary Engine</Badge>}
+        badge={<Badge variant="amber">Parliamentary Engine</Badge>}
       />
 
       {/* Preset Selector Grid */}
@@ -131,34 +131,34 @@ export default function ParliamentaryPage() {
           <Card
             key={idx}
             onClick={() => handlePresetSelect(p)}
-            className="p-4 cursor-pointer hover:border-amber-500/50 hover:bg-ash/60 transition-all border-steel group bg-white shadow-card-light"
+            className="p-4 cursor-pointer hover:border-[#18B6B2]/50 hover:bg-[#20313D]/50 transition-all border-[#2C3D49] group bg-[#17232D] shadow-card-dark"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-amber-600 font-bold uppercase tracking-wider">{p.type}</span>
-              <ArrowRight className="h-3.5 w-3.5 text-slateText group-hover:text-amber-600 transition-colors" />
+              <span className="text-xs font-mono text-[#F2A900] font-bold uppercase tracking-wider">{p.type}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-[#9EADB7] group-hover:text-[#35D3CE] transition-colors" />
             </div>
-            <h4 className="text-sm font-semibold text-ink group-hover:text-amber-600 mb-1">{p.title}</h4>
-            <p className="text-xs text-slateText line-clamp-2">{p.question}</p>
+            <h4 className="text-sm font-semibold text-[#F1F5F7] group-hover:text-[#35D3CE] mb-1">{p.title}</h4>
+            <p className="text-xs text-[#9EADB7] line-clamp-2">{p.question}</p>
           </Card>
         ))}
       </div>
 
       {/* Question Form & Scope Display */}
-      <Card className="border-steel shadow-card-light">
-        <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
+      <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
+        <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <CardTitle className="text-sm font-semibold text-ink flex items-center gap-2">
-              <Landmark className="h-4 w-4 text-amber-500" />
+            <CardTitle className="text-sm font-semibold text-[#F1F5F7] flex items-center gap-2">
+              <Landmark className="h-4 w-4 text-[#18B6B2]" />
               <span>Parliamentary Question Input</span>
             </CardTitle>
 
             {/* Scope Badges */}
             <div className="flex items-center gap-2">
-              <Badge variant="gold" size="sm" className="gap-1 font-mono">
+              <Badge variant="amber" size="sm" className="gap-1 font-mono">
                 <Building2 className="h-3 w-3" />
                 {selectedSubsidiary}
               </Badge>
-              <Badge variant="default" size="sm" className="gap-1 font-mono">
+              <Badge variant="secondary" size="sm" className="gap-1 font-mono">
                 <Calendar className="h-3 w-3" />
                 FY {selectedFiscalYear}
               </Badge>
@@ -168,23 +168,23 @@ export default function ParliamentaryPage() {
 
         <CardContent className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-mono text-ink mb-2">Parliamentary Starred / Executive Question Text</label>
+            <label className="block text-xs font-mono text-[#F1F5F7] mb-2">Parliamentary Starred / Executive Question Text</label>
             <textarea
               value={questionText}
               onChange={(e) => setQuestionText(e.target.value)}
               rows={3}
               placeholder="Enter Parliamentary Question or Executive Query (e.g. Provide subsidiary-wise coal production and overburden removal figures for FY2023-24...)"
-              className="w-full bg-white border border-steel rounded-xl px-4 py-3 text-sm text-ink placeholder-slateText focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+              className="w-full bg-[#111B24] border border-[#2C3D49] rounded-xl px-4 py-3 text-sm text-[#F1F5F7] placeholder-[#9EADB7] focus:outline-none focus:border-[#18B6B2] focus:ring-1 focus:ring-[#18B6B2]/50"
             />
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2">
             <div className="flex items-center gap-3">
-              <span className="text-xs font-mono text-slateText whitespace-nowrap">Intent Filter:</span>
+              <span className="text-xs font-mono text-[#9EADB7] whitespace-nowrap">Intent Filter:</span>
               <select
                 value={questionType}
                 onChange={(e) => setQuestionType(e.target.value)}
-                className="bg-white border border-steel rounded-lg px-3 py-1.5 text-xs text-ink font-mono focus:outline-none focus:border-amber-500"
+                className="bg-[#111B24] border border-[#2C3D49] rounded-lg px-3 py-1.5 text-xs text-[#F1F5F7] font-mono focus:outline-none focus:border-[#18B6B2]"
               >
                 <option value="GENERAL">General Briefing</option>
                 <option value="TARGETS">Production Targets</option>
@@ -197,7 +197,7 @@ export default function ParliamentaryPage() {
             <button
               onClick={handleGenerate}
               disabled={loading || !questionText.trim()}
-              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-coal-900 font-bold text-sm shadow-glow-amber transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="px-6 py-2.5 rounded-xl bg-[#18B6B2] hover:bg-[#35D3CE] text-[#0B1117] font-bold text-sm shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <span>Synthesizing Evidence...</span>
@@ -222,16 +222,16 @@ export default function ParliamentaryPage() {
       {briefing && !loading && (
         <div className="space-y-6">
           {/* Briefing Banner Card */}
-          <Card className="border-steel shadow-card-light bg-white">
+          <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
             <div className="p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-steel pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2C3D49] pb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <Landmark className="h-5 w-5 text-amber-500" />
-                    <h2 className="text-lg font-bold text-ink">Parliamentary Briefing Note</h2>
+                    <Landmark className="h-5 w-5 text-[#18B6B2]" />
+                    <h2 className="text-lg font-bold text-[#F1F5F7]">Parliamentary Briefing Note</h2>
                   </div>
-                  <p className="text-xs text-slateText font-mono">
-                    Target Scope: <span className="text-amber-600 font-bold">{briefing.selected_scope}</span> | Fiscal Year: <span className="text-green-600 font-bold">{briefing.fiscal_year}</span> | Compiled: {briefing.generated_at}
+                  <p className="text-xs text-[#9EADB7] font-mono">
+                    Target Scope: <span className="text-[#35D3CE] font-bold">{briefing.selected_scope}</span> | Fiscal Year: <span className="text-[#39B978] font-bold">{briefing.fiscal_year}</span> | Compiled: {briefing.generated_at}
                   </p>
                 </div>
 
@@ -247,17 +247,17 @@ export default function ParliamentaryPage() {
                   <button
                     onClick={handleExportPdf}
                     disabled={downloadingPdf}
-                    className="px-4 py-2 rounded-lg bg-white hover:bg-ash border border-steel text-ink text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
+                    className="px-4 py-2 rounded-lg bg-[#20313D] hover:bg-[#2C3D49] border border-[#2C3D49] text-[#F1F5F7] text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
                   >
-                    <Download className="h-4 w-4 text-amber-500" />
+                    <Download className="h-4 w-4 text-[#18B6B2]" />
                     <span>{downloadingPdf ? 'Exporting PDF...' : 'Download Briefing Note (PDF)'}</span>
                   </button>
                 </div>
               </div>
 
               {/* Disclaimer Notice */}
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-800 flex items-center gap-2">
-                <Info className="h-4 w-4 shrink-0 text-amber-600" />
+              <div className="p-3 bg-[#3A2C0A] border border-[#F2A900]/30 rounded-xl text-xs text-[#F2A900] flex items-center gap-2">
+                <Info className="h-4 w-4 shrink-0 text-[#F2A900]" />
                 <span>
                   <b>Institutional Disclaimer:</b> AI-generated evidence-backed Parliamentary Briefing Note for analytical decision support. Not an official Ministry issued document.
                 </span>
@@ -265,8 +265,8 @@ export default function ParliamentaryPage() {
 
               {/* Executive Summary */}
               <div className="space-y-2">
-                <h3 className="text-xs font-mono uppercase tracking-wider text-slateText font-bold">Executive Summary</h3>
-                <p className="text-sm text-ink leading-relaxed bg-ash/50 p-4 rounded-xl border border-steel">
+                <h3 className="text-xs font-mono uppercase tracking-wider text-[#9EADB7] font-bold">Executive Summary</h3>
+                <p className="text-sm text-[#F1F5F7] leading-relaxed bg-[#20313D]/40 p-4 rounded-xl border border-[#2C3D49]">
                   {briefing.executive_summary}
                 </p>
               </div>
@@ -274,11 +274,11 @@ export default function ParliamentaryPage() {
               {/* Key Findings */}
               {briefing.key_findings.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-mono uppercase tracking-wider text-slateText font-bold">Key Findings & Operational Highlights</h3>
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#9EADB7] font-bold">Key Findings & Operational Highlights</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {briefing.key_findings.map((finding, idx) => (
-                      <div key={idx} className="p-3 bg-ash/50 border border-steel rounded-xl flex items-start gap-2.5 text-xs text-ink">
-                        <CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div key={idx} className="p-3 bg-[#20313D]/40 border border-[#2C3D49] rounded-xl flex items-start gap-2.5 text-xs text-[#F1F5F7]">
+                        <CheckCircle2 className="h-4 w-4 text-[#18B6B2] shrink-0 mt-0.5" />
                         <span>{finding}</span>
                       </div>
                     ))}
@@ -290,10 +290,10 @@ export default function ParliamentaryPage() {
 
           {/* Subsidiary Metrics Table */}
           {briefing.subsidiary_metrics.length > 0 && (
-            <Card className="border-steel shadow-card-light">
-              <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
-                <CardTitle className="text-sm font-semibold text-ink flex items-center gap-2">
-                  <FileCheck2 className="h-4 w-4 text-green-600" />
+            <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
+              <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
+                <CardTitle className="text-sm font-semibold text-[#F1F5F7] flex items-center gap-2">
+                  <FileCheck2 className="h-4 w-4 text-[#39B978]" />
                   <span>Verified Operational Metrics Table</span>
                 </CardTitle>
               </CardHeader>
@@ -301,7 +301,7 @@ export default function ParliamentaryPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-steel bg-ash text-[11px] font-mono text-slateText uppercase tracking-wider">
+                      <tr className="border-b border-[#2C3D49] bg-[#20313D] text-[11px] font-mono text-[#F1F5F7] uppercase tracking-wider">
                         <th className="py-3 px-4">Mine Entity</th>
                         <th className="py-3 px-4">Subsidiary</th>
                         <th className="py-3 px-4">Metric Name</th>
@@ -310,15 +310,15 @@ export default function ParliamentaryPage() {
                         <th className="py-3 px-4">Fiscal Year</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-steel/60 text-xs font-mono">
+                    <tbody className="divide-y divide-[#2C3D49] text-xs font-mono">
                       {briefing.subsidiary_metrics.map((m, idx) => (
-                        <tr key={idx} className="hover:bg-ash/60 transition-colors">
-                          <td className="py-3 px-4 font-sans font-semibold text-ink">{m.mine_name}</td>
-                          <td className="py-3 px-4 text-amber-600 font-bold">{m.subsidiary}</td>
-                          <td className="py-3 px-4 text-slateText">{m.metric_name}</td>
-                          <td className="py-3 px-4 text-ink">{m.numeric_value} {m.unit}</td>
-                          <td className="py-3 px-4 font-bold text-green-600">{formatStandardValue(m.standard_value)} {m.standard_unit}</td>
-                          <td className="py-3 px-4 text-slateText">{m.fiscal_year}</td>
+                        <tr key={idx} className="hover:bg-[#20313D]/40 transition-colors">
+                          <td className="py-3 px-4 font-sans font-semibold text-[#F1F5F7]">{m.mine_name}</td>
+                          <td className="py-3 px-4 text-[#35D3CE] font-bold">{m.subsidiary}</td>
+                          <td className="py-3 px-4 text-[#9EADB7]">{m.metric_name}</td>
+                          <td className="py-3 px-4 text-[#F1F5F7]">{m.numeric_value} {m.unit}</td>
+                          <td className="py-3 px-4 font-bold text-[#39B978]">{formatStandardValue(m.standard_value)} {m.standard_unit}</td>
+                          <td className="py-3 px-4 text-[#9EADB7]">{m.fiscal_year}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -330,20 +330,20 @@ export default function ParliamentaryPage() {
 
           {/* Flagged Discrepancies */}
           {briefing.discrepancies.length > 0 && (
-            <Card className="border-danger/30 shadow-card-light bg-danger/5">
-              <CardHeader className="py-3.5 px-4 bg-danger/10 border-b border-danger/20">
-                <CardTitle className="text-sm font-semibold text-danger flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-danger" />
+            <Card className="border-[#F05B5B]/30 shadow-card-dark bg-[#17232D]">
+              <CardHeader className="py-3.5 px-4 bg-[#F05B5B]/10 border-b border-[#F05B5B]/20">
+                <CardTitle className="text-sm font-semibold text-[#F05B5B] flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-[#F05B5B]" />
                   <span>Flagged Cross-Document Discrepancies ({briefing.discrepancies.length})</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 space-y-3">
                 {briefing.discrepancies.map((d, idx) => (
-                  <div key={idx} className="p-4 bg-white border border-danger/30 rounded-xl space-y-2">
+                  <div key={idx} className="p-4 bg-[#20313D] border border-[#F05B5B]/30 rounded-xl space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-ink">{d.entity}</span>
-                        <span className="text-xs text-slateText font-mono">({d.metric_name})</span>
+                        <span className="text-sm font-bold text-[#F1F5F7]">{d.entity}</span>
+                        <span className="text-xs text-[#9EADB7] font-mono">({d.metric_name})</span>
                       </div>
                       <Badge variant={d.is_seeded_demo ? 'warning' : 'danger'} size="sm" className="font-mono font-bold">
                         {d.provenance_label}
@@ -351,17 +351,17 @@ export default function ParliamentaryPage() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono pt-1">
-                      <div className="p-2.5 bg-ash rounded-lg border border-steel">
-                        <span className="text-slateText block text-[10px] truncate">{d.doc_a_filename}</span>
-                        <span className="text-ink font-bold text-sm block mt-0.5">{d.doc_a_value} {d.unit}</span>
+                      <div className="p-2.5 bg-[#111B24] rounded-lg border border-[#2C3D49]">
+                        <span className="text-[#9EADB7] block text-[10px] truncate">{d.doc_a_filename}</span>
+                        <span className="text-[#F1F5F7] font-bold text-sm block mt-0.5">{d.doc_a_value} {d.unit}</span>
                       </div>
-                      <div className="p-2.5 bg-ash rounded-lg border border-steel">
-                        <span className="text-slateText block text-[10px] truncate">{d.doc_b_filename}</span>
-                        <span className="text-ink font-bold text-sm block mt-0.5">{d.doc_b_value} {d.unit}</span>
+                      <div className="p-2.5 bg-[#111B24] rounded-lg border border-[#2C3D49]">
+                        <span className="text-[#9EADB7] block text-[10px] truncate">{d.doc_b_filename}</span>
+                        <span className="text-[#F1F5F7] font-bold text-sm block mt-0.5">{d.doc_b_value} {d.unit}</span>
                       </div>
-                      <div className="p-2.5 bg-danger/10 rounded-lg border border-danger/30 text-center">
-                        <span className="text-danger block text-[10px]">Variance Percentage</span>
-                        <span className="text-danger font-bold text-sm block mt-0.5">{d.variance_percentage}%</span>
+                      <div className="p-2.5 bg-[#F05B5B]/10 rounded-lg border border-[#F05B5B]/30 text-center">
+                        <span className="text-[#F05B5B] block text-[10px]">Variance Percentage</span>
+                        <span className="text-[#F05B5B] font-bold text-sm block mt-0.5">{d.variance_percentage}%</span>
                       </div>
                     </div>
                   </div>
@@ -372,25 +372,25 @@ export default function ParliamentaryPage() {
 
           {/* Traceable Evidence Lineage */}
           {briefing.evidence.length > 0 && (
-            <Card className="border-steel shadow-card-light">
-              <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
-                <CardTitle className="text-sm font-semibold text-ink flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-amber-500" />
+            <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
+              <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
+                <CardTitle className="text-sm font-semibold text-[#F1F5F7] flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-[#18B6B2]" />
                   <span>Traceable Evidence Lineage ({briefing.evidence.length} Chunks)</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 space-y-3">
                 {briefing.evidence.map((ev, idx) => (
-                  <div key={idx} className="p-3.5 bg-ash/50 border border-steel rounded-xl flex items-start justify-between gap-4">
+                  <div key={idx} className="p-3.5 bg-[#20313D]/40 border border-[#2C3D49] rounded-xl flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-xs font-mono">
-                        <span className="text-amber-600 font-bold">{ev.document_name}</span>
-                        <span className="text-slateText">•</span>
-                        <span className="text-ink">Page {ev.page_number}</span>
-                        <span className="text-slateText">•</span>
-                        <span className="text-green-600 font-semibold">RRF Score: {ev.rrf_score}</span>
+                        <span className="text-[#35D3CE] font-bold">{ev.document_name}</span>
+                        <span className="text-[#9EADB7]">•</span>
+                        <span className="text-[#F1F5F7]">Page {ev.page_number}</span>
+                        <span className="text-[#9EADB7]">•</span>
+                        <span className="text-[#39B978] font-semibold">RRF Score: {ev.rrf_score}</span>
                       </div>
-                      <p className="text-xs text-ink line-clamp-2 leading-relaxed font-sans">{ev.text_snippet}</p>
+                      <p className="text-xs text-[#F1F5F7] line-clamp-2 leading-relaxed font-sans">{ev.text_snippet}</p>
                     </div>
 
                     <button
@@ -403,7 +403,7 @@ export default function ParliamentaryPage() {
                           rrfScore: ev.rrf_score,
                         })
                       }
-                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-ash border border-steel text-amber-600 text-xs font-semibold shrink-0 transition-colors whitespace-nowrap shadow-sm"
+                      className="px-3 py-1.5 rounded-lg bg-[#20313D] hover:bg-[#2C3D49] border border-[#2C3D49] text-[#35D3CE] text-xs font-semibold shrink-0 transition-colors whitespace-nowrap shadow-sm"
                     >
                       View Evidence
                     </button>
@@ -415,10 +415,10 @@ export default function ParliamentaryPage() {
 
           {/* Limitations Card */}
           {briefing.limitations.length > 0 && (
-            <Card className="border-steel shadow-card-light bg-ash/50">
+            <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
               <div className="p-4 space-y-2">
-                <h4 className="text-xs font-mono uppercase tracking-wider text-slateText font-bold">System Limitations & Scope Boundaries</h4>
-                <ul className="list-disc list-inside text-xs text-slateText space-y-1 font-mono">
+                <h4 className="text-xs font-mono uppercase tracking-wider text-[#9EADB7] font-bold">System Limitations & Scope Boundaries</h4>
+                <ul className="list-disc list-inside text-xs text-[#9EADB7] space-y-1 font-mono">
                   {briefing.limitations.map((lim, idx) => (
                     <li key={idx}>{lim}</li>
                   ))}
