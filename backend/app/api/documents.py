@@ -187,6 +187,11 @@ def get_document_lineage(
                 "standard_value": float(m.standard_value) if m.standard_value is not None else 0.0,
                 "standard_unit": m.standard_unit or "MT",
                 "fiscal_year": m.fiscal_year,
+                "confidence_score": (
+                    float(m.confidence_score)
+                    if m.confidence_score is not None
+                    else 0.95
+                ),
                 "validation_status": m.validation_status or "VALIDATED",
                 "raw_snippet": m.raw_snippet or ""
             }
