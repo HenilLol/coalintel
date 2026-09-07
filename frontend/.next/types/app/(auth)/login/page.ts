@@ -1,4 +1,4 @@
-// File: C:\Users\Henil Patel\COALINTEL\frontend\app\(auth)\login\page.tsx
+// File: D:\Coalintel\coalintel-main\frontend\app\(auth)\login\page.tsx
 import * as entry from '../../../../../app/(auth)/login/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

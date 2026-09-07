@@ -24,7 +24,6 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
   const pageNum = citation.page_number || 1;
 
   return (
-  return (
     <div className="fixed inset-0 z-50 flex justify-end bg-coal-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg h-full bg-white border-l border-steel p-6 flex flex-col justify-between space-y-6 shadow-2xl overflow-y-auto">
         {/* Header */}
