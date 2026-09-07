@@ -71,10 +71,10 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>
-            <ShieldCheck className="h-5 w-5 text-emerald-400" />
+            <ShieldCheck className="h-5 w-5 text-green-600" />
             <span>Validation & Data Quality Feed</span>
           </CardTitle>
-          <Link href="/validation" className="text-xs text-gold-400 hover:text-gold-300 font-mono flex items-center gap-1">
+          <Link href="/validation" className="text-xs text-teal-600 hover:text-teal-700 font-mono flex items-center gap-1">
             View All <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
@@ -87,7 +87,7 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 w-full animate-pulse rounded-lg bg-navy-950/60" />
+              <div key={i} className="h-20 w-full animate-pulse rounded-lg bg-ash" />
             ))}
           </div>
         ) : (
@@ -99,10 +99,10 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
               return (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-lg bg-navy-950/80 border border-slate-800 hover:border-slate-700 transition-colors space-y-1.5"
+                  className="p-3.5 rounded-lg bg-ash/70 border border-steel hover:border-slateText/50 transition-colors space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-200">{item.mine_name}</span>
+                    <span className="text-xs font-bold text-ink">{item.mine_name}</span>
                     <Badge
                       variant={isConflict ? 'danger' : isWarning ? 'warning' : 'success'}
                       size="sm"
@@ -111,13 +111,13 @@ export const ValidationFeedWidget: React.FC<ValidationFeedWidgetProps> = ({
                     </Badge>
                   </div>
 
-                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                  <p className="text-[11px] text-slateText line-clamp-2 leading-relaxed">
                     {item.message}
                   </p>
 
-                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-1">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-slateText pt-1">
                     <span>Metric: {item.metric_name}</span>
-                    <span className="text-gold-400 font-semibold">{item.reported_value} {item.standard_unit}</span>
+                    <span className="text-amber-600 font-bold">{item.reported_value} {item.standard_unit}</span>
                   </div>
                 </div>
               );

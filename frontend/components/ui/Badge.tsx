@@ -14,12 +14,12 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const variants = {
-    default: 'bg-navy-800 text-slate-300 border-slate-700',
-    success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    warning: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-    danger: 'bg-red-500/10 text-red-400 border-red-500/30',
-    info: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-    gold: 'bg-gold-500/10 text-gold-400 border-gold-500/30 font-semibold',
+    default: 'bg-steel/20 text-ink border-steel',
+    success: 'bg-green-500/15 text-green-600 border-green-500/30 font-semibold',
+    warning: 'bg-warning/15 text-warning border-warning/35 font-semibold',
+    danger: 'bg-danger/15 text-danger border-danger/35 font-semibold',
+    info: 'bg-teal-500/15 text-teal-600 border-teal-500/35 font-semibold',
+    gold: 'bg-amber-500/15 text-amber-700 border-amber-500/40 font-semibold',
   };
 
   const sizes = {

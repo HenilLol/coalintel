@@ -47,7 +47,7 @@ def generate_pdf_reportlab(
         'DocTitle',
         parent=styles['Heading1'],
         fontSize=18,
-        textColor=colors.HexColor('#0F172A'),
+        textColor=colors.HexColor('#20262B'),
         spaceAfter=12
     )
 
@@ -55,7 +55,7 @@ def generate_pdf_reportlab(
         'DocMeta',
         parent=styles['Normal'],
         fontSize=10,
-        textColor=colors.HexColor('#475569'),
+        textColor=colors.HexColor('#5E6B73'),
         spaceAfter=18
     )
 
@@ -95,14 +95,14 @@ def generate_pdf_reportlab(
 
     t = Table(table_data)
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#171A1F')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8FAFC')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F7F8')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD3D8')),
     ]))
 
     story.append(t)

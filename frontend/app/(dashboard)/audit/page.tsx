@@ -35,13 +35,13 @@ export default function AuditPage() {
 
       {/* 403 Forbidden RBAC Notice */}
       {isForbidden ? (
-        <div className="p-8 rounded-2xl bg-navy-900 border border-amber-500/30 text-center space-y-3 max-w-xl mx-auto my-8">
-          <div className="p-3 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 w-fit mx-auto">
+        <div className="p-8 rounded-2xl bg-white border border-steel shadow-card-light text-center space-y-3 max-w-xl mx-auto my-8">
+          <div className="p-3 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/30 w-fit mx-auto">
             <ShieldAlert className="h-8 w-8" />
           </div>
-          <h3 className="text-base font-bold text-slate-100">RBAC Authorization Notice</h3>
-          <p className="text-xs text-slate-400">
-            System security audit logs are restricted to users with <code className="text-gold-400">Admin</code> role authorization.
+          <h3 className="text-base font-bold text-ink">RBAC Authorization Notice</h3>
+          <p className="text-xs text-slateText">
+            System security audit logs are restricted to users with <code className="text-amber-600 font-semibold">Admin</code> role authorization.
           </p>
         </div>
       ) : isError ? (

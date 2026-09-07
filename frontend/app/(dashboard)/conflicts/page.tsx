@@ -58,11 +58,11 @@ export default function ConflictsPage() {
       {isError && <ErrorState message={error instanceof Error ? error.message : 'Failed to fetch conflict list.'} />}
 
       {/* Main Conflicts Data Table Card */}
-      <Card className="border-slate-800/90 shadow-card-dark">
-        <CardHeader className="py-3.5 px-4 bg-navy-950/80 border-b border-slate-800">
+      <Card className="border-steel shadow-card-light">
+        <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <GitCompare className="h-4 w-4 text-amber-400" />
+            <CardTitle className="text-sm font-semibold text-ink flex items-center gap-2">
+              <GitCompare className="h-4 w-4 text-amber-500" />
               <span>Cross-Document Metric Discrepancies</span>
             </CardTitle>
             <Badge variant="gold" size="sm">
@@ -75,7 +75,7 @@ export default function ConflictsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-800/90 bg-navy-950/40 text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+                <tr className="border-b border-steel bg-ash text-[11px] font-mono text-slateText uppercase tracking-wider">
                   <th className="py-3 px-4">Mine & Metric Entity</th>
                   <th className="py-3 px-4">Document A Value</th>
                   <th className="py-3 px-4">Document B Value</th>
@@ -85,53 +85,53 @@ export default function ConflictsPage() {
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-800/60 text-xs font-mono">
+              <tbody className="divide-y divide-steel/60 text-xs font-mono">
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, idx) => (
                     <tr key={idx} className="animate-pulse">
-                      <td className="py-3.5 px-4"><div className="h-4 w-36 bg-navy-800 rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-navy-800 rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-navy-800 rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-16 bg-navy-800 rounded" /></td>
-                      <td className="py-3.5 px-4"><div className="h-4 w-20 bg-navy-800 rounded" /></td>
-                      <td className="py-3.5 px-4 text-right"><div className="h-6 w-20 bg-navy-800 rounded ml-auto" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-36 bg-ash rounded" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-ash rounded" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-28 bg-ash rounded" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-16 bg-ash rounded" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 w-20 bg-ash rounded" /></td>
+                      <td className="py-3.5 px-4 text-right"><div className="h-6 w-20 bg-ash rounded ml-auto" /></td>
                     </tr>
                   ))
                 ) : conflicts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                    <td colSpan={6} className="py-8 text-center text-slateText text-xs">
                       No cross-document metric discrepancies detected.
                     </td>
                   </tr>
                 ) : (
                   conflicts.map((c) => (
-                    <tr key={c.id} className="hover:bg-navy-800/40 transition-colors">
-                      <td className="py-3.5 px-4 font-sans font-semibold text-slate-200">
+                    <tr key={c.id} className="hover:bg-ash/60 transition-colors">
+                      <td className="py-3.5 px-4 font-sans font-semibold text-ink">
                         {c.mine_name}
-                        <span className="block text-[11px] text-slate-400 font-mono font-normal">
+                        <span className="block text-[11px] text-slateText font-mono font-normal">
                           {c.metric_name} ({c.fiscal_year})
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 text-slate-300">
-                        <span className="font-bold text-slate-200 block">
+                      <td className="py-3.5 px-4 text-slateText">
+                        <span className="font-bold text-ink block">
                           {c.document_a_value} {c.document_a_unit}
                         </span>
-                        <span className="text-[10px] text-slate-500 truncate block max-w-xs" title={c.document_a_filename}>
+                        <span className="text-[10px] text-slateText truncate block max-w-xs" title={c.document_a_filename}>
                           {c.document_a_filename}
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 text-slate-300">
-                        <span className="font-bold text-slate-200 block">
+                      <td className="py-3.5 px-4 text-slateText">
+                        <span className="font-bold text-ink block">
                           {c.document_b_value} {c.document_b_unit}
                         </span>
-                        <span className="text-[10px] text-slate-500 truncate block max-w-xs" title={c.document_b_filename}>
+                        <span className="text-[10px] text-slateText truncate block max-w-xs" title={c.document_b_filename}>
                           {c.document_b_filename}
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 font-bold text-amber-400">
+                      <td className="py-3.5 px-4 font-bold text-warning">
                         {c.discrepancy_percentage?.toFixed(2)}%
                       </td>
 

@@ -39,7 +39,7 @@ export default function ValidationPage() {
             value={selectedSubsidiary}
             onChange={(e) => setSelectedSubsidiary(e.target.value)}
             options={CIL_SUBSIDIARIES}
-            className="w-48 bg-navy-900 text-xs py-1.5"
+            className="w-48 bg-white text-xs py-1.5"
           />
         }
       />

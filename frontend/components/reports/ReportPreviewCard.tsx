@@ -22,13 +22,13 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
 
   if (!report) {
     return (
-      <Card className="h-full flex items-center justify-center p-12 text-center border-slate-800/90 shadow-card-dark">
-        <div className="space-y-2 text-slate-500">
-          <FileText className="h-10 w-10 mx-auto text-slate-600" />
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+      <Card className="h-full flex items-center justify-center p-12 text-center border-steel shadow-card-light">
+        <div className="space-y-2 text-slateText">
+          <FileText className="h-10 w-10 mx-auto text-slateText/70" />
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-slateText">
             No Active Report Draft Selected
           </h4>
-          <p className="text-xs text-slate-500 max-w-xs">
+          <p className="text-xs text-slateText max-w-xs">
             Configure report parameters on the left and click &quot;Assemble Report Draft&quot; to generate an institutional preview.
           </p>
         </div>
@@ -52,11 +52,11 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
   };
 
   return (
-    <Card className="h-full border-slate-800/90 shadow-card-dark space-y-4">
-      <CardHeader className="py-3.5 px-4 bg-navy-950/80 border-b border-slate-800 flex items-center justify-between">
+    <Card className="h-full border-steel shadow-card-light space-y-4">
+      <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-gold-400" />
-          <CardTitle className="text-sm font-semibold">Reportlab Draft Assembly Preview</CardTitle>
+          <Sparkles className="h-4 w-4 text-amber-500" />
+          <CardTitle className="text-sm font-semibold text-ink">Reportlab Draft Assembly Preview</CardTitle>
         </div>
         <Badge variant={isApproved ? 'success' : 'warning'}>
           {report.approval_status || 'DRAFT'}
@@ -65,9 +65,9 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
 
       <CardContent className="p-6 space-y-5">
         {/* Title & Metadata Card */}
-        <div className="p-4 rounded-xl bg-navy-950 border border-slate-800 space-y-3">
+        <div className="p-4 rounded-xl bg-ash border border-steel space-y-3">
           <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-bold text-slate-100 font-sans leading-snug">
+            <h3 className="text-base font-bold text-ink font-sans leading-snug">
               {report.title}
             </h3>
             <Badge variant="gold" size="sm" className="shrink-0 font-mono">
@@ -75,24 +75,24 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
             </Badge>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-400 pt-1 border-t border-slate-800/80">
-            <span>Template: <code className="text-slate-200">{report.report_type}</code></span>
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slateText pt-1 border-t border-steel">
+            <span>Template: <code className="text-ink font-semibold">{report.report_type}</code></span>
             <span>•</span>
-            <span>Subsidiary: <span className="text-gold-400">{report.subsidiary || 'ECL'}</span></span>
+            <span>Subsidiary: <span className="text-amber-600 font-semibold">{report.subsidiary || 'ECL'}</span></span>
             <span>•</span>
-            <span>FY: <span className="text-gold-400">{report.fiscal_year || '2023-24'}</span></span>
+            <span>FY: <span className="text-amber-600 font-semibold">{report.fiscal_year || '2023-24'}</span></span>
           </div>
 
-          <div className="text-[11px] font-mono text-slate-500 truncate" title={report.file_path}>
+          <div className="text-[11px] font-mono text-slateText truncate" title={report.file_path}>
             PDF File: {report.file_path}
           </div>
         </div>
 
         {/* Verification Note */}
-        <div className="p-3.5 rounded-xl bg-navy-950/60 border border-slate-800/90 text-xs text-slate-300 flex items-center gap-2.5">
-          <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+        <div className="p-3.5 rounded-xl bg-green-500/10 border border-green-500/30 text-xs text-ink flex items-center gap-2.5">
+          <ShieldCheck className="h-4 w-4 text-green-600 shrink-0" />
           <span>
-            Compiled using verified unit-normalized metrics from database <code className="text-gold-400 font-mono">extracted_metrics</code> and resolved conflicts.
+            Compiled using verified unit-normalized metrics from database <code className="text-amber-600 font-mono font-semibold">extracted_metrics</code> and resolved conflicts.
           </span>
         </div>
 

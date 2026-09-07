@@ -156,7 +156,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Search & Filter Bar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 p-4 rounded-xl bg-navy-900/80 border border-slate-800/90 shadow-card-dark">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 p-4 rounded-xl bg-white border border-steel shadow-card-light">
         {/* Search Input */}
         <div className="flex-1 max-w-md">
           <Input
@@ -166,8 +166,8 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            leftIcon={<Search className="h-4 w-4 text-slate-400" />}
-            className="bg-navy-950/90 text-xs py-2"
+            leftIcon={<Search className="h-4 w-4 text-slateText" />}
+            className="bg-white text-xs py-2"
           />
         </div>
 
@@ -180,7 +180,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               setCurrentPage(1);
             }}
             options={CIL_SUBSIDIARIES}
-            className="bg-navy-950/90 text-xs font-medium py-2 w-48"
+            className="bg-white text-xs font-medium py-2 w-48"
           />
 
           {onRefresh && (
@@ -198,7 +198,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       </div>
 
       {/* Status Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-slate-800/80">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-steel">
         {statusTabs.map((tab) => (
           <button
             key={tab.value}
@@ -208,8 +208,8 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
             }}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap select-none ${
               selectedStatus === tab.value
-                ? 'bg-gold-500/15 text-gold-400 border border-gold-500/30 font-semibold shadow-glow-gold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-navy-900/60'
+                ? 'bg-amber-500/15 text-amber-600 border border-amber-500/40 font-semibold'
+                : 'text-slateText hover:text-ink hover:bg-ash'
             }`}
           >
             {tab.label}
@@ -218,11 +218,11 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       </div>
 
       {/* Document Data Table */}
-      <div className="rounded-xl border border-slate-800/90 bg-navy-900/60 overflow-hidden shadow-card-dark">
+      <div className="rounded-xl border border-steel bg-white overflow-hidden shadow-card-light">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-800/90 bg-navy-950/80 text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+              <tr className="border-b border-steel bg-ash text-[11px] font-mono text-slateText uppercase tracking-wider">
                 <th className="py-3 px-4">Document / File Type</th>
                 <th className="py-3 px-4">Subsidiary / FY</th>
                 <th className="py-3 px-4">Pages / Size</th>
@@ -232,27 +232,27 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/60 text-xs">
+            <tbody className="divide-y divide-steel/60 text-xs">
               {loading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="py-4 px-4">
-                      <div className="h-4 w-48 bg-navy-800 rounded" />
+                      <div className="h-4 w-48 bg-ash rounded" />
                     </td>
                     <td className="py-4 px-4">
-                      <div className="h-4 w-24 bg-navy-800 rounded" />
+                      <div className="h-4 w-24 bg-ash rounded" />
                     </td>
                     <td className="py-4 px-4">
-                      <div className="h-4 w-20 bg-navy-800 rounded" />
+                      <div className="h-4 w-20 bg-ash rounded" />
                     </td>
                     <td className="py-4 px-4">
-                      <div className="h-4 w-16 bg-navy-800 rounded" />
+                      <div className="h-4 w-16 bg-ash rounded" />
                     </td>
                     <td className="py-4 px-4">
-                      <div className="h-4 w-24 bg-navy-800 rounded" />
+                      <div className="h-4 w-24 bg-ash rounded" />
                     </td>
                     <td className="py-4 px-4 text-right">
-                      <div className="h-6 w-20 bg-navy-800 rounded ml-auto" />
+                      <div className="h-6 w-20 bg-ash rounded ml-auto" />
                     </td>
                   </tr>
                 ))
@@ -267,22 +267,22 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                 </tr>
               ) : (
                 paginatedDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-navy-800/40 transition-colors group">
+                  <tr key={doc.id} className="hover:bg-ash/60 transition-colors group">
                     {/* Filename & Type */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-navy-950 border border-slate-800 group-hover:border-slate-700 shrink-0">
+                        <div className="p-2 rounded-lg bg-ash border border-steel group-hover:border-steel/80 shrink-0">
                           {getFileTypeIcon(doc.file_type)}
                         </div>
                         <div className="min-w-0">
                           <Link
                             href={`/documents/${doc.id}`}
-                            className="font-semibold text-slate-200 hover:text-gold-400 transition-colors truncate block max-w-xs sm:max-w-sm"
+                            className="font-semibold text-ink hover:text-teal-600 transition-colors truncate block max-w-xs sm:max-w-sm"
                             title={doc.filename}
                           >
                             {doc.filename}
                           </Link>
-                          <span className="text-[10px] font-mono text-slate-500 truncate block max-w-xs">
+                          <span className="text-[10px] font-mono text-slateText truncate block max-w-xs">
                             SHA-256: {doc.file_hash ? doc.file_hash.substring(0, 16) : 'N/A'}...
                           </span>
                         </div>
@@ -290,22 +290,22 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                     </td>
 
                     {/* Subsidiary & FY */}
-                    <td className="py-3.5 px-4 font-mono text-slate-300">
-                      <span className="font-semibold block text-slate-200">{doc.subsidiary || 'CIL HQ'}</span>
-                      <span className="text-[11px] text-gold-400">{doc.fiscal_year || '2023-24'}</span>
+                    <td className="py-3.5 px-4 font-mono text-slateText">
+                      <span className="font-semibold block text-ink">{doc.subsidiary || 'CIL HQ'}</span>
+                      <span className="text-[11px] text-amber-600 font-semibold">{doc.fiscal_year || '2023-24'}</span>
                     </td>
 
                     {/* Pages & Size */}
-                    <td className="py-3.5 px-4 font-mono text-slate-300">
-                      <span className="block">{doc.total_pages || 1} Pages</span>
-                      <span className="text-[11px] text-slate-500">{formatFileSize(doc.file_size_bytes)}</span>
+                    <td className="py-3.5 px-4 font-mono text-slateText">
+                      <span className="block text-ink">{doc.total_pages || 1} Pages</span>
+                      <span className="text-[11px] text-slateText">{formatFileSize(doc.file_size_bytes)}</span>
                     </td>
 
                     {/* Status */}
                     <td className="py-3.5 px-4">{getStatusBadge(doc.status)}</td>
 
                     {/* Date */}
-                    <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px]">
+                    <td className="py-3.5 px-4 text-slateText font-mono text-[11px]">
                       {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Recent'}
                     </td>
 
@@ -329,7 +329,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                               setDeleteError(null);
                               setDocumentToDelete(doc);
                             }}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-950/40 border border-transparent hover:border-red-500/30"
+                            className="text-danger hover:text-danger hover:bg-danger/10 border border-transparent hover:border-danger/30"
                             leftIcon={<Trash2 className="h-3.5 w-3.5" />}
                           >
                             Delete
@@ -345,7 +345,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
         </div>
 
         {/* Pagination Footer */}
-        <div className="py-3 px-4 border-t border-slate-800/80 bg-navy-950/60 flex items-center justify-between text-xs font-mono text-slate-400">
+        <div className="py-3 px-4 border-t border-steel bg-ash/50 flex items-center justify-between text-xs font-mono text-slateText">
           <span>
             Showing {filteredDocuments.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to{' '}
             {Math.min(currentPage * pageSize, filteredDocuments.length)} of {filteredDocuments.length} documents
@@ -355,7 +355,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1 || loading}
-              className="p-1.5 rounded-lg bg-navy-900 border border-slate-800 text-slate-300 hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-lg bg-white border border-steel text-ink hover:bg-ash disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -367,7 +367,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages || loading}
-              className="p-1.5 rounded-lg bg-navy-900 border border-slate-800 text-slate-300 hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-lg bg-white border border-steel text-ink hover:bg-ash disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -377,24 +377,24 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 
       {/* Admin Document Deletion Confirmation Modal */}
       {documentToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg p-6 rounded-2xl bg-navy-900 border border-red-500/40 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-coal-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg p-6 rounded-2xl bg-white border border-danger/40 shadow-2xl space-y-6">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex items-center justify-between border-b border-steel pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30">
+                <div className="p-2 rounded-lg bg-danger/10 text-danger border border-danger/30">
                   <AlertTriangle className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100">Delete this document?</h3>
-                  <p className="text-xs text-slate-400 font-mono">Document #{documentToDelete.id}</p>
+                  <h3 className="text-lg font-bold text-ink">Delete this document?</h3>
+                  <p className="text-xs text-slateText font-mono">Document #{documentToDelete.id}</p>
                 </div>
               </div>
 
               <button
                 onClick={() => setDocumentToDelete(null)}
                 disabled={isDeleting}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-navy-800 transition-colors"
+                className="p-1.5 rounded-lg text-slateText hover:text-ink hover:bg-ash transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -402,34 +402,34 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 
             {/* Error Banner */}
             {deleteError && (
-              <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-start gap-2.5">
-                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-red-400" />
+              <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/40 text-danger text-xs flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-danger" />
                 <span>{deleteError}</span>
               </div>
             )}
 
             {/* Modal Body */}
-            <div className="space-y-3 text-xs text-slate-300">
+            <div className="space-y-3 text-xs text-slateText">
               <p>
                 Are you sure you want to permanently delete{' '}
-                <strong className="text-slate-100 font-semibold">{documentToDelete.filename}</strong>?
+                <strong className="text-ink font-semibold">{documentToDelete.filename}</strong>?
               </p>
-              <div className="p-3.5 rounded-xl bg-navy-950/80 border border-slate-800 space-y-1.5 font-mono text-[11px] text-slate-400">
-                <p className="text-amber-400 font-sans font-semibold text-xs">This operation will permanently remove:</p>
-                <ul className="list-disc list-inside space-y-1 text-slate-300">
+              <div className="p-3.5 rounded-xl bg-ash border border-steel space-y-1.5 font-mono text-[11px] text-slateText">
+                <p className="text-amber-600 font-sans font-semibold text-xs">This operation will permanently remove:</p>
+                <ul className="list-disc list-inside space-y-1 text-ink">
                   <li>Stored source document file from storage</li>
                   <li>All extracted metrics and unit normalizations</li>
                   <li>Document text chunks and token metadata</li>
                   <li>Semantic vector embeddings in ChromaDB</li>
                 </ul>
-                <p className="text-red-400/90 pt-1 font-sans text-[11px] font-semibold">
+                <p className="text-danger pt-1 font-sans text-[11px] font-semibold">
                   This action cannot be undone.
                 </p>
               </div>
             </div>
 
             {/* Modal Footer Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-steel">
               <Button
                 variant="ghost"
                 size="md"

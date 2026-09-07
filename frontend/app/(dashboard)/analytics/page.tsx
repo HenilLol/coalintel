@@ -66,26 +66,26 @@ export default function AnalyticsPage() {
 
             {/* Entity Recognition Summary Side Card */}
             <div className="lg:col-span-4 space-y-4">
-              <Card className="border-slate-800/90 shadow-card-dark">
+              <Card className="border-steel shadow-card-light bg-white">
                 <div className="p-6 space-y-4 text-center">
-                  <div className="inline-flex p-3.5 rounded-full bg-gold-500/10 text-gold-400 border border-gold-500/30">
+                  <div className="inline-flex p-3.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30">
                     <Database className="h-8 w-8" />
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-100">Mining Named Entity Recognition</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <h3 className="text-base font-bold text-ink">Mining Named Entity Recognition</h3>
+                  <p className="text-xs text-slateText leading-relaxed">
                     Automated entity tagger identifying Opencast Mines, Coalfields, CIL Subsidiaries (ECL, BCCL, CCL, WCL, SECL, NCL, MCL), and target production metrics.
                   </p>
 
-                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-800 text-xs font-mono">
-                    <div className="p-3 bg-navy-950 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Tagged Mines</span>
-                      <span className="text-lg font-bold text-gold-400 mt-1 block">48 Mines</span>
+                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-steel text-xs font-mono">
+                    <div className="p-3 bg-ash rounded-xl border border-steel">
+                      <span className="text-slateText block text-[10px]">Tagged Mines</span>
+                      <span className="text-lg font-bold text-amber-600 mt-1 block">48 Mines</span>
                     </div>
 
-                    <div className="p-3 bg-navy-950 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Subsidiary Tags</span>
-                      <span className="text-lg font-bold text-emerald-400 mt-1 block">8 Subsidiaries</span>
+                    <div className="p-3 bg-ash rounded-xl border border-steel">
+                      <span className="text-slateText block text-[10px]">Subsidiary Tags</span>
+                      <span className="text-lg font-bold text-green-600 mt-1 block">8 Subsidiaries</span>
                     </div>
                   </div>
                 </div>
