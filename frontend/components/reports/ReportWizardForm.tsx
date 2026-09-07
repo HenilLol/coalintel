@@ -40,13 +40,13 @@ export const ReportWizardForm: React.FC<ReportWizardFormProps> = ({
   };
 
   return (
-    <Card className="border-slate-800/90 shadow-card-dark">
-      <CardHeader className="py-3.5 px-4 bg-navy-950/80 border-b border-slate-800">
+    <Card className="border-steel shadow-card-light">
+      <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
         <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-gold-400" />
-          <CardTitle className="text-sm font-semibold">Report Assembly Configuration</CardTitle>
+          <FileSpreadsheet className="h-4 w-4 text-amber-500" />
+          <CardTitle className="text-sm font-semibold text-ink">Report Assembly Configuration</CardTitle>
         </div>
-        <CardDescription className="text-xs">
+        <CardDescription className="text-xs text-slateText">
           Select template, fiscal year, and target subsidiary to trigger ReportLab PDF assembly.
         </CardDescription>
       </CardHeader>

@@ -38,7 +38,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
   };
 
   return (
-    <Card className="border-slate-800/90 shadow-card-dark">
+    <Card className="border-steel shadow-card-light bg-white">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Top Controls: Input Bar & Subsidiary Filter */}
         <div className="flex flex-col lg:flex-row items-stretch gap-3">
@@ -47,8 +47,8 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               placeholder="Ask any natural-language geological, production, OBR, or parliamentary query..."
               value={prompt}
               onChange={(e) => onPromptChange(e.target.value)}
-              leftIcon={<Sparkles className="h-4 w-4 text-gold-400" />}
-              className="bg-navy-950/90 text-sm py-2.5"
+              leftIcon={<Sparkles className="h-4 w-4 text-amber-500" />}
+              className="bg-white text-sm py-2.5"
             />
           </div>
 
@@ -57,7 +57,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               value={selectedSubsidiary}
               onChange={(e) => onSubsidiaryChange(e.target.value)}
               options={CIL_SUBSIDIARIES}
-              className="bg-navy-950/90 text-xs py-2.5 w-48"
+              className="bg-white text-xs py-2.5 w-48"
             />
 
             <Button
@@ -74,8 +74,8 @@ export const QueryInput: React.FC<QueryInputProps> = ({
         </div>
 
         {/* Sample Query Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-semibold shrink-0">
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-steel/60">
+          <span className="text-[10px] font-mono text-slateText uppercase tracking-widest font-semibold shrink-0">
             Sample Queries:
           </span>
           {SAMPLE_QUERIES.map((sq, i) => (
@@ -86,7 +86,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
                 onPromptChange(sq);
                 onSubmit(sq);
               }}
-              className="px-3 py-1 rounded-full bg-navy-950 border border-slate-800 hover:border-gold-500/50 hover:bg-gold-500/10 text-slate-300 text-xs transition-all text-left truncate max-w-xs"
+              className="px-3 py-1 rounded-full bg-ash border border-steel hover:border-amber-500/50 hover:bg-amber-500/10 text-ink text-xs transition-all text-left truncate max-w-xs"
             >
               {sq}
             </button>

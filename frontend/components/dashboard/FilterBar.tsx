@@ -24,9 +24,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   isLoading = false,
 }) => {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-xl bg-navy-900/80 border border-slate-800/90 shadow-card-dark">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-300">
-        <Filter className="h-4 w-4 text-gold-500" />
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-xl bg-white border border-steel shadow-card-light">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink">
+        <Filter className="h-4 w-4 text-amber-500" />
         <span>Operational Scope:</span>
       </div>
 
@@ -35,14 +35,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           value={selectedSubsidiary}
           onChange={(e) => onSubsidiaryChange(e.target.value)}
           options={CIL_SUBSIDIARIES}
-          className="bg-navy-950/90 text-xs font-medium py-2"
+          className="bg-white border-steel text-xs font-medium py-2"
         />
 
         <Select
           value={selectedFiscalYear}
           onChange={(e) => onFiscalYearChange(e.target.value)}
           options={FISCAL_YEARS}
-          className="bg-navy-950/90 text-xs font-medium py-2"
+          className="bg-white border-steel text-xs font-medium py-2"
         />
 
         {onRefresh && (

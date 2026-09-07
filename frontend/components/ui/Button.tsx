@@ -27,19 +27,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-navy-950 disabled:opacity-50 disabled:cursor-not-allowed select-none';
+      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed select-none';
 
     const variants = {
       primary:
-        'bg-gradient-to-r from-gold-600 to-gold-500 hover:from-gold-500 hover:to-gold-400 text-slate-950 font-semibold shadow-glow-gold focus:ring-gold-500 border border-gold-400/30 active:scale-[0.98]',
+        'bg-amber-500 hover:bg-amber-600 text-coal-900 font-bold shadow-sm focus:ring-amber-500 border border-amber-600/30 active:scale-[0.98]',
       secondary:
-        'bg-navy-800 hover:bg-navy-900 text-slate-200 border border-slate-700 hover:border-slate-600 focus:ring-slate-400 active:scale-[0.98]',
+        'bg-white hover:bg-ash text-ink border border-steel hover:border-slateText/60 focus:ring-slateText active:scale-[0.98]',
       outline:
-        'bg-transparent hover:bg-gold-500/10 text-gold-400 hover:text-gold-300 border border-gold-500/40 hover:border-gold-400 focus:ring-gold-500 active:scale-[0.98]',
+        'bg-transparent hover:bg-teal-500/10 text-teal-600 hover:text-teal-700 border border-teal-500 hover:border-teal-600 focus:ring-teal-500 active:scale-[0.98]',
       ghost:
-        'bg-transparent hover:bg-navy-800 text-slate-300 hover:text-slate-100 focus:ring-slate-400',
+        'bg-transparent hover:bg-steel/20 text-slateText hover:text-ink focus:ring-steel active:scale-[0.98]',
       danger:
-        'bg-red-600 hover:bg-red-500 text-white shadow-sm focus:ring-red-500 active:scale-[0.98]',
+        'bg-danger hover:bg-red-700 text-white shadow-sm focus:ring-red-500 active:scale-[0.98]',
     };
 
     const sizes = {

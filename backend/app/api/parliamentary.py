@@ -251,21 +251,21 @@ def export_parliamentary_pdf(
             'HeaderTitle',
             parent=styles['Heading1'],
             fontSize=16,
-            textColor=colors.HexColor('#0F172A'),
+            textColor=colors.HexColor('#20262B'),
             spaceAfter=4
         )
         sub_style = ParagraphStyle(
             'HeaderSub',
             parent=styles['Normal'],
             fontSize=9,
-            textColor=colors.HexColor('#64748B'),
+            textColor=colors.HexColor('#5E6B73'),
             spaceAfter=12
         )
         heading2_style = ParagraphStyle(
             'SectionHead',
             parent=styles['Heading2'],
             fontSize=12,
-            textColor=colors.HexColor('#1E293B'),
+            textColor=colors.HexColor('#171A1F'),
             spaceBefore=10,
             spaceAfter=6
         )
@@ -273,7 +273,7 @@ def export_parliamentary_pdf(
             'Body',
             parent=styles['Normal'],
             fontSize=9,
-            textColor=colors.HexColor('#334155'),
+            textColor=colors.HexColor('#20262B'),
             leading=13
         )
 
@@ -282,7 +282,7 @@ def export_parliamentary_pdf(
         # Document Header
         story.append(Paragraph("<b>COALINTEL — Parliamentary Briefing Note</b>", title_style))
         story.append(Paragraph("<i>AI-generated evidence-backed Parliamentary Briefing Note (Not an official Ministry issued document)</i>", sub_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#CBD5E1'), spaceAfter=10))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#CBD3D8'), spaceAfter=10))
 
         # Metadata Table
         meta_data = [
@@ -296,7 +296,7 @@ def export_parliamentary_pdf(
         meta_table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1E293B')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#20262B')),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ]))
@@ -329,11 +329,11 @@ def export_parliamentary_pdf(
                 ])
             m_table = Table(m_table_data, colWidths=[100, 70, 150, 60, 50, 60])
             m_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#171A1F')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD3D8')),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ]))
             story.append(m_table)
@@ -354,18 +354,18 @@ def export_parliamentary_pdf(
                 ])
             d_table = Table(d_table_data, colWidths=[90, 80, 130, 130, 50, 100])
             d_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#991B1B')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#C2413B')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#FCA5A5')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD3D8')),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ]))
             story.append(d_table)
             story.append(Spacer(1, 10))
 
         # Limitations Footer
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#CBD5E1'), spaceBefore=10, spaceAfter=8))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#CBD3D8'), spaceBefore=10, spaceAfter=8))
         story.append(Paragraph("<b>Limitations & System Disclaimers:</b>", body_style))
         for lim in payload.limitations:
             story.append(Paragraph(f"• {lim}", sub_style))
