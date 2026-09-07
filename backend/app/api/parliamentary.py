@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from database import get_db
 from app.models.user import User
@@ -23,6 +23,8 @@ from app.schemas.parliamentary import (
     BriefingEvidenceItem,
 )
 from app.services.rag_service import execute_rag_query
+from app.services.hybrid_search_service import detect_query_entities
+from app.services.normalization_service import get_base_mine_name, detect_query_fiscal_year
 from app.services.conflict_service import (
     get_metric_domain,
     are_units_compatible,
@@ -53,7 +55,7 @@ def generate_parliamentary_briefing(
 ):
     """
     Parliamentary Question & Executive Briefing Intelligence Engine.
-    Orchestrates RAG retrieval, structured metric extractions, deterministic validation,
+    Orchestrates query-aware RAG retrieval, structured metric extractions, deterministic validation,
     and cross-document conflict detection into an auditable institutional briefing.
     """
     question_text = payload.question_text.strip()
@@ -67,39 +69,82 @@ def generate_parliamentary_briefing(
     fy = payload.fiscal_year or "2023-24"
     q_type = (payload.question_type or "GENERAL").upper()
 
-    # 1. Query structured DB metrics for the selected scope & fiscal year
+    # 1. Parse question intent, target entities, and temporal context (Component 6)
+    q_entities = detect_query_entities(question_text)
+    target_mines = q_entities.get("mines", [])
+    target_metric = q_entities.get("metric")
+    metric_domain = q_entities.get("metric_domain")
+    detected_fy = q_entities.get("fiscal_year")
+    detected_sub = q_entities.get("subsidiary")
+
+    effective_fy = detected_fy or fy
+    effective_sub = scope
+    if scope.upper() in ["ALL", "ALL CIL"] and detected_sub:
+        effective_sub = detected_sub
+
+    # 2. Query structured DB metrics with entity, metric, and fiscal year grounding
     metric_query = db.query(ExtractedMetric, Document).join(
         Document, ExtractedMetric.document_id == Document.id
     )
 
-    if scope.upper() not in ["ALL", "ALL CIL"]:
-        metric_query = metric_query.filter(Document.subsidiary == scope)
+    if effective_sub.upper() not in ["ALL", "ALL CIL"]:
+        metric_query = metric_query.filter(Document.subsidiary == effective_sub)
 
-    if fy and fy.upper() != "ALL":
-        metric_query = metric_query.filter(ExtractedMetric.fiscal_year == fy)
+    if effective_fy and effective_fy.upper() != "ALL":
+        metric_query = metric_query.filter(ExtractedMetric.fiscal_year == effective_fy)
+
+    # Specific mine question: filter for target mine / base mine
+    if target_mines:
+        mine_conds = []
+        for tm in target_mines:
+            mine_conds.append(ExtractedMetric.mine_name.ilike(f"%{tm}%"))
+            base_tm = get_base_mine_name(tm)
+            if base_tm and base_tm.lower() != tm.lower():
+                mine_conds.append(ExtractedMetric.mine_name.ilike(f"%{base_tm}%"))
+        metric_query = metric_query.filter(or_(*mine_conds))
+
+    # Metric domain filtering
+    if metric_domain:
+        domain_terms = metric_domain.get("db_metric_names", [])
+        if domain_terms:
+            metric_conds = [ExtractedMetric.metric_name.ilike(f"%{dm}%") for dm in domain_terms]
+            metric_query = metric_query.filter(or_(*metric_conds))
+    elif target_metric:
+        metric_query = metric_query.filter(ExtractedMetric.metric_name.ilike(f"%{target_metric}%"))
 
     extracted_records = metric_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
 
-    # 2. Execute Hybrid RAG Search for context & citations
+    # If entity/metric filtering returned nothing for a broad question, fallback to broader query
+    if not extracted_records and not target_mines:
+        broad_query = db.query(ExtractedMetric, Document).join(
+            Document, ExtractedMetric.document_id == Document.id
+        )
+        if effective_sub.upper() not in ["ALL", "ALL CIL"]:
+            broad_query = broad_query.filter(Document.subsidiary == effective_sub)
+        if effective_fy and effective_fy.upper() != "ALL":
+            broad_query = broad_query.filter(ExtractedMetric.fiscal_year == effective_fy)
+        extracted_records = broad_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
+
+    # 3. Execute Hybrid RAG Search for context & citations
     rag_result = execute_rag_query(
         db=db,
         query_text=question_text,
         top_k=6,
-        subsidiary_filter=scope if scope.upper() not in ["ALL", "ALL CIL"] else None
+        subsidiary_filter=effective_sub if effective_sub.upper() not in ["ALL", "ALL CIL"] else None
     )
 
     evidence_chunks = rag_result.get("evidence_chunks", [])
     
-    # 3. Handle Insufficient Evidence Case
+    # 4. Handle Insufficient Evidence Case
     if not extracted_records and not evidence_chunks:
         return ParliamentaryBriefingResponse(
             question=question_text,
             question_type=q_type,
-            fiscal_year=fy,
+            fiscal_year=effective_fy,
             selected_scope=scope,
             executive_summary=(
                 f"No official document records or extracted evidence were found in the database "
-                f"matching target scope '{scope}' for Fiscal Year {fy}."
+                f"matching target scope '{scope}' for Fiscal Year {effective_fy}."
             ),
             key_findings=[
                 "Insufficient evidence available in ingested repository.",
@@ -118,7 +163,7 @@ def generate_parliamentary_briefing(
             generated_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
         )
 
-    # 4. Format Subsidiary Metrics
+    # 5. Format Subsidiary Metrics
     subsidiary_metrics: List[SubsidiaryMetricItem] = []
     for m, doc in extracted_records:
         subsidiary_metrics.append(
@@ -130,13 +175,13 @@ def generate_parliamentary_briefing(
                 unit=m.unit,
                 standard_value=m.standard_value,
                 standard_unit=m.standard_unit,
-                fiscal_year=m.fiscal_year or fy,
+                fiscal_year=m.fiscal_year or effective_fy,
                 page_number=m.page_number,
                 document_filename=doc.filename
             )
         )
 
-    # 5. Check for Cross-Document Discrepancies relevant to scope
+    # 6. Filter Cross-Document Discrepancies relevant to question entities, domain & scope
     discrepancies: List[FlaggedDiscrepancyItem] = []
     conflicts_query = db.query(DataConflict).filter(DataConflict.status.in_(["ACTIVE", "OPEN"]))
     active_conflicts = conflicts_query.order_by(DataConflict.id.desc()).all()
@@ -148,8 +193,43 @@ def generate_parliamentary_briefing(
         sub_b = c.doc_b.subsidiary if c.doc_b else "CIL"
 
         # Scope filtering if specific subsidiary requested
-        if scope.upper() not in ["ALL", "ALL CIL"] and scope not in [sub_a, sub_b]:
+        if effective_sub.upper() not in ["ALL", "ALL CIL"] and effective_sub not in [sub_a, sub_b]:
             continue
+
+        # Entity filtering: if specific mine queried, conflict must match target mine / base mine
+        if target_mines:
+            c_mine = (c.mine_name or "").lower()
+            c_base = get_base_mine_name(c_mine).lower()
+            mine_matched = False
+            for tm in target_mines:
+                base_tm = get_base_mine_name(tm).lower()
+                if tm.lower() in c_mine or base_tm in c_mine or tm.lower() in c_base or base_tm in c_base:
+                    mine_matched = True
+                    break
+            if not mine_matched:
+                continue
+
+        # Metric domain filtering
+        if metric_domain:
+            c_domain = get_metric_domain(c.metric_name)
+            d_key = metric_domain.get("domain_key", "")
+            if d_key == "COAL_PRODUCTION" and c_domain != "PRODUCTION":
+                continue
+            elif d_key == "OVERBURDEN_REMOVAL" and c_domain != "OVERBURDEN":
+                continue
+            elif d_key == "STRIPPING_RATIO" and c_domain != "OVERBURDEN":
+                continue
+            elif d_key == "COAL_DESPATCH" and c_domain != "OFFTAKE_DISPATCH":
+                continue
+            elif d_key == "WASHING_CAPACITY" and c_domain != "CAPACITY":
+                continue
+            elif d_key == "EXPLORATION_DRILLING" and c_domain not in ["DRILLING", "EXPLORATION"]:
+                continue
+
+        # Fiscal year filtering
+        if effective_fy and effective_fy.upper() != "ALL":
+            if c.fiscal_year and c.fiscal_year != effective_fy:
+                continue
 
         is_seeded = "BCCL_Production_Audit_Q4.pdf" in [doc_a_name, doc_b_name]
         prov_label = "Seeded Mine-Level Discrepancy" if is_seeded else "Verified High-Precision Conflict"
@@ -158,7 +238,7 @@ def generate_parliamentary_briefing(
             FlaggedDiscrepancyItem(
                 entity=c.mine_name,
                 metric_name=c.metric_name,
-                fiscal_year=c.fiscal_year or fy,
+                fiscal_year=c.fiscal_year or effective_fy,
                 doc_a_filename=doc_a_name,
                 doc_a_value=float(c.doc_a_value or 0.0),
                 doc_b_filename=doc_b_name,
@@ -171,7 +251,7 @@ def generate_parliamentary_briefing(
             )
         )
 
-    # 6. Format Evidence Lineage Items
+    # 7. Format Evidence Lineage Items
     evidence_list: List[BriefingEvidenceItem] = []
     for chunk in evidence_chunks:
         evidence_list.append(
@@ -187,24 +267,42 @@ def generate_parliamentary_briefing(
             )
         )
 
-    # 7. Synthesize Executive Summary & Key Findings
+    # 8. Synthesize Executive Summary & Question-Specific Key Findings
     rag_answer = rag_result.get("answer", "")
     exec_summary = (
-        f"Parliamentary Briefing Note compiled for target scope '{scope}' ({fy}). "
+        f"Parliamentary Briefing Note compiled for target scope '{scope}' ({effective_fy}). "
         f"{rag_answer}"
     )
 
     key_findings = []
-    if subsidiary_metrics:
+    if target_mines and subsidiary_metrics:
+        # Find metric matching target mine
+        matching_m = next(
+            (m for m in subsidiary_metrics if any(get_base_mine_name(tm).lower() in m.mine_name.lower() for tm in target_mines)),
+            subsidiary_metrics[0]
+        )
+        key_findings.append(
+            f"Recorded {matching_m.metric_name} for {matching_m.mine_name} ({matching_m.subsidiary}) in FY {matching_m.fiscal_year}: {matching_m.standard_value:.2f} {matching_m.standard_unit}."
+        )
+    elif subsidiary_metrics:
         first_m = subsidiary_metrics[0]
-        key_findings.append(f"Recorded {first_m.metric_name} for {first_m.mine_name} ({first_m.subsidiary}): {first_m.standard_value:.2f} {first_m.standard_unit}.")
+        key_findings.append(
+            f"Recorded {first_m.metric_name} for {first_m.mine_name} ({first_m.subsidiary}) in FY {first_m.fiscal_year}: {first_m.standard_value:.2f} {first_m.standard_unit}."
+        )
+
     if len(subsidiary_metrics) > 1:
-        key_findings.append(f"Total {len(subsidiary_metrics)} verified operational metrics extracted across official CIL documents.")
+        if target_mines:
+            key_findings.append(f"Identified {len(subsidiary_metrics)} verified operational metrics matching {', '.join(target_mines)}.")
+        else:
+            key_findings.append(f"Total {len(subsidiary_metrics)} verified operational metrics extracted across official CIL documents.")
+
     if discrepancies:
         d_first = discrepancies[0]
-        key_findings.append(f"Discrepancy Flagged: {d_first.entity} ({d_first.metric_name}) variance of {d_first.variance_percentage}% between {d_first.doc_a_filename} and {d_first.doc_b_filename} [{d_first.provenance_label}].")
+        key_findings.append(
+            f"Discrepancy Flagged: {d_first.entity} ({d_first.metric_name}) variance of {d_first.variance_percentage}% between {d_first.doc_a_filename} and {d_first.doc_b_filename} [{d_first.provenance_label}]."
+        )
     else:
-        key_findings.append("No active metric discrepancies detected across current scope documents.")
+        key_findings.append("No active metric discrepancies detected across requested scope documents.")
 
     confidence_rating = "HIGH" if len(evidence_list) >= 3 else ("MEDIUM" if len(evidence_list) >= 1 else "LOW")
     confidence_val = 0.95 if confidence_rating == "HIGH" else (0.75 if confidence_rating == "MEDIUM" else 0.50)

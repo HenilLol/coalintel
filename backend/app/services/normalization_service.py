@@ -14,6 +14,101 @@ KNOWN_MINES = [
     "Magadh OC", "Amrapali OC", "Kalyani OC", "Moonidih UG", "Jharia OC"
 ]
 
+GENERIC_MINE_PHRASES = {
+    "cil mine", "coal mine", "overall mine", "unspecified mine",
+    "mines of cil", "cil mines", "company mine", "total mine", "national mine",
+    "coalfield", "coalfields"
+}
+
+
+def get_base_mine_name(name: str) -> str:
+    """
+    Extracts the base mine name by stripping mining type suffixes.
+    Supported suffixes: OC, OpenCast, UG, Underground, Mine, Colliery, Project, Block, Washery.
+    Examples:
+        "Gevra OC" -> "Gevra"
+        "Gevra OpenCast" -> "Gevra"
+        "Alpha Mine" -> "Alpha"
+        "Alpha UG" -> "Alpha"
+    """
+    if not name:
+        return ""
+    clean = str(name).strip()
+    base = re.sub(
+        r"\s+(?:OC|OpenCast|UG|Underground|Mine|Colliery|Project|Block|Washery)\b",
+        "",
+        clean,
+        flags=re.IGNORECASE
+    ).strip()
+    return base if base else clean
+
+
+def canonicalize_mine_name(name: str) -> str:
+    """
+    Returns the canonical mine name representation if matched against KNOWN_MINES,
+    otherwise preserves the source's explicit entity without inventing suffixes.
+    """
+    if not name:
+        return ""
+    clean = str(name).strip()
+    base = get_base_mine_name(clean)
+    for km in KNOWN_MINES:
+        if km.lower() == clean.lower():
+            return km
+        if get_base_mine_name(km).lower() == base.lower():
+            # If source already has a suffix, preserve it with canonical casing
+            if base.lower() != clean.lower():
+                return clean
+            # If source is bare base name, keep source's explicit entity
+            return clean
+    return clean
+
+
+def detect_query_fiscal_year(query_text: str) -> Optional[str]:
+    """
+    Detects explicit fiscal year from query string.
+    Supports: FY2023-24, FY 2023-24, 2023-24, FY 23-24, 2023/24.
+    Normalizes to canonical 'YYYY-YY' (e.g. '2023-24').
+    """
+    if not query_text or not query_text.strip():
+        return None
+    # Match FY 2023-24 or FY2023-24 or 2023-24 or 2023/24
+    m = re.search(r"\b(?:FY\s*)?((?:19|20)\d{2})[-\/](\d{2,4})\b", query_text, re.IGNORECASE)
+    if m:
+        start_yr = m.group(1)
+        end_yr = m.group(2)
+        if len(end_yr) == 4:
+            end_yr = end_yr[-2:]
+        return f"{start_yr}-{end_yr}"
+    # Match FY 23-24 or FY23-24
+    m2 = re.search(r"\bFY\s*(\d{2})[-\/](\d{2})\b", query_text, re.IGNORECASE)
+    if m2:
+        start_yr_short = int(m2.group(1))
+        full_start = 2000 + start_yr_short if start_yr_short < 70 else 1900 + start_yr_short
+        return f"{full_start}-{m2.group(2)}"
+    return None
+
+
+def classify_document_authority(filename: str) -> str:
+    """
+    Classifies document source authority into:
+    - OFFICIAL: Official annual reports, ministry reports, audited filings, CIL/subsidiary reports
+    - SYNTHETIC_TEST: Test files, demo files, synthetic/mock uploads
+    - INTERNAL / UNKNOWN: Other sources
+    """
+    if not filename:
+        return "UNKNOWN"
+    f_lower = filename.lower()
+    if any(t in f_lower for t in ["test", "demo", "synthetic", "mock"]):
+        return "SYNTHETIC_TEST"
+    if any(o in f_lower for o in [
+        "annual_report", "annual report", "annualreport", "chap", "moc", "ministry",
+        "audit", "srn-", "secl", "ecl", "bccl", "cmpdi", "cil", "wcl", "mcl", "ccl", "ncl"
+    ]):
+        return "OFFICIAL"
+    return "INTERNAL"
+
+
 # Specificity Precedence Rules for Metric Classification
 # Evaluated strictly against local line/sentence context (bare 'coal' removed from triggers)
 METRIC_CLASSIFICATION_RULES = [
@@ -235,21 +330,29 @@ def extract_entity_tuples_from_text(
         line_end = len(text) if line_end == -1 else line_end
         current_line = text[line_start:line_end].strip()
 
-        # Step 2: Entity & Mine Extraction (Line-proximity first, then distance-weighted)
+        # Step 2: Entity & Mine Extraction (Line-proximity first, specific over generic)
         detected_mine = None
 
-        # A. Check current line for known mines or mine regex (highest priority)
+        # Check for specific known mines on current line (full name first)
         for km in KNOWN_MINES:
             if re.search(r"\b" + re.escape(km) + r"\b", current_line, re.IGNORECASE):
                 detected_mine = km
                 break
 
+        # Check for base name of known mines on current line (e.g. "Gevra" in "Gevra achieved 59.11 MT")
         if not detected_mine:
-            m_match = mine_name_regex.search(current_line)
-            if m_match:
-                detected_mine = m_match.group(1).strip()
+            for km in KNOWN_MINES:
+                base_km = get_base_mine_name(km)
+                if len(base_km) >= 3 and re.search(r"\b" + re.escape(base_km) + r"\b", current_line, re.IGNORECASE):
+                    # Check if suffix exists in line, else preserve explicit entity
+                    suffix_m = re.search(r"\b" + re.escape(base_km) + r"\s+(OC|OpenCast|UG|Underground|Mine|Colliery|Project|Block)\b", current_line, re.IGNORECASE)
+                    if suffix_m:
+                        detected_mine = suffix_m.group(0).strip()
+                    else:
+                        detected_mine = base_km
+                    break
 
-        # B. Check previous line (table row header on preceding line)
+        # Check previous line for known mines or base name
         if not detected_mine and line_start > 0:
             prev_line_start = text.rfind("\n", 0, line_start - 1)
             prev_line_start = 0 if prev_line_start == -1 else prev_line_start + 1
@@ -258,23 +361,62 @@ def extract_entity_tuples_from_text(
                 if re.search(r"\b" + re.escape(km) + r"\b", prev_line, re.IGNORECASE):
                     detected_mine = km
                     break
-            if not detected_mine:
+                base_km = get_base_mine_name(km)
+                if len(base_km) >= 3 and re.search(r"\b" + re.escape(base_km) + r"\b", prev_line, re.IGNORECASE):
+                    suffix_m = re.search(r"\b" + re.escape(base_km) + r"\s+(OC|OpenCast|UG|Underground|Mine|Colliery|Project|Block)\b", prev_line, re.IGNORECASE)
+                    detected_mine = suffix_m.group(0).strip() if suffix_m else base_km
+                    break
+
+        # Check regex for general mine entities on current line or previous line
+        if not detected_mine:
+            m_match = mine_name_regex.search(current_line)
+            if m_match and m_match.group(1).strip().lower() not in GENERIC_MINE_PHRASES:
+                detected_mine = m_match.group(1).strip()
+            elif line_start > 0:
                 p_match = mine_name_regex.search(prev_line)
-                if p_match:
+                if p_match and p_match.group(1).strip().lower() not in GENERIC_MINE_PHRASES:
                     detected_mine = p_match.group(1).strip()
 
-        # C. If still not found, search snippet for the closest mine mention by character distance
+        # Check snippet for known mine base names (specific entity over corporate generic)
+        if not detected_mine:
+            for km in KNOWN_MINES:
+                base_km = get_base_mine_name(km)
+                if len(base_km) >= 3 and re.search(r"\b" + re.escape(base_km) + r"\b", snippet, re.IGNORECASE):
+                    suffix_m = re.search(r"\b" + re.escape(base_km) + r"\s+(OC|OpenCast|UG|Underground|Mine|Colliery|Project|Block)\b", snippet, re.IGNORECASE)
+                    detected_mine = suffix_m.group(0).strip() if suffix_m else base_km
+                    break
+
+        # Closest regex mine mention in snippet (excluding generic corporate phrases)
         if not detected_mine:
             closest_mine = None
             min_dist = float("inf")
             match_offset_in_snippet = match.start() - max(0, match.start() - 180)
             for m in mine_name_regex.finditer(snippet):
+                m_str = m.group(1).strip()
+                if m_str.lower() in GENERIC_MINE_PHRASES:
+                    continue
                 dist = abs(m.start() - match_offset_in_snippet)
                 if dist < min_dist:
                     min_dist = dist
-                    closest_mine = m.group(1).strip()
+                    closest_mine = m_str
             if closest_mine:
                 detected_mine = closest_mine
+
+        # Check for named entity followed by operational verb on current line or snippet (e.g. 'Alpha achieved 15.5 MT')
+        if not detected_mine:
+            action_verb_match = re.search(
+                r"\b([A-Z][A-Za-z0-9_\-\.]+(?:\s+[A-Za-z0-9_\-\.]+)*(?:\s+(?:OC|OpenCast|UG|Underground|Mine|Colliery|Project|Block))?)\s+(?:achieved|produced|recorded|reached|reported|mined|extracted)\b",
+                current_line or snippet
+            )
+            if action_verb_match:
+                cand = action_verb_match.group(1).strip()
+                cand_lower = cand.lower()
+                stop_words = {"during", "in", "the", "total", "annual", "overall", "target", "cil", "this"}
+                is_corp = any(w in cand_lower for w in ["limited", "ltd", "company", "coalfields", "corporation", "subsidiary", "board"])
+                is_sub = any(s.lower() == cand_lower for s in SUBSIDIARIES)
+                if cand_lower not in GENERIC_MINE_PHRASES and cand_lower not in stop_words and not is_corp and not is_sub and len(cand) >= 3:
+                    # If it doesn't have a mine suffix, ensure it looks like a clean single or double named entity
+                    detected_mine = cand
 
         # Step 3: Subsidiary Extraction (Local first, then fallback)
         subsidiary = None
@@ -292,8 +434,8 @@ def extract_entity_tuples_from_text(
             if not subsidiary:
                 subsidiary = default_subsidiary or "CIL HQ"
 
-        # D. Safe non-misleading fallback for mine name (NO synthetic "ECL Mine")
-        if not detected_mine:
+        # Safe non-misleading fallback for mine name (NO synthetic "CIL Mine" or "ECL Mine")
+        if not detected_mine or detected_mine.lower() in GENERIC_MINE_PHRASES:
             mine_name = "Unspecified Mine"
         else:
             mine_name = detected_mine
@@ -305,7 +447,7 @@ def extract_entity_tuples_from_text(
         # A. Detect historical year mentions (e.g. "in 1975", "at inception in 1975", "since 1975")
         hist_match = re.search(
             r"\b(?:in|since|inception\s+in|year\s+of\s+its\s+inception|during|year|established\s+in)\s+(19\d{2}|20[01]\d)\b",
-            snippet,
+            current_line or snippet,
             re.IGNORECASE
         )
         if hist_match:
@@ -314,19 +456,44 @@ def extract_entity_tuples_from_text(
             is_historical = True
         else:
             # Check for standalone historical 19xx years
-            standalone_19xx = re.search(r"\b(19\d{2})\b", snippet)
+            standalone_19xx = re.search(r"\b(19\d{2})\b", current_line or snippet)
             if standalone_19xx:
                 hist_year = standalone_19xx.group(1)
                 fiscal_year = f"{hist_year}"
                 is_historical = True
 
-        # B. If not historical, search for explicit fiscal year in local snippet
+        # B. Multi-year table / line-proximity fiscal year extraction
         if not fiscal_year:
-            fy_match = re.search(r"\b(20\d{2}[-\/]\d{2,4})\b", snippet)
-            if fy_match:
-                fiscal_year = fy_match.group(1)
+            # 1. Prefer fiscal year on the same line as the numeric value (e.g. "4. 2023-24 - 1.22 MT")
+            line_fy = re.search(r"\b(20\d{2}[-\/]\d{2,4})\b", current_line)
+            if line_fy:
+                raw_fy = line_fy.group(1)
+                if "/" in raw_fy:
+                    raw_fy = raw_fy.replace("/", "-")
+                if len(raw_fy) == 9 and "-" in raw_fy:
+                    parts = raw_fy.split("-")
+                    raw_fy = f"{parts[0]}-{parts[1][-2:]}"
+                fiscal_year = raw_fy
             else:
-                fiscal_year = default_year or "2023-24"
+                # 2. Search snippet for the closest fiscal year relative to the numeric match position
+                match_offset_in_snippet = match.start() - max(0, match.start() - 180)
+                fy_candidates = []
+                for fy_m in re.finditer(r"\b(20\d{2}[-\/]\d{2,4})\b", snippet):
+                    dist = abs(fy_m.start() - match_offset_in_snippet)
+                    is_preceding = fy_m.start() <= match_offset_in_snippet
+                    score = dist if is_preceding else (dist + 40)
+                    raw_cand = fy_m.group(1)
+                    if "/" in raw_cand:
+                        raw_cand = raw_cand.replace("/", "-")
+                    if len(raw_cand) == 9 and "-" in raw_cand:
+                        parts = raw_cand.split("-")
+                        raw_cand = f"{parts[0]}-{parts[1][-2:]}"
+                    fy_candidates.append((score, raw_cand))
+                if fy_candidates:
+                    fy_candidates.sort(key=lambda x: x[0])
+                    fiscal_year = fy_candidates[0][1]
+                else:
+                    fiscal_year = default_year or "2023-24"
 
         # Step 5: Dynamic Confidence Scoring
         confidence = 0.40  # Base for numeric value + valid unit
