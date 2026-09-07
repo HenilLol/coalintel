@@ -39,6 +39,43 @@ class DegradedLLMProvider(BaseLLMProvider):
     """
     provider_name: str = "degraded"
 
+    @staticmethod
+    def _parse_structured_chunk(chunk_text: str) -> Optional[Dict[str, Any]]:
+        """Extracts structured metric fields from chunk text if present."""
+        if "mine entity:" not in chunk_text.lower() and "metric:" not in chunk_text.lower():
+            return None
+
+        mine_m = re.search(r"Mine Entity:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        metric_m = re.search(r"Metric:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        raw_val_m = re.search(r"Raw Extracted Value:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        norm_val_m = re.search(r"Normalized Value:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        fy_m = re.search(r"Fiscal Year:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        snippet_m = re.search(r"Raw Evidence Snippet:\s*(.+)", chunk_text, re.DOTALL | re.IGNORECASE)
+
+        mine_name = mine_m.group(1).strip() if mine_m else None
+        metric_name = metric_m.group(1).strip() if metric_m else "Production"
+        raw_val = raw_val_m.group(1).strip() if raw_val_m else None
+        norm_val = norm_val_m.group(1).strip() if norm_val_m else None
+        fy = fy_m.group(1).strip() if fy_m else "FY 2023-24"
+        snippet = snippet_m.group(1).strip() if snippet_m else ""
+
+        if raw_val and norm_val and raw_val.lower() != norm_val.lower() and not raw_val.upper().endswith("MT"):
+            val_display = f"{raw_val} ({norm_val})"
+        elif norm_val:
+            val_display = norm_val
+        elif raw_val:
+            val_display = raw_val
+        else:
+            val_display = None
+
+        return {
+            "mine_name": mine_name,
+            "metric_name": metric_name,
+            "value": val_display,
+            "fiscal_year": fy,
+            "snippet": snippet
+        }
+
     def generate(self, prompt: str) -> str:
         """Grounded synthesis of XML context for degraded/local execution."""
         # Extract untrusted context block strictly within XML boundary delimiters
@@ -85,62 +122,70 @@ class DegradedLLMProvider(BaseLLMProvider):
                     target_mine = rm
                     break
 
-        if target_mine and target_mine.lower() not in context_str.lower():
-            return "Insufficient evidence found for this query."
+        base_mine = re.sub(r"\s+(?:OC|OpenCast|UG|Underground|Mine|Colliery)\b", "", target_mine, flags=re.IGNORECASE).strip() if target_mine else None
 
-        # Analyze entity targets in query
-        is_rajmahal = "rajmahal" in q_lower
-        is_ecl_total = "ecl" in q_lower and ("total" in q_lower or not is_rajmahal)
-        is_comparison = "compare" in q_lower or "versus" in q_lower or "vs" in q_lower or (is_rajmahal and "ecl total" in q_lower)
-
-        rajmahal_chunk = next((c for c in parsed_chunks if "rajmahal" in c["text"].lower()), None)
-        ecl_total_chunk = next((c for c in parsed_chunks if "ecl total" in c["text"].lower() or ("ecl" in c["text"].lower() and "total" in c["text"].lower())), None)
-
-        if is_comparison and (rajmahal_chunk or ecl_total_chunk):
-            ans_parts = ["According to ingested document evidence:"]
-            if rajmahal_chunk:
-                ans_parts.append(f"- Rajmahal OC Coal Production: 42.50 Lakh Tonnes (4.25 MT) {rajmahal_chunk['tag']}")
-            if ecl_total_chunk:
-                ans_parts.append(f"- ECL Total Coal Production: 42.50 MT {ecl_total_chunk['tag']}")
-            return "\n".join(ans_parts)
-
-        if is_rajmahal:
-            if rajmahal_chunk:
-                return f"According to ingested document evidence {rajmahal_chunk['tag']}, total coal production at Rajmahal OC specifically for FY 2023-24 was 42.50 Lakh Tonnes (4.25 MT)."
-            else:
+        if target_mine:
+            mine_in_context = target_mine.lower() in context_str.lower() or (base_mine and base_mine.lower() in context_str.lower())
+            if not mine_in_context:
                 return "Insufficient evidence found for this query."
 
-        if is_ecl_total:
-            if ecl_total_chunk:
-                return f"According to ingested document evidence {ecl_total_chunk['tag']}, ECL total coal production reached 42.50 Million Tonnes (MT) in FY 2023-24."
-            elif rajmahal_chunk:
-                return f"According to ingested document evidence {rajmahal_chunk['tag']}, ECL total coal production reached 42.50 Million Tonnes (MT) in FY 2023-24."
+        # Check if comparison query
+        is_comparison = "compare" in q_lower or "versus" in q_lower or "vs" in q_lower
+        if is_comparison and len(parsed_chunks) >= 2:
+            ans_parts = ["According to ingested document evidence:"]
+            for c in parsed_chunks:
+                s_info = self._parse_structured_chunk(c["text"])
+                if s_info and s_info["value"]:
+                    m_label = s_info["mine_name"]
+                    if not m_label or m_label == "Unspecified Mine":
+                        sub_m = re.search(r"\b([A-Z]{3,4})\b", c["filename"] + " " + c["text"])
+                        m_label = f"{sub_m.group(1)} Total" if sub_m else "Total"
+                    ans_parts.append(f"- {m_label} {s_info['metric_name']}: {s_info['value']} {c['tag']}")
+                else:
+                    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", c["text"]) if s.strip()]
+                    rel_s = sentences[0] if sentences else c["text"][:120]
+                    ans_parts.append(f"- {rel_s} {c['tag']}")
+            return "\n".join(ans_parts)
 
         # Find best matching chunk for target mine or general query
         best_chunk = None
         if target_mine:
-            # 1. Look for chunk where raw evidence snippet explicitly contains target mine
+            mine_terms = [target_mine.lower()]
+            if base_mine and len(base_mine) >= 3:
+                mine_terms.append(base_mine.lower())
+
+            # 1. Look for chunk where structured mine_name matches target mine
             for c in parsed_chunks:
-                t_lower = c["text"].lower()
-                snippet_part = t_lower.split("raw evidence snippet:")[-1] if "raw evidence snippet:" in t_lower else t_lower
-                if target_mine.lower() in snippet_part:
-                    best_chunk = c
-                    break
-            # 2. Check structured metric chunks with target mine
+                s_info = self._parse_structured_chunk(c["text"])
+                if s_info and s_info["mine_name"]:
+                    m_lower = s_info["mine_name"].lower()
+                    if any(mt in m_lower for mt in mine_terms):
+                        best_chunk = c
+                        break
+            # 2. Look for chunk where raw evidence snippet explicitly contains target mine
             if not best_chunk:
                 for c in parsed_chunks:
                     t_lower = c["text"].lower()
-                    if target_mine.lower() in t_lower and ("metric:" in t_lower or "mine entity:" in t_lower):
+                    snippet_part = t_lower.split("raw evidence snippet:")[-1] if "raw evidence snippet:" in t_lower else t_lower
+                    if any(mt in snippet_part for mt in mine_terms):
                         best_chunk = c
                         break
-            # 3. Fallback to any chunk containing target mine
+            # 3. Check any chunk containing target mine
             if not best_chunk:
                 for c in parsed_chunks:
-                    if target_mine.lower() in c["text"].lower():
+                    t_lower = c["text"].lower()
+                    if any(mt in t_lower for mt in mine_terms):
                         best_chunk = c
                         break
         else:
-            best_chunk = parsed_chunks[0]
+            # Check if query asks for aggregate/total
+            if "total" in q_lower:
+                for c in parsed_chunks:
+                    if "total" in c["text"].lower() or "as a whole" in c["text"].lower():
+                        best_chunk = c
+                        break
+            if not best_chunk:
+                best_chunk = parsed_chunks[0]
 
         if not best_chunk:
             return "Insufficient evidence found for this query."
@@ -148,38 +193,37 @@ class DegradedLLMProvider(BaseLLMProvider):
         tag = best_chunk["tag"]
         chunk_text = best_chunk["text"]
 
-        # Parse structured metric evidence
-        if "mine entity:" in chunk_text.lower() or "metric:" in chunk_text.lower():
-            mine_m = re.search(r"Mine Entity:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
-            metric_m = re.search(r"Metric:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
-            val_m = re.search(r"Normalized Value:\s*([0-9\.]+)\s*([A-Za-z\.]+)", chunk_text, re.IGNORECASE)
-            if not val_m:
-                val_m = re.search(r"Raw Extracted Value:\s*([0-9\.]+)\s*([A-Za-z\.]+)", chunk_text, re.IGNORECASE)
-            fy_m = re.search(r"Fiscal Year:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        # 1. Dynamic synthesis from structured metric evidence
+        s_info = self._parse_structured_chunk(chunk_text)
+        if s_info and s_info["value"]:
+            m_name = s_info["mine_name"]
+            m_metric = s_info["metric_name"]
+            m_val = s_info["value"]
+            m_fy = s_info["fiscal_year"]
 
-            m_name = mine_m.group(1).strip() if mine_m else (target_mine or "Mine")
-            m_metric = metric_m.group(1).strip() if metric_m else "Production"
-            m_val = f"{val_m.group(1)} {val_m.group(2)}" if val_m else None
-            m_fy = fy_m.group(1).strip() if fy_m else "FY 2023-24"
+            if not m_name or m_name == "Unspecified Mine":
+                sub_m = re.search(r"\b([A-Z]{3,4})\b", best_chunk["filename"] + " " + chunk_text)
+                sub_label = f"{sub_m.group(1)} total" if sub_m else "Total"
+                return f"According to ingested document evidence {tag}, {sub_label} {m_metric.lower()} was {m_val} in {m_fy}."
+            else:
+                return f"According to ingested document evidence {tag}, {m_name} {m_metric.lower()} was {m_val} in {m_fy}."
 
-            if m_val:
-                return f"According to ingested document evidence {tag}, {m_name} coal {m_metric.lower()} was {m_val} in {m_fy}."
-
-        if target_mine and "gevra" in target_mine.lower() and "59.11" in chunk_text:
-            return f"According to ingested document evidence {tag}, Gevra OC coal production was 59.11 MT in FY 2023-24."
-
-        # Extract most relevant sentence
-        sentences = re.split(r"(?<=[.!?])\s+", chunk_text)
+        # 2. Dynamic synthesis from unstructured text chunk
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", chunk_text) if s.strip()]
         relevant_sentence = None
-        for s in sentences:
-            s_clean = s.strip()
-            if not s_clean:
-                continue
-            if target_mine and target_mine.lower() in s_clean.lower():
-                relevant_sentence = s_clean
-                break
+        if target_mine:
+            for s in sentences:
+                if target_mine.lower() in s.lower():
+                    relevant_sentence = s
+                    break
         if not relevant_sentence and sentences:
-            relevant_sentence = sentences[0].strip()
+            # Prioritize sentence with numbers/units
+            for s in sentences:
+                if re.search(r"\d+(?:\.\d+)?\s*(?:MT|Lakh|Million|Tonnes|M\.Cu\.M|MCuM)", s, re.IGNORECASE):
+                    relevant_sentence = s
+                    break
+            if not relevant_sentence:
+                relevant_sentence = sentences[0]
 
         if relevant_sentence:
             return f"According to ingested document evidence {tag}: \"{relevant_sentence}\""

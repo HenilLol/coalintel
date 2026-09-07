@@ -16,15 +16,19 @@ J. Missing scope does not force Admin/global query into CIL HQ.
 import unittest
 import os
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Ensure backend root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from database import Base
+from main import app
+from database import Base, get_db
 from database_seed import init_db
+from app.core.rbac import get_current_user
+from app.models.user import User
 from app.models.document import Document
 from app.models.extracted_metric import ExtractedMetric
 from app.services.normalization_service import (
@@ -74,6 +78,7 @@ class TestPhase9ARAGRecovery(unittest.TestCase):
             cls.db.add(secl_doc)
             cls.db.commit()
             cls.db.refresh(secl_doc)
+        cls.secl_doc = secl_doc
 
         gevra_metric = cls.db.query(ExtractedMetric).filter(
             ExtractedMetric.document_id == secl_doc.id,
@@ -101,6 +106,50 @@ class TestPhase9ARAGRecovery(unittest.TestCase):
             cls.db.add(gevra_metric)
             cls.db.commit()
 
+        # Ensure ECL Document and metric exist for isolated scope testing (Task 1)
+        ecl_doc = cls.db.query(Document).filter(Document.filename == "ECL_Test_Mining_Report.pdf").first()
+        if not ecl_doc:
+            ecl_doc = Document(
+                filename="ECL_Test_Mining_Report.pdf",
+                file_path="uploads/ECL_Test_Mining_Report.pdf",
+                file_hash="mock_ecl_hash_9a",
+                file_type="pdf",
+                file_size_bytes=1048576,
+                subsidiary="ECL",
+                fiscal_year="2023-24",
+                status="PARSED",
+                total_pages=20
+            )
+            cls.db.add(ecl_doc)
+            cls.db.commit()
+            cls.db.refresh(ecl_doc)
+        cls.ecl_doc = ecl_doc
+
+        ecl_metric = cls.db.query(ExtractedMetric).filter(
+            ExtractedMetric.document_id == ecl_doc.id,
+            ExtractedMetric.mine_name.ilike("%Rajmahal%"),
+            ExtractedMetric.metric_name == "Production"
+        ).first()
+        if not ecl_metric:
+            ecl_metric = ExtractedMetric(
+                document_id=ecl_doc.id,
+                page_number=14,
+                mine_name="Rajmahal OC",
+                subsidiary="ECL",
+                metric_name="Production",
+                numeric_value=4.25,
+                unit="MT",
+                raw_unit="MT",
+                standard_value=4.25,
+                standard_unit="MT",
+                fiscal_year="2023-24",
+                confidence_score=0.990,
+                validation_status="VALIDATED",
+                raw_snippet="Rajmahal OC achieved coal production of 4.25 MT in FY2023-24."
+            )
+            cls.db.add(ecl_metric)
+            cls.db.commit()
+
     @classmethod
     def tearDownClass(cls):
         cls.db.close()
@@ -124,15 +173,47 @@ class TestPhase9ARAGRecovery(unittest.TestCase):
     # --- Test B: Specific Subsidiary Scope Filtering ---
     def test_b_specific_subsidiary_scope_filters(self):
         """Explicit subsidiary filter restricts hybrid search strictly to that subsidiary."""
-        results = execute_hybrid_search(
-            db=self.db,
-            query_text="What was the coal production in FY 2023-24?",
-            top_k=5,
-            subsidiary_filter="ECL"
-        )
+        def mock_vector_search(query_text, top_k=10, subsidiary_filter=None):
+            all_chunks = [
+                {
+                    "chunk_id": None,
+                    "document_id": self.ecl_doc.id,
+                    "filename": self.ecl_doc.filename,
+                    "page_number": 14,
+                    "chunk_index": 0,
+                    "text": "Rajmahal OC coal production was 4.25 MT in FY 2023-24.",
+                    "vector_score": 0.90,
+                    "subsidiary": "ECL"
+                },
+                {
+                    "chunk_id": None,
+                    "document_id": self.secl_doc.id,
+                    "filename": self.secl_doc.filename,
+                    "page_number": 16,
+                    "chunk_index": 0,
+                    "text": "Gevra OC coal production was 59.11 MT in FY 2023-24.",
+                    "vector_score": 0.92,
+                    "subsidiary": "SECL"
+                }
+            ]
+            if subsidiary_filter:
+                return [c for c in all_chunks if c.get("subsidiary") == subsidiary_filter][:top_k]
+            return all_chunks[:top_k]
+
+        with patch("app.services.hybrid_search_service.search_vector_store", side_effect=mock_vector_search):
+            results = execute_hybrid_search(
+                db=self.db,
+                query_text="What was the coal production in FY 2023-24?",
+                top_k=5,
+                subsidiary_filter="ECL"
+            )
+
         self.assertGreater(len(results), 0)
         for item in results:
-            self.assertIn("ECL", item["filename"])
+            doc = self.db.query(Document).filter(Document.id == item["document_id"]).first()
+            self.assertIsNotNone(doc)
+            self.assertEqual(doc.subsidiary, "ECL", f"Expected ECL subsidiary, got {doc.subsidiary} for doc {doc.id}")
+            self.assertNotEqual(doc.id, self.secl_doc.id, "SECL document must not appear in ECL-scoped search")
 
     # --- Test C: Golden Gevra RAG Query ---
     def test_c_gevra_golden_rag_query(self):
@@ -184,66 +265,54 @@ class TestPhase9ARAGRecovery(unittest.TestCase):
 
     # --- Test F: RRF Candidate Identity Fusion ---
     def test_f_rrf_merges_identical_physical_chunks(self):
-        """BUG-06: Chunks with same (document_id, page_number, chunk_index) fuse into one candidate."""
-        fused_candidates = {}
-
-        def get_candidate_key(item):
-            return (
-                int(item.get("document_id") or 0),
-                int(item.get("page_number") or 1),
-                int(item.get("chunk_index") or 0)
-            )
-
-        # Vector result: chunk_id is None
-        vector_item = {
+        """BUG-06: Chunks with same (document_id, page_number, chunk_index) fuse into one candidate via execute_hybrid_search."""
+        mock_vec = [{
             "chunk_id": None,
             "document_id": 9,
             "filename": "chap8AnnualReport2024en2.pdf",
             "page_number": 16,
-            "chunk_index": 0,
-            "text": "Gevra OC produced 59.11 MT coal.",
+            "chunk_index": 3,
+            "text": "Gevra OC produced 59.11 MT coal in FY 2023-24.",
             "vector_score": 0.88
-        }
-        # Keyword result: chunk_id is 646
-        keyword_item = {
+        }]
+        mock_kw = [{
             "chunk_id": 646,
             "document_id": 9,
             "filename": "chap8AnnualReport2024en2.pdf",
             "page_number": 16,
-            "chunk_index": 0,
-            "text": "Gevra OC produced 59.11 MT coal.",
+            "chunk_index": 3,
+            "text": "Gevra OC produced 59.11 MT coal in FY 2023-24.",
             "keyword_score": 0.75
-        }
+        }]
 
-        # Process vector
-        key_v = get_candidate_key(vector_item)
-        rrf_v = 1.0 / (RRF_K_CONSTANT + 1)
-        fused_candidates[key_v] = {
-            "chunk_id": vector_item.get("chunk_id"),
-            "document_id": vector_item["document_id"],
-            "filename": vector_item["filename"],
-            "page_number": vector_item["page_number"],
-            "chunk_index": vector_item["chunk_index"],
-            "text": vector_item["text"],
-            "vector_score": vector_item["vector_score"],
-            "keyword_score": 0.0,
-            "rrf_score": rrf_v
-        }
+        with patch("app.services.hybrid_search_service.search_vector_store", return_value=mock_vec), \
+             patch("app.services.hybrid_search_service.search_keyword_store", return_value=mock_kw):
+            results = execute_hybrid_search(
+                db=self.db,
+                query_text="What was Gevra OC coal production in FY 2023-24?",
+                top_k=5
+            )
 
-        # Process keyword
-        key_k = get_candidate_key(keyword_item)
-        rrf_k = 1.0 / (RRF_K_CONSTANT + 1)
-        if key_k in fused_candidates:
-            if not fused_candidates[key_k].get("chunk_id") and keyword_item.get("chunk_id"):
-                fused_candidates[key_k]["chunk_id"] = keyword_item.get("chunk_id")
-            fused_candidates[key_k]["keyword_score"] = keyword_item["keyword_score"]
-            fused_candidates[key_k]["rrf_score"] += rrf_k
+        matching = [
+            r for r in results
+            if r["document_id"] == 9 and r["page_number"] == 16 and r["chunk_index"] == 3
+        ]
 
-        # Verify only 1 fused candidate exists and chunk_id is resolved to 646
-        self.assertEqual(len(fused_candidates), 1)
-        fused = list(fused_candidates.values())[0]
+        # Verify exactly ONE fused candidate exists (not two duplicated candidates)
+        self.assertEqual(len(matching), 1, "Duplicate physical chunks were not merged into single candidate")
+        fused = matching[0]
+
+        # Verify preserved chunk_id from keyword source
         self.assertEqual(fused["chunk_id"], 646)
-        self.assertAlmostEqual(fused["rrf_score"], rrf_v + rrf_k)
+
+        # Verify both vector_score and keyword_score are populated
+        self.assertEqual(fused["vector_score"], 0.88)
+        self.assertEqual(fused["keyword_score"], 0.75)
+
+        # Verify canonical identity preserved
+        self.assertEqual(fused["document_id"], 9)
+        self.assertEqual(fused["page_number"], 16)
+        self.assertEqual(fused["chunk_index"], 3)
 
     # --- Test G: Degraded LLM Citation Regex Collision Prevention ---
     def test_g_degraded_provider_no_instruction_collision(self):
@@ -295,44 +364,108 @@ class TestPhase9ARAGRecovery(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertEqual(len(citations), 0)
 
-    # --- Test J: Missing Scope RBAC Resolution ---
+    # --- Test J: Missing Scope RBAC Resolution via FastAPI Route ---
     def test_j_missing_scope_rbac_admin_global(self):
-        """BUG-07: Admin or global user with stored subsidiary must NOT be restricted on missing scope."""
-        # Admin user with stored subsidiary "CIL HQ"
-        admin_user = MagicMock()
-        admin_user.role = "Admin"
-        admin_user.subsidiary = "CIL HQ"
-        admin_user.username = "admin"
+        """BUG-07: FastAPI route /api/v1/query/ask authoritative RBAC scope resolution."""
+        client = TestClient(app)
 
-        # Missing scope in payload -> should remain unrestricted (None)
-        payload = QueryRequest(query="What was Gevra OC's coal production in FY2023-24?", subsidiary_filter=None)
-        raw_scope = normalize_subsidiary_scope(payload.subsidiary_filter)
-        is_global_user = admin_user.role in ["Admin", "SuperAdmin", "Analyst"] or admin_user.subsidiary in ["CIL HQ", "Ministry of Coal"]
+        cases = [
+            # (user_role, user_sub, payload_sub, expected_effective_sub)
+            ("Admin", "CIL HQ", None, None),            # CASE A: Admin + missing scope -> global
+            ("Admin", "CIL HQ", "ALL CIL", None),        # CASE B: Admin + ALL CIL -> global
+            ("Admin", "CIL HQ", "SECL", "SECL"),         # CASE C: Admin + explicit SECL -> SECL
+            ("Reviewer", "ECL", "ALL CIL", "ECL"),       # CASE D: Reviewer ECL + ALL CIL -> remains ECL
+            ("Reviewer", "ECL", "SECL", "ECL"),          # CASE E: Reviewer ECL + explicit SECL -> remains ECL
+            ("Reviewer", "ECL", None, "ECL"),            # CASE F: Reviewer ECL + missing scope -> remains ECL
+        ]
 
-        if raw_scope:
-            effective_subsidiary = raw_scope
-        elif is_global_user:
-            effective_subsidiary = None
-        else:
-            effective_subsidiary = normalize_subsidiary_scope(admin_user.subsidiary)
+        for role, u_sub, p_sub, exp_sub in cases:
+            mock_user = MagicMock(spec=User)
+            mock_user.id = 1
+            mock_user.username = f"{role.lower()}_user"
+            mock_user.role = role
+            mock_user.subsidiary = u_sub
 
-        self.assertIsNone(effective_subsidiary)
+            app.dependency_overrides[get_current_user] = lambda u=mock_user: u
+            app.dependency_overrides[get_db] = lambda: self.db
 
-        # Subsidiary user with subsidiary "WCL" -> should be restricted to WCL
-        sub_user = MagicMock()
-        sub_user.role = "Subsidiary User"
-        sub_user.subsidiary = "WCL"
-        sub_user.username = "wcl_user"
+            try:
+                with patch("app.api.query.execute_rag_query") as mock_rag:
+                    mock_rag.return_value = {
+                        "query": "What is the coal production in FY 2023-24?",
+                        "answer": "According to evidence [Doc.pdf, Page 1], production was 59.11 MT.",
+                        "citations": [{"document_name": "Doc.pdf", "page_number": 1, "citation_tag": "[Doc.pdf, Page 1]"}],
+                        "evidence_chunks": [],
+                        "provider": "degraded",
+                        "degraded_mode": True
+                    }
 
-        is_sub_global = sub_user.role in ["Admin", "SuperAdmin", "Analyst"] or sub_user.subsidiary in ["CIL HQ", "Ministry of Coal"]
-        if raw_scope:
-            effective_sub = raw_scope
-        elif is_sub_global:
-            effective_sub = None
-        else:
-            effective_sub = normalize_subsidiary_scope(sub_user.subsidiary)
+                    payload = {"query": "What is the coal production in FY 2023-24?"}
+                    if p_sub is not None:
+                        payload["subsidiary_filter"] = p_sub
 
-        self.assertEqual(effective_sub, "WCL")
+                    response = client.post("/api/v1/query/ask", json=payload)
+                    self.assertEqual(response.status_code, 200, f"Route returned status {response.status_code} for role={role}")
+                    self.assertTrue(mock_rag.called, "execute_rag_query was not invoked by the route")
+
+                    actual_sub = mock_rag.call_args.kwargs.get("subsidiary_filter")
+                    self.assertEqual(
+                        actual_sub, exp_sub,
+                        f"RBAC failed for {role} (sub={u_sub}) with payload_sub='{p_sub}': expected '{exp_sub}', got '{actual_sub}'"
+                    )
+            finally:
+                app.dependency_overrides.clear()
+
+    # --- Test K: Generic Degraded Provider Synthetic Evidence Synthesis (TASK 5) ---
+    def test_k_generic_degraded_provider_synthetic_evidence(self):
+        """TASK 5: Generic DegradedLLMProvider dynamically synthesizes structured evidence without hardcoding."""
+        provider = DegradedLLMProvider()
+
+        # Synthetic generic evidence block
+        synthetic_evidence = [{
+            "filename": "Example_Mining_Report.pdf",
+            "page_number": 12,
+            "text": (
+                "Mine Entity: Example Mine | Metric: Production | "
+                "Raw Extracted Value: 42.5 MT | Normalized Value: 42.5 MT | Fiscal Year: FY2023-24\n"
+                "Raw Evidence Snippet: Example Mine achieved production of 42.5 MT in FY2023-24."
+            )
+        }]
+
+        prompt = build_isolated_prompt("What was Example Mine's production in FY2023-24?", synthetic_evidence)
+        answer = provider.generate(prompt)
+
+        # Verify dynamic extraction from evidence
+        self.assertIn("Example Mine", answer)
+        self.assertIn("42.5 MT", answer)
+        self.assertIn("[Example_Mining_Report.pdf, Page 12]", answer)
+        self.assertNotIn("Gevra", answer)
+        self.assertNotIn("Rajmahal", answer)
+        self.assertNotIn("59.11", answer)
+
+        # Verify citation extraction and gate acceptance
+        citations, is_valid = extract_and_validate_citations(answer, synthetic_evidence)
+        self.assertTrue(is_valid)
+        self.assertEqual(len(citations), 1)
+        self.assertEqual(citations[0]["document_name"], "Example_Mining_Report.pdf")
+        self.assertEqual(citations[0]["page_number"], 12)
+
+        # Negative test 1: Empty evidence -> Insufficient evidence
+        prompt_empty = build_isolated_prompt("What was Example Mine's production in FY2023-24?", [])
+        answer_empty = provider.generate(prompt_empty)
+        self.assertIn("Insufficient evidence", answer_empty)
+        self.assertNotIn("Document.pdf", answer_empty)
+
+        # Negative test 2: Malformed evidence without citation headers -> No fabricated citations
+        malformed_prompt = (
+            "<untrusted_document_context>\n"
+            "Just some unformatted text without page citations.\n"
+            "</untrusted_document_context>\n\n"
+            "USER QUESTION: What was production?\n\nCITED ANSWER:"
+        )
+        answer_malformed = provider.generate(malformed_prompt)
+        self.assertIn("Insufficient evidence", answer_malformed)
+        self.assertNotIn("Document.pdf", answer_malformed)
 
 
 if __name__ == "__main__":
