@@ -28,7 +28,7 @@ import {
   Layers,
   ArrowRight,
 } from 'lucide-react';
-
+/*
 const PRESETS = [
   {
     title: 'Production Target Achievement',
@@ -51,7 +51,7 @@ const PRESETS = [
     question: 'Provide executive briefing on HEMM equipment availability, coal washing capacity, and infrastructure readiness.',
   },
 ];
-
+*/
 export default function ParliamentaryPage() {
   const { selectedSubsidiary, selectedFiscalYear } = useScope();
   const [questionText, setQuestionText] = useState('');
