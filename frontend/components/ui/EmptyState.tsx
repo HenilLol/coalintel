@@ -13,20 +13,20 @@ interface EmptyStateProps {
 export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
-  icon = <FolderOpen className="h-10 w-10 text-slate-500" />,
+  icon = <FolderOpen className="h-10 w-10 text-[#9EADB7]" />,
   action,
   className,
 }) => {
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center p-8 text-center rounded-xl bg-white border border-steel border-dashed shadow-card-light',
+        'flex flex-col items-center justify-center p-8 text-center rounded-xl bg-[#17232D] border border-[#2C3D49] border-dashed shadow-lg',
         className
       )}
     >
-      <div className="p-3 rounded-full bg-ash mb-3 border border-steel">{icon}</div>
-      <h4 className="text-base font-bold text-ink">{title}</h4>
-      <p className="text-xs text-slateText max-w-sm mt-1 mb-4">{description}</p>
+      <div className="p-3 rounded-full bg-[#20313D] mb-3 border border-[#2C3D49]">{icon}</div>
+      <h4 className="text-base font-bold text-[#F1F5F7]">{title}</h4>
+      <p className="text-xs text-[#9EADB7] max-w-sm mt-1 mb-4">{description}</p>
       {action}
     </div>
   );

@@ -5,23 +5,21 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Sparkles, FileSpreadsheet } from 'lucide-react';
-import { CIL_SUBSIDIARIES, FISCAL_YEARS } from '@/lib/constants';
+import { REPORT_TEMPLATES, FISCAL_YEARS, CIL_SUBSIDIARIES } from '@/lib/constants';
 
 interface ReportWizardFormProps {
-  onGenerate: (payload: { report_type: string; fiscal_year: string; subsidiary: string; title: string }) => void;
-  isLoading: boolean;
+  onGenerate: (params: {
+    report_type: string;
+    fiscal_year: string;
+    subsidiary: string;
+    title: string;
+  }) => void;
+  isLoading?: boolean;
 }
-
-const REPORT_TEMPLATES = [
-  { value: 'PARLIAMENTARY_REPLY', label: 'Parliamentary Inquiry Reply (Lok Sabha / Rajya Sabha)' },
-  { value: 'ANNUAL_SUMMARY', label: 'Annual Operational & Mining Summary' },
-  { value: 'SUBSIDIARY_COMPARISON', label: 'Cross-Subsidiary Performance Matrix' },
-  { value: 'PRODUCTION_AUDIT', label: 'Mine-Level Production & OBR Audit' },
-];
 
 export const ReportWizardForm: React.FC<ReportWizardFormProps> = ({
   onGenerate,
-  isLoading,
+  isLoading = false,
 }) => {
   const [template, setTemplate] = useState('PARLIAMENTARY_REPLY');
   const [fiscalYear, setFiscalYear] = useState('2023-24');
@@ -29,8 +27,9 @@ export const ReportWizardForm: React.FC<ReportWizardFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const templateLabel = REPORT_TEMPLATES.find((t) => t.value === template)?.label.split('(')[0].trim() || 'Report';
-    const title = `Official ${templateLabel} — ${subsidiary} (${fiscalYear})`;
+    const templateObj = REPORT_TEMPLATES.find((t) => t.value === template);
+    const title = `${subsidiary} ${templateObj?.label || 'Mining Report'} (${fiscalYear})`;
+
     onGenerate({
       report_type: template,
       fiscal_year: fiscalYear,
@@ -40,13 +39,13 @@ export const ReportWizardForm: React.FC<ReportWizardFormProps> = ({
   };
 
   return (
-    <Card className="border-steel shadow-card-light">
-      <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
+    <Card className="border-[#2C3D49] shadow-lg bg-[#17232D]">
+      <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
         <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-amber-500" />
-          <CardTitle className="text-sm font-semibold text-ink">Report Assembly Configuration</CardTitle>
+          <FileSpreadsheet className="h-4 w-4 text-[#18B6B2]" />
+          <CardTitle className="text-sm font-semibold text-[#F1F5F7]">Report Assembly Configuration</CardTitle>
         </div>
-        <CardDescription className="text-xs text-slateText">
+        <CardDescription className="text-xs text-[#9EADB7]">
           Select template, fiscal year, and target subsidiary to trigger ReportLab PDF assembly.
         </CardDescription>
       </CardHeader>

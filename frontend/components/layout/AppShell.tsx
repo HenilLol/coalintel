@@ -39,7 +39,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-ash flex font-sans text-ink antialiased selection:bg-amber-500/30 selection:text-amber-700">
+    <div className="min-h-screen bg-[#0B1117] flex font-sans text-[#F1F5F7] antialiased selection:bg-[#18B6B2]/30 selection:text-[#35D3CE]">
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <Sidebar
@@ -55,7 +55,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       {/* Mobile Drawer Backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-coal-900/80 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-[#0B1117]/80 backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -76,7 +76,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-ash">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#0B1117]">
         <Header
           onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
           userName={user?.username || 'CMPDI Analyst'}
@@ -87,7 +87,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           {children}
         </main>
 
-        <footer className="py-4 px-6 border-t border-steel text-center text-xs text-slateText font-mono bg-ash">
+        <footer className="py-4 px-6 border-t border-[#2C3D49] text-center text-xs text-[#9EADB7] font-mono bg-[#0B1117]">
           COALINTEL V2 Platform • Evidence-Driven Geological & Mining Intelligence • Ministry of Coal / CIL
         </footer>
       </div>

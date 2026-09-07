@@ -24,6 +24,13 @@ export const FISCAL_YEARS = [
   { value: '2021-22', label: 'FY 2021-22' },
 ] as const;
 
+export const REPORT_TEMPLATES = [
+  { value: 'PARLIAMENTARY_REPLY', label: 'Parliamentary Starred Reply Draft' },
+  { value: 'ANNUAL_SUMMARY', label: 'Subsidiary Annual Performance Summary' },
+  { value: 'SUBSIDIARY_COMPARISON', label: 'Cross-Subsidiary Metric Comparison' },
+  { value: 'PRODUCTION_AUDIT', label: 'Mine-Level Production & OBR Audit' },
+] as const;
+
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Executive Dashboard', icon: 'LayoutDashboard' },
   { href: '/documents', label: 'Document Library', icon: 'FileText' },

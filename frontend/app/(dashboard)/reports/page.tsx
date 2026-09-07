@@ -57,7 +57,7 @@ export default function ReportsPage() {
         title="Institutional Report Assembly Wizard"
         description="Automated compilation of Parliamentary Inquiry Replies, Annual Summaries, and Production Audits rendered via Python ReportLab engine."
         breadcrumbs={[{ label: 'Report Wizard' }]}
-        badge={<Badge variant="gold">ReportLab Engine</Badge>}
+        badge={<Badge variant="amber">ReportLab Engine</Badge>}
       />
 
       {/* Error Alert */}

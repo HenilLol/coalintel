@@ -102,7 +102,7 @@ export default function DocumentDetailPage() {
           { label: 'Document Repository', href: '/documents' },
           { label: document.filename },
         ]}
-        badge={<Badge variant="gold">Document Workspace</Badge>}
+        badge={<Badge variant="amber">Document Workspace</Badge>}
         actions={
           <Link href="/documents">
             <Button variant="ghost" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />}>

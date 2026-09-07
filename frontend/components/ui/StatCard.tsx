@@ -27,35 +27,35 @@ export const StatCard: React.FC<StatCardProps> = ({
   loading = false,
 }) => {
   return (
-    <Card className={cn('relative overflow-hidden group hover:border-steel transition-all duration-200 bg-white border border-steel shadow-card-light', className)}>
+    <Card className={cn('relative overflow-hidden group hover:border-[#18B6B2]/50 transition-all duration-200 bg-[#17232D] border border-[#2C3D49] shadow-lg', className)}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-slateText uppercase tracking-wider">{title}</p>
+          <p className="text-xs font-semibold text-[#9EADB7] uppercase tracking-wider">{title}</p>
           {loading ? (
-            <div className="h-8 w-28 animate-pulse rounded bg-ash my-1" />
+            <div className="h-8 w-28 animate-pulse rounded bg-[#20313D] my-1" />
           ) : (
             <div className="flex items-baseline space-x-1.5">
-              <span className="text-2xl lg:text-3xl font-extrabold text-ink tracking-tight font-sans">
+              <span className="text-2xl lg:text-3xl font-extrabold text-[#F1F5F7] tracking-tight font-sans">
                 {value}
               </span>
-              {unit && <span className="text-xs font-bold text-amber-600 uppercase font-mono">{unit}</span>}
+              {unit && <span className="text-xs font-bold text-[#F2A900] uppercase font-mono">{unit}</span>}
             </div>
           )}
         </div>
 
-        <div className="p-2.5 rounded-lg bg-ash border border-steel text-amber-500 group-hover:scale-110 group-hover:bg-amber-500/10 transition-all duration-200">
+        <div className="p-2.5 rounded-lg bg-[#3A2C0A] border border-[#F2A900]/30 text-[#F2A900] group-hover:scale-110 transition-all duration-200 shadow-glow-amber">
           {icon}
         </div>
       </div>
 
       {(subtitle || trend) && (
-        <div className="mt-3 pt-3 border-t border-steel/60 flex items-center justify-between text-xs">
-          {subtitle && <span className="text-slateText">{subtitle}</span>}
+        <div className="mt-3 pt-3 border-t border-[#2C3D49] flex items-center justify-between text-xs">
+          {subtitle && <span className="text-[#9EADB7]">{subtitle}</span>}
           {trend && (
             <span
               className={cn(
                 'font-semibold px-1.5 py-0.5 rounded font-mono text-[11px]',
-                trend.isPositive ? 'text-green-600 bg-green-500/15' : 'text-warning bg-warning/15'
+                trend.isPositive ? 'text-[#39B978] bg-[#39B978]/15 border border-[#39B978]/30' : 'text-[#F08A24] bg-[#F08A24]/15 border border-[#F08A24]/30'
               )}
             >
               {trend.value}

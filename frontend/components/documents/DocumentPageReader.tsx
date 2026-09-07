@@ -72,7 +72,7 @@ export const DocumentPageReader: React.FC<DocumentPageReaderProps> = ({
       <span className="whitespace-pre-wrap">
         {parts.map((part, i) =>
           regex.test(part) ? (
-            <mark key={i} className="bg-amber-500/20 text-ink px-1 py-0.5 rounded font-semibold border border-amber-500/40">
+            <mark key={i} className="bg-[#3A2C0A] text-[#F2A900] px-1 py-0.5 rounded font-semibold border border-[#F2A900]/40">
               {part}
             </mark>
           ) : (
@@ -90,14 +90,14 @@ export const DocumentPageReader: React.FC<DocumentPageReaderProps> = ({
   };
 
   return (
-    <Card className="h-full flex flex-col min-h-[600px] border-steel shadow-card-light">
+    <Card className="h-full flex flex-col min-h-[600px] border-[#2C3D49] bg-[#17232D] shadow-lg">
       {/* Header Toolbar */}
-      <CardHeader className="py-3 px-4 bg-ash border-b border-steel">
+      <CardHeader className="py-3 px-4 bg-[#20313D] border-b border-[#2C3D49]">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Left Title & Provenance Badge */}
           <div className="flex items-center gap-2.5">
-            <BookOpen className="h-4 w-4 text-amber-500 shrink-0" />
-            <CardTitle className="text-sm font-semibold truncate max-w-xs text-ink">{filename}</CardTitle>
+            <BookOpen className="h-4 w-4 text-[#18B6B2] shrink-0" />
+            <CardTitle className="text-sm font-semibold truncate max-w-xs text-[#F1F5F7]">{filename}</CardTitle>
             <Badge variant="gold" size="sm" className="hidden md:inline-flex">
               Page {currentPage} of {totalPages || 1}
             </Badge>
@@ -109,31 +109,31 @@ export const DocumentPageReader: React.FC<DocumentPageReaderProps> = ({
               placeholder="Search text in page..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              leftIcon={<Search className="h-3.5 w-3.5 text-slateText" />}
-              className="bg-white text-xs py-1.5"
+              leftIcon={<Search className="h-3.5 w-3.5 text-[#9EADB7]" />}
+              className="bg-[#111B24] border-[#2C3D49] text-[#F1F5F7] text-xs py-1.5"
             />
           </div>
 
           {/* Right Controls: Font size & Navigation */}
           <div className="flex items-center justify-between sm:justify-end gap-2">
-            <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-steel">
+            <div className="flex items-center gap-1 bg-[#111B24] rounded-lg p-1 border border-[#2C3D49]">
               <button
                 onClick={() => setFontSize('sm')}
-                className={`px-1.5 py-0.5 text-[10px] font-mono rounded ${fontSize === 'sm' ? 'bg-amber-500 text-coal-900 font-bold' : 'text-slateText hover:text-ink'}`}
+                className={`px-1.5 py-0.5 text-[10px] font-mono rounded ${fontSize === 'sm' ? 'bg-[#18B6B2] text-[#0B1117] font-bold' : 'text-[#9EADB7] hover:text-[#F1F5F7]'}`}
                 title="Small Font"
               >
                 A-
               </button>
               <button
                 onClick={() => setFontSize('base')}
-                className={`px-1.5 py-0.5 text-[10px] font-mono rounded ${fontSize === 'base' ? 'bg-amber-500 text-coal-900 font-bold' : 'text-slateText hover:text-ink'}`}
+                className={`px-1.5 py-0.5 text-[10px] font-mono rounded ${fontSize === 'base' ? 'bg-[#18B6B2] text-[#0B1117] font-bold' : 'text-[#9EADB7] hover:text-[#F1F5F7]'}`}
                 title="Normal Font"
               >
                 A
               </button>
               <button
                 onClick={() => setFontSize('lg')}
-                className={`px-1.5 py-0.5 text-[10px] font-mono rounded ${fontSize === 'lg' ? 'bg-amber-500 text-coal-900 font-bold' : 'text-slateText hover:text-ink'}`}
+                className={`px-1.5 py-0.5 text-[10px] font-mono rounded ${fontSize === 'lg' ? 'bg-[#18B6B2] text-[#0B1117] font-bold' : 'text-[#9EADB7] hover:text-[#F1F5F7]'}`}
                 title="Large Font"
               >
                 A+
@@ -145,7 +145,7 @@ export const DocumentPageReader: React.FC<DocumentPageReaderProps> = ({
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1 || loading}
-                className="p-1.5 rounded-lg bg-white border border-steel text-ink hover:bg-ash disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-lg bg-[#20313D] border border-[#2C3D49] text-[#F1F5F7] hover:bg-[#2C3D49] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title="Previous Page"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -158,15 +158,15 @@ export const DocumentPageReader: React.FC<DocumentPageReaderProps> = ({
                   max={totalPages || 1}
                   value={currentPage}
                   onChange={(e) => handlePageChange(parseInt(e.target.value) || 1)}
-                  className="w-10 text-center bg-white border border-steel rounded text-xs py-1 text-ink font-bold focus:outline-none focus:border-amber-500"
+                  className="w-10 text-center bg-[#111B24] border border-[#2C3D49] rounded text-xs py-1 text-[#F1F5F7] font-bold focus:outline-none focus:border-[#18B6B2]"
                 />
-                <span className="text-slateText">/ {totalPages || 1}</span>
+                <span className="text-[#9EADB7]">/ {totalPages || 1}</span>
               </div>
 
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= (totalPages || 1) || loading}
-                className="p-1.5 rounded-lg bg-white border border-steel text-ink hover:bg-ash disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-lg bg-[#20313D] border border-[#2C3D49] text-[#F1F5F7] hover:bg-[#2C3D49] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title="Next Page"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -177,32 +177,32 @@ export const DocumentPageReader: React.FC<DocumentPageReaderProps> = ({
       </CardHeader>
 
       {/* Main Scrollable Reading Area */}
-      <CardContent className="flex-1 p-6 overflow-y-auto max-h-[650px] bg-white text-ink scrollbar-thin">
+      <CardContent className="flex-1 p-6 overflow-y-auto max-h-[650px] bg-[#111B24] text-[#F1F5F7] scrollbar-thin">
         {loading ? (
           <div className="space-y-4 animate-pulse p-4">
-            <div className="h-4 bg-ash rounded w-3/4" />
-            <div className="h-4 bg-ash rounded w-full" />
-            <div className="h-4 bg-ash rounded w-5/6" />
-            <div className="h-4 bg-ash rounded w-2/3" />
+            <div className="h-4 bg-[#20313D] rounded w-3/4" />
+            <div className="h-4 bg-[#20313D] rounded w-full" />
+            <div className="h-4 bg-[#20313D] rounded w-5/6" />
+            <div className="h-4 bg-[#20313D] rounded w-2/3" />
           </div>
         ) : activePageItem ? (
           <div className="space-y-4">
             {/* Document Provenance Header inside Canvas */}
-            <div className="flex items-center justify-between pb-3 border-b border-steel text-[11px] font-mono text-slateText">
-              <span className="flex items-center gap-1.5 text-ink font-semibold">
-                <Bookmark className="h-3.5 w-3.5 text-amber-500" />
+            <div className="flex items-center justify-between pb-3 border-b border-[#2C3D49] text-[11px] font-mono text-[#9EADB7]">
+              <span className="flex items-center gap-1.5 text-[#F1F5F7] font-semibold">
+                <Bookmark className="h-3.5 w-3.5 text-[#18B6B2]" />
                 Provenanced Extracted Text Canvas
               </span>
-              <span className="text-amber-600 font-semibold">Page {activePageItem.page_number}</span>
+              <span className="text-[#F2A900] font-semibold">Page {activePageItem.page_number}</span>
             </div>
 
             {/* Structured Page Content */}
-            <div className={`font-sans tracking-wide text-ink selection:bg-amber-500/30 ${fontClasses[fontSize]}`}>
+            <div className={`font-sans tracking-wide text-[#F1F5F7] selection:bg-[#18B6B2]/30 ${fontClasses[fontSize]}`}>
               {renderHighlightedText(activePageItem.text_snippet || 'No text content available for this page.')}
             </div>
           </div>
         ) : (
-          <div className="p-8 text-center text-slateText text-xs font-mono">
+          <div className="p-8 text-center text-[#9EADB7] text-xs font-mono">
             No page text data retrieved for Page {currentPage}.
           </div>
         )}

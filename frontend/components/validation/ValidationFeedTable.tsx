@@ -16,18 +16,18 @@ export const ValidationFeedTable: React.FC<ValidationFeedTableProps> = ({
   loading = false,
 }) => {
   return (
-    <Card className="border-steel shadow-card-light bg-white">
-      <CardHeader className="py-3.5 px-4 bg-ash border-b border-steel">
+    <Card className="border-[#2C3D49] shadow-lg bg-[#17232D]">
+      <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-bold text-ink flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-green-600" />
+          <CardTitle className="text-sm font-bold text-[#F1F5F7] flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[#39B978]" />
             <span>Deterministic Arithmetic Validation Feed</span>
           </CardTitle>
           <Badge variant="gold" size="sm">
             {items.length} Validation Scans
           </Badge>
         </div>
-        <CardDescription className="text-xs text-slateText">
+        <CardDescription className="text-xs text-[#9EADB7]">
           Deterministic arithmetic checks detecting calculation discrepancies ($&gt; 5\%$) and unit conversion anomalies.
         </CardDescription>
       </CardHeader>
@@ -36,7 +36,7 @@ export const ValidationFeedTable: React.FC<ValidationFeedTableProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-steel bg-ash text-[11px] font-mono text-slateText uppercase tracking-wider">
+              <tr className="border-b border-[#2C3D49] bg-[#20313D] text-[11px] font-mono text-[#F1F5F7] uppercase tracking-wider">
                 <th className="py-3 px-4">Mine Entity</th>
                 <th className="py-3 px-4">Metric Type</th>
                 <th className="py-3 px-4">Discrepancy Details</th>
@@ -45,47 +45,47 @@ export const ValidationFeedTable: React.FC<ValidationFeedTableProps> = ({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-steel/60 text-xs font-mono">
+            <tbody className="divide-y divide-[#2C3D49] text-xs font-mono">
               {loading ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="py-3.5 px-4"><div className="h-4 w-32 bg-ash rounded" /></td>
-                    <td className="py-3.5 px-4"><div className="h-4 w-28 bg-ash rounded" /></td>
-                    <td className="py-3.5 px-4"><div className="h-4 w-48 bg-ash rounded" /></td>
-                    <td className="py-3.5 px-4"><div className="h-4 w-16 bg-ash rounded" /></td>
-                    <td className="py-3.5 px-4 text-right"><div className="h-6 w-20 bg-ash rounded ml-auto" /></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-32 bg-[#20313D] rounded" /></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-28 bg-[#20313D] rounded" /></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-48 bg-[#20313D] rounded" /></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-16 bg-[#20313D] rounded" /></td>
+                    <td className="py-3.5 px-4 text-right"><div className="h-6 w-20 bg-[#20313D] rounded ml-auto" /></td>
                   </tr>
                 ))
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slateText text-xs">
+                  <td colSpan={5} className="py-8 text-center text-[#9EADB7] text-xs">
                     No arithmetic validation warnings detected across ingested document set.
                   </td>
                 </tr>
               ) : (
                 items.map((item) => (
-                  <tr key={item.id} className="hover:bg-ash/50 transition-colors">
-                    <td className="py-3.5 px-4 font-sans font-bold text-ink">
+                  <tr key={item.id} className="hover:bg-[#20313D]/50 transition-colors">
+                    <td className="py-3.5 px-4 font-sans font-bold text-[#F1F5F7]">
                       {item.mine_name}
-                      <span className="block text-[10px] text-slateText font-mono font-normal">
+                      <span className="block text-[10px] text-[#9EADB7] font-mono font-normal">
                         {item.subsidiary}
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4 text-ink">
+                    <td className="py-3.5 px-4 text-[#F1F5F7]">
                       {item.metric_name}
                     </td>
 
-                    <td className="py-3.5 px-4 text-ink font-sans">
+                    <td className="py-3.5 px-4 text-[#F1F5F7] font-sans">
                       <div className="space-y-0.5">
-                        <span className="font-bold text-warning font-mono block">
+                        <span className="font-bold text-[#F08A24] font-mono block">
                           Discrepancy: {item.discrepancy}
                         </span>
-                        <span className="text-[11px] text-slateText block">{item.details}</span>
+                        <span className="text-[11px] text-[#9EADB7] block">{item.details}</span>
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 text-green-600 font-bold">
+                    <td className="py-3.5 px-4 text-[#39B978] font-bold">
                       {(item.confidence || 0.95).toFixed(2)}
                     </td>
 

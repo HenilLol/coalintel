@@ -1,36 +1,36 @@
 'use client';
 
 import React from 'react';
-import { Send, Sparkles, Filter, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
+import { Sparkles, Send } from 'lucide-react';
 import { CIL_SUBSIDIARIES } from '@/lib/constants';
 
 interface QueryInputProps {
   prompt: string;
   onPromptChange: (val: string) => void;
-  onSubmit: (queryText?: string) => void;
-  isLoading: boolean;
+  onSubmit: (customPrompt?: string) => void;
   selectedSubsidiary: string;
-  onSubsidiaryChange: (sub: string) => void;
+  onSubsidiaryChange: (val: string) => void;
+  isLoading?: boolean;
 }
 
 const SAMPLE_QUERIES = [
-  'What was the total coal production for ECL in FY 2023-24?',
-  'Compare overburden removal between Rajmahal OC and Gevra OC.',
-  'List all active cross-document discrepancies in CCL reports.',
-  'What are the primary operational metrics reported for BCCL?',
+  'What is the total coal production of ECL in FY 2023-24?',
+  'List all mines with overburden removal exceeding 100 M.Cu.M',
+  'Which subsidiary achieved the highest actual vs target ratio?',
+  'Compare SECL and MCL coal extraction numbers',
 ];
 
 export const QueryInput: React.FC<QueryInputProps> = ({
   prompt,
   onPromptChange,
   onSubmit,
-  isLoading,
   selectedSubsidiary,
   onSubsidiaryChange,
+  isLoading = false,
 }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +38,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
   };
 
   return (
-    <Card className="border-steel shadow-card-light bg-white">
+    <Card className="border-[#2C3D49] shadow-lg bg-[#17232D]">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Top Controls: Input Bar & Subsidiary Filter */}
         <div className="flex flex-col lg:flex-row items-stretch gap-3">
@@ -47,8 +47,8 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               placeholder="Ask any natural-language geological, production, OBR, or parliamentary query..."
               value={prompt}
               onChange={(e) => onPromptChange(e.target.value)}
-              leftIcon={<Sparkles className="h-4 w-4 text-amber-500" />}
-              className="bg-white text-sm py-2.5"
+              leftIcon={<Sparkles className="h-4 w-4 text-[#18B6B2]" />}
+              className="bg-[#111B24] border-[#2C3D49] text-[#F1F5F7] text-sm py-2.5"
             />
           </div>
 
@@ -57,7 +57,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               value={selectedSubsidiary}
               onChange={(e) => onSubsidiaryChange(e.target.value)}
               options={CIL_SUBSIDIARIES}
-              className="bg-white text-xs py-2.5 w-48"
+              className="bg-[#111B24] border-[#2C3D49] text-[#F1F5F7] text-xs py-2.5 w-48"
             />
 
             <Button
@@ -74,8 +74,8 @@ export const QueryInput: React.FC<QueryInputProps> = ({
         </div>
 
         {/* Sample Query Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-steel/60">
-          <span className="text-[10px] font-mono text-slateText uppercase tracking-widest font-semibold shrink-0">
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#2C3D49]">
+          <span className="text-[10px] font-mono text-[#9EADB7] uppercase tracking-widest font-semibold shrink-0">
             Sample Queries:
           </span>
           {SAMPLE_QUERIES.map((sq, i) => (
@@ -86,7 +86,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
                 onPromptChange(sq);
                 onSubmit(sq);
               }}
-              className="px-3 py-1 rounded-full bg-ash border border-steel hover:border-amber-500/50 hover:bg-amber-500/10 text-ink text-xs transition-all text-left truncate max-w-xs"
+              className="px-3 py-1 rounded-full bg-[#20313D] border border-[#2C3D49] hover:border-[#18B6B2]/50 hover:bg-[#123C43]/40 text-[#F1F5F7] text-xs transition-all text-left truncate max-w-xs"
             >
               {sq}
             </button>

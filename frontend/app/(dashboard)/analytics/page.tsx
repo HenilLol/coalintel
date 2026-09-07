@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
         title="Automated Word Cloud & Topic Identification Module"
         description="Statistical TF-IDF term frequency analysis, operational keyword clustering, and entity recognition breakdown across ingested CIL documents."
         breadcrumbs={[{ label: 'Topic Analytics' }]}
-        badge={<Badge variant="gold">Topic Engine</Badge>}
+        badge={<Badge variant="amber">Topic Engine</Badge>}
       />
 
       {/* Error Alert */}
@@ -66,26 +66,26 @@ export default function AnalyticsPage() {
 
             {/* Entity Recognition Summary Side Card */}
             <div className="lg:col-span-4 space-y-4">
-              <Card className="border-steel shadow-card-light bg-white">
+              <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
                 <div className="p-6 space-y-4 text-center">
-                  <div className="inline-flex p-3.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30">
+                  <div className="inline-flex p-3.5 rounded-full bg-[#123C43] text-[#18B6B2] border border-[#18B6B2]/40">
                     <Database className="h-8 w-8" />
                   </div>
 
-                  <h3 className="text-base font-bold text-ink">Mining Named Entity Recognition</h3>
-                  <p className="text-xs text-slateText leading-relaxed">
+                  <h3 className="text-base font-bold text-[#F1F5F7]">Mining Named Entity Recognition</h3>
+                  <p className="text-xs text-[#9EADB7] leading-relaxed">
                     Automated entity tagger identifying Opencast Mines, Coalfields, CIL Subsidiaries (ECL, BCCL, CCL, WCL, SECL, NCL, MCL), and target production metrics.
                   </p>
 
-                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-steel text-xs font-mono">
-                    <div className="p-3 bg-ash rounded-xl border border-steel">
-                      <span className="text-slateText block text-[10px]">Tagged Mines</span>
-                      <span className="text-lg font-bold text-amber-600 mt-1 block">48 Mines</span>
+                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[#2C3D49] text-xs font-mono">
+                    <div className="p-3 bg-[#20313D] rounded-xl border border-[#2C3D49]">
+                      <span className="text-[#9EADB7] block text-[10px]">Tagged Mines</span>
+                      <span className="text-lg font-bold text-[#F2A900] mt-1 block">48 Mines</span>
                     </div>
 
-                    <div className="p-3 bg-ash rounded-xl border border-steel">
-                      <span className="text-slateText block text-[10px]">Subsidiary Tags</span>
-                      <span className="text-lg font-bold text-green-600 mt-1 block">8 Subsidiaries</span>
+                    <div className="p-3 bg-[#20313D] rounded-xl border border-[#2C3D49]">
+                      <span className="text-[#9EADB7] block text-[10px]">Subsidiary Tags</span>
+                      <span className="text-lg font-bold text-[#39B978] mt-1 block">8 Subsidiaries</span>
                     </div>
                   </div>
                 </div>

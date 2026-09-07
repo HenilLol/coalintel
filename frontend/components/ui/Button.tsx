@@ -27,19 +27,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed select-none';
+      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0B1117] disabled:opacity-50 disabled:cursor-not-allowed select-none';
 
     const variants = {
       primary:
-        'bg-amber-500 hover:bg-amber-600 text-coal-900 font-bold shadow-sm focus:ring-amber-500 border border-amber-600/30 active:scale-[0.98]',
+        'bg-[#18B6B2] hover:bg-[#35D3CE] text-[#0B1117] font-bold shadow-sm focus:ring-[#18B6B2] active:scale-[0.98]',
       secondary:
-        'bg-white hover:bg-ash text-ink border border-steel hover:border-slateText/60 focus:ring-slateText active:scale-[0.98]',
+        'bg-[#20313D] hover:bg-[#2C3D49] text-[#F1F5F7] border border-[#2C3D49] focus:ring-[#18B6B2] active:scale-[0.98]',
       outline:
-        'bg-transparent hover:bg-teal-500/10 text-teal-600 hover:text-teal-700 border border-teal-500 hover:border-teal-600 focus:ring-teal-500 active:scale-[0.98]',
+        'bg-transparent hover:bg-[#18B6B2]/15 text-[#35D3CE] hover:text-[#35D3CE] border border-[#18B6B2] focus:ring-[#18B6B2] active:scale-[0.98]',
       ghost:
-        'bg-transparent hover:bg-steel/20 text-slateText hover:text-ink focus:ring-steel active:scale-[0.98]',
+        'bg-transparent hover:bg-[#20313D] text-[#9EADB7] hover:text-[#F1F5F7] focus:ring-[#2C3D49] active:scale-[0.98]',
       danger:
-        'bg-danger hover:bg-red-700 text-white shadow-sm focus:ring-red-500 active:scale-[0.98]',
+        'bg-[#F05B5B] hover:bg-[#F57878] text-[#0B1117] font-semibold shadow-sm focus:ring-[#F05B5B] active:scale-[0.98]',
     };
 
     const sizes = {

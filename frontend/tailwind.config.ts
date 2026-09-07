@@ -10,85 +10,121 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // CoalIntel Dark Theme Core Palette
+        deepMine: '#0B1117',
+        coalNavy: '#111B24',
+        graphite: '#17232D',
+        steelSlate: '#20313D',
+        darkSteel: '#2C3D49',
+        frost: '#F1F5F7',
+        ashGray: '#9EADB7',
+
+        // Structure & Surfaces
         coal: {
-          50: '#F5F7F8',
-          100: '#E6E9EC',
-          700: '#33404B',
-          800: '#27313A', // Graphite Slate
-          900: '#171A1F', // Coal Black
-          950: '#0F1216',
-          DEFAULT: '#171A1F',
+          50: '#F1F5F7',
+          100: '#9EADB7',
+          700: '#2C3D49', // Dark Steel (Borders)
+          800: '#20313D', // Steel Slate (Elevated surface)
+          850: '#17232D', // Graphite (Cards)
+          900: '#111B24', // Coal Navy (Navigation)
+          950: '#0B1117', // Deep Mine (Main background)
+          DEFAULT: '#0B1117',
         },
         ash: {
-          DEFAULT: '#F5F7F8',
+          DEFAULT: '#0B1117', // Main background alias
+          50: '#111B24',
+          100: '#17232D',
+          200: '#20313D',
+          300: '#2C3D49',
         },
         surface: {
-          DEFAULT: '#FFFFFF',
-          dark: '#27313A',
+          DEFAULT: '#17232D', // Graphite
+          dark: '#111B24',    // Coal Navy
+          elevated: '#20313D', // Steel Slate
         },
         steel: {
-          DEFAULT: '#CBD3D8',
-          100: '#F5F7F8',
-          200: '#E2E8F0',
-          300: '#CBD3D8',
-          400: '#94A3B8',
-          500: '#64748B',
+          DEFAULT: '#2C3D49', // Dark Steel
+          100: '#111B24',
+          200: '#17232D',
+          300: '#20313D',
+          400: '#2C3D49',
+          500: '#9EADB7',
         },
-        amber: {
-          DEFAULT: '#F2A900',
-          400: '#FFC233',
-          500: '#F2A900', // Signal Amber
-          600: '#D97706',
-          700: '#B45309',
-        },
-        gold: {
-          400: '#F2A900',
-          500: '#F2A900',
-          600: '#D97706',
-          700: '#B45309',
-        },
+
+        // Brand Accents
         teal: {
-          DEFAULT: '#008C95',
-          50: '#E6F4F5',
-          100: '#CCE9EB',
-          400: '#00A8B5',
-          500: '#008C95', // Electric Teal
-          600: '#007077',
-          700: '#00555A',
+          DEFAULT: '#18B6B2', // Intelligence Teal
+          50: '#E6F9F9',
+          100: '#C2F3F2',
+          200: '#8CEAE7',
+          300: '#35D3CE',     // Bright Teal (Hover/Active)
+          400: '#22C4C0',
+          500: '#18B6B2',     // Main Accent
+          600: '#123C43',     // Active navigation background
+          700: '#0D2D32',
+          800: '#0A2226',
+          900: '#07181A',
         },
         brand: {
-          50: '#E6F4F5',
-          100: '#CCE9EB',
-          500: '#008C95',
-          600: '#007077',
-          700: '#00555A',
-          900: '#171A1F',
+          50: '#E6F9F9',
+          100: '#C2F3F2',
+          300: '#35D3CE',
+          500: '#18B6B2',
+          600: '#123C43',
+          900: '#111B24',
         },
+        amber: {
+          DEFAULT: '#F2A900', // Ember Amber
+          300: '#FFC83B',
+          400: '#FFBA1A',
+          500: '#F2A900',
+          600: '#D97706',
+          700: '#92400E',
+          900: '#3A2C0A',     // KPI highlight background
+        },
+        gold: {
+          400: '#FFC83B',
+          500: '#F2A900',
+          600: '#D97706',
+          900: '#3A2C0A',
+        },
+
+        // Status Colors
         green: {
-          DEFAULT: '#2E7D5B',
-          500: '#2E7D5B', // Mine Green
-          600: '#246548',
+          DEFAULT: '#39B978', // Mine Green
+          400: '#52C78D',
+          500: '#39B978',
+          600: '#2E9762',
+          900: '#0D331E',
         },
         warning: {
-          DEFAULT: '#D97706',
-          500: '#D97706', // Caution Orange
+          DEFAULT: '#F08A24', // Caution Orange
+          400: '#F5A14B',
+          500: '#F08A24',
+          600: '#D47112',
+          900: '#421E03',
         },
         danger: {
-          DEFAULT: '#C2413B',
-          500: '#C2413B', // Alert Red
+          DEFAULT: '#F05B5B', // Signal Red
+          400: '#F57878',
+          500: '#F05B5B',
+          600: '#D43D3D',
+          900: '#421010',
         },
+
+        // Typography
         ink: {
-          DEFAULT: '#20262B', // Primary text
-          primary: '#20262B',
-          muted: '#5E6B73',
+          DEFAULT: '#F1F5F7', // Frost White
+          primary: '#F1F5F7',
+          muted: '#9EADB7',   // Ash Gray
         },
         slateText: {
-          DEFAULT: '#5E6B73', // Secondary / muted text
+          DEFAULT: '#9EADB7', // Ash Gray
         },
         navy: {
-          800: '#33404B',
-          900: '#27313A', // Graphite Slate
-          950: '#171A1F', // Coal Black
+          800: '#20313D',
+          900: '#17232D',
+          950: '#111B24',
         },
       },
       fontFamily: {
@@ -98,11 +134,11 @@ const config: Config = {
       boxShadow: {
         'glow-amber': '0 0 20px -5px rgba(242, 169, 0, 0.35)',
         'glow-gold': '0 0 20px -5px rgba(242, 169, 0, 0.35)',
-        'glow-teal': '0 0 20px -5px rgba(0, 140, 149, 0.35)',
-        'glow-red': '0 0 20px -5px rgba(194, 65, 59, 0.35)',
-        'glow-emerald': '0 0 20px -5px rgba(46, 125, 91, 0.35)',
-        'card-light': '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)',
-        'card-dark': '0 4px 20px -2px rgba(23, 26, 31, 0.25)',
+        'glow-teal': '0 0 20px -5px rgba(24, 182, 178, 0.35)',
+        'glow-red': '0 0 20px -5px rgba(240, 91, 91, 0.35)',
+        'glow-emerald': '0 0 20px -5px rgba(57, 185, 120, 0.35)',
+        'card-light': '0 4px 20px -2px rgba(11, 17, 23, 0.5)',
+        'card-dark': '0 4px 20px -2px rgba(11, 17, 23, 0.7)',
       },
     },
   },

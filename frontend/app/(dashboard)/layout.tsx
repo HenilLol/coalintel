@@ -20,8 +20,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen bg-ash flex items-center justify-center">
-        <div className="animate-pulse text-xs font-mono text-amber-500 font-bold uppercase tracking-widest">
+      <div className="min-h-screen bg-[#0B1117] flex items-center justify-center">
+        <div className="animate-pulse text-xs font-mono text-[#18B6B2] font-bold uppercase tracking-widest">
           Authenticating Operational Session...
         </div>
       </div>
