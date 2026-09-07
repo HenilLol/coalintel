@@ -9,6 +9,7 @@ from app.core.rbac import get_current_user, require_roles
 from app.schemas.query import QueryRequest, QueryResponse, CitationItem, EvidenceChunkItem
 from app.services.rag_service import execute_rag_query
 from app.services.vector_store_service import add_chunks_to_vector_store
+from app.services.normalization_service import normalize_subsidiary_scope
 
 router = APIRouter(tags=["Q&A & Vector Retrieval"])
 
@@ -32,16 +33,32 @@ def ask_question(
             detail="Query string cannot be empty."
         )
 
+    # Resolve subsidiary filter with RBAC enforcement (BUG-01, BUG-07)
+    normalized_sub = normalize_subsidiary_scope(payload.subsidiary_filter)
+
+    # Check if user has global query privileges
+    is_global_user = (
+        current_user.role in ["Admin", "Analyst"]
+        or not current_user.subsidiary
+        or current_user.subsidiary.strip().upper() in ["CIL HQ", "CIL", "MINISTRY OF COAL"]
+    )
+
+    if is_global_user:
+        effective_subsidiary = normalized_sub
+    else:
+        # Subsidiary-scoped user: restrict to user's assigned subsidiary
+        effective_subsidiary = current_user.subsidiary
+
     result = execute_rag_query(
         db=db,
         query_text=payload.query,
         top_k=payload.top_k or 5,
-        subsidiary_filter=payload.subsidiary_filter or current_user.subsidiary
+        subsidiary_filter=effective_subsidiary
     )
 
     evidence_items = [
         EvidenceChunkItem(
-            chunk_id=c.get("chunk_id"),
+            chunk_id=c["chunk_id"] if isinstance(c.get("chunk_id"), int) else None,
             document_id=c["document_id"],
             filename=c["filename"],
             page_number=c["page_number"],

@@ -5,6 +5,7 @@ from sqlalchemy import or_
 
 from app.models.document_chunk import DocumentChunk
 from app.models.document import Document
+from app.services.normalization_service import normalize_subsidiary_scope
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,9 @@ def search_keyword_store(
     query = db.query(DocumentChunk, Document.filename, Document.subsidiary).\
         join(Document, DocumentChunk.document_id == Document.id)
 
-    if subsidiary_filter and subsidiary_filter != "ALL":
-        query = query.filter(Document.subsidiary == subsidiary_filter)
+    norm_sub = normalize_subsidiary_scope(subsidiary_filter)
+    if norm_sub:
+        query = query.filter(Document.subsidiary == norm_sub)
 
     # Build ILIKE filters for keywords
     ilike_filters = [DocumentChunk.chunk_text.ilike(f"%{kw}%") for kw in keywords]

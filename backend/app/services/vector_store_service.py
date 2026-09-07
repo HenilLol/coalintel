@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 
 from config import settings
 from app.services.embedding_service import generate_embedding, generate_batch_embeddings
+from app.services.normalization_service import normalize_subsidiary_scope
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +118,9 @@ def search_vector_store(
 
     try:
         where_clause = None
-        if subsidiary_filter and subsidiary_filter != "ALL":
-            where_clause = {"subsidiary": subsidiary_filter}
+        norm_sub = normalize_subsidiary_scope(subsidiary_filter)
+        if norm_sub:
+            where_clause = {"subsidiary": norm_sub}
 
         results = collection.query(
             query_embeddings=[query_vec],
