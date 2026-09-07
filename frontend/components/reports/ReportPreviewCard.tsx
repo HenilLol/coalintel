@@ -22,13 +22,13 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
 
   if (!report) {
     return (
-      <Card className="h-full flex items-center justify-center p-12 text-center border-[#2C3D49] bg-[#17232D] shadow-lg">
-        <div className="space-y-2 text-[#9EADB7]">
-          <FileText className="h-10 w-10 mx-auto text-[#9EADB7]/70" />
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9EADB7]">
+      <Card className="h-full flex items-center justify-center p-12 text-center border-[#30383D] bg-[#1C2226] shadow-sm">
+        <div className="space-y-2 text-[#9BA5A8]">
+          <FileText className="h-10 w-10 mx-auto text-[#9BA5A8]/70" />
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5A8]">
             No Active Report Draft Selected
           </h4>
-          <p className="text-xs text-[#9EADB7] max-w-xs">
+          <p className="text-xs text-[#9BA5A8] max-w-xs leading-relaxed">
             Configure report parameters on the left and click &quot;Assemble Report Draft&quot; to generate an institutional preview.
           </p>
         </div>
@@ -52,11 +52,11 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
   };
 
   return (
-    <Card className="h-full border-[#2C3D49] bg-[#17232D] shadow-lg space-y-4">
-      <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49] flex items-center justify-between">
+    <Card className="h-full border-[#30383D] bg-[#1C2226] shadow-sm space-y-4">
+      <CardHeader className="py-3.5 px-4 bg-[#151A1D] border-b border-[#30383D] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[#18B6B2]" />
-          <CardTitle className="text-sm font-semibold text-[#F1F5F7]">Reportlab Draft Assembly Preview</CardTitle>
+          <Sparkles className="h-4 w-4 text-[#C58B3A]" />
+          <CardTitle className="text-sm font-semibold text-[#E8ECEB]">ReportLab Draft Assembly Preview</CardTitle>
         </div>
         <Badge variant={isApproved ? 'success' : 'warning'}>
           {report.approval_status || 'DRAFT'}
@@ -65,34 +65,34 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
 
       <CardContent className="p-6 space-y-5">
         {/* Title & Metadata Card */}
-        <div className="p-4 rounded-xl bg-[#20313D] border border-[#2C3D49] space-y-3">
+        <div className="p-4 rounded-lg bg-[#242C30] border border-[#30383D] space-y-3">
           <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-bold text-[#F1F5F7] font-sans leading-snug">
+            <h3 className="text-base font-bold text-[#E8ECEB] font-sans leading-snug">
               {report.title}
             </h3>
-            <Badge variant="gold" size="sm" className="shrink-0 font-mono">
+            <Badge variant="amber" size="sm" className="shrink-0 font-mono">
               ID #{report.id}
             </Badge>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[#9EADB7] pt-1 border-t border-[#2C3D49]">
-            <span>Template: <code className="text-[#F1F5F7] font-semibold">{report.report_type}</code></span>
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[#9BA5A8] pt-1 border-t border-[#30383D]">
+            <span>Template: <code className="text-[#E8ECEB] font-semibold">{report.report_type}</code></span>
             <span>•</span>
-            <span>Subsidiary: <span className="text-[#F2A900] font-semibold">{report.subsidiary || 'ECL'}</span></span>
+            <span>Subsidiary: <span className="text-[#C58B3A] font-semibold">{report.subsidiary || 'ECL'}</span></span>
             <span>•</span>
-            <span>FY: <span className="text-[#F2A900] font-semibold">{report.fiscal_year || '2023-24'}</span></span>
+            <span>FY: <span className="text-[#C58B3A] font-semibold">{report.fiscal_year || '2023-24'}</span></span>
           </div>
 
-          <div className="text-[11px] font-mono text-[#9EADB7] truncate" title={report.file_path}>
+          <div className="text-[11px] font-mono text-[#9BA5A8] truncate" title={report.file_path}>
             PDF File: {report.file_path}
           </div>
         </div>
 
         {/* Verification Note */}
-        <div className="p-3.5 rounded-xl bg-[#39B978]/10 border border-[#39B978]/30 text-xs text-[#F1F5F7] flex items-center gap-2.5">
-          <ShieldCheck className="h-4 w-4 text-[#39B978] shrink-0" />
+        <div className="p-3.5 rounded-lg bg-[#4F8A62]/10 border border-[#4F8A62]/30 text-xs text-[#E8ECEB] flex items-center gap-2.5">
+          <ShieldCheck className="h-4 w-4 text-[#4F8A62] shrink-0" />
           <span>
-            Compiled using verified unit-normalized metrics from database <code className="text-[#F2A900] font-mono font-semibold">extracted_metrics</code> and resolved conflicts.
+            Compiled using verified unit-normalized metrics from database <code className="text-[#C58B3A] font-mono font-semibold">extracted_metrics</code> and resolved conflicts.
           </span>
         </div>
 

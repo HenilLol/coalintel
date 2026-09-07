@@ -19,7 +19,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="w-full space-y-1.5">
         {label && (
-          <label htmlFor={selectId} className="block text-xs font-semibold uppercase tracking-wider text-[#F1F5F7]">
+          <label htmlFor={selectId} className="block text-xs font-semibold uppercase tracking-wider text-[#E8ECEB]">
             {label}
           </label>
         )}
@@ -29,22 +29,22 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           disabled={disabled}
           className={cn(
-            'w-full rounded-lg bg-[#111B24] border border-[#2C3D49] px-3.5 py-2.5 text-sm text-[#F1F5F7] shadow-sm transition-all duration-150',
-            'focus:outline-none focus:border-[#18B6B2] focus:ring-1 focus:ring-[#18B6B2]',
-            'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-[#0B1117]',
-            error && 'border-[#F05B5B] focus:border-[#F05B5B] focus:ring-[#F05B5B]',
+            'w-full rounded-lg bg-[#151A1D] border border-[#30383D] px-3.5 py-2.5 text-sm text-[#E8ECEB] shadow-sm transition-colors duration-150',
+            'focus:outline-none focus:border-[#C58B3A] focus:ring-1 focus:ring-[#C58B3A]',
+            'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-[#0E1113]',
+            error && 'border-[#C94B45] focus:border-[#C94B45] focus:ring-[#C94B45]',
             className
           )}
           {...props}
         >
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-[#111B24] text-[#F1F5F7] py-1">
+            <option key={opt.value} value={opt.value} className="bg-[#151A1D] text-[#E8ECEB] py-1">
               {opt.label}
             </option>
           ))}
         </select>
 
-        {error && <p className="text-xs font-medium text-[#F05B5B] mt-1">{error}</p>}
+        {error && <p className="text-xs font-medium text-[#C94B45] mt-1">{error}</p>}
       </div>
     );
   }

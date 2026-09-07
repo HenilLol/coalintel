@@ -27,35 +27,35 @@ export const StatCard: React.FC<StatCardProps> = ({
   loading = false,
 }) => {
   return (
-    <Card className={cn('relative overflow-hidden group hover:border-[#18B6B2]/50 transition-all duration-200 bg-[#17232D] border border-[#2C3D49] shadow-lg', className)}>
+    <Card className={cn('relative overflow-hidden group hover:border-[#C58B3A]/40 transition-colors duration-150 bg-[#1C2226] border border-[#30383D] shadow-sm', className)}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-[#9EADB7] uppercase tracking-wider">{title}</p>
+          <p className="text-xs font-semibold text-[#9BA5A8] uppercase tracking-wider">{title}</p>
           {loading ? (
-            <div className="h-8 w-28 animate-pulse rounded bg-[#20313D] my-1" />
+            <div className="h-8 w-28 animate-pulse rounded bg-[#242C30] my-1" />
           ) : (
             <div className="flex items-baseline space-x-1.5">
-              <span className="text-2xl lg:text-3xl font-extrabold text-[#F1F5F7] tracking-tight font-sans">
+              <span className="text-2xl lg:text-3xl font-extrabold text-[#E8ECEB] tracking-tight font-sans">
                 {value}
               </span>
-              {unit && <span className="text-xs font-bold text-[#F2A900] uppercase font-mono">{unit}</span>}
+              {unit && <span className="text-xs font-bold text-[#C58B3A] uppercase font-mono">{unit}</span>}
             </div>
           )}
         </div>
 
-        <div className="p-2.5 rounded-lg bg-[#3A2C0A] border border-[#F2A900]/30 text-[#F2A900] group-hover:scale-110 transition-all duration-200 shadow-glow-amber">
+        <div className="p-2.5 rounded-lg bg-[#151A1D] border border-[#30383D] text-[#C58B3A]">
           {icon}
         </div>
       </div>
 
       {(subtitle || trend) && (
-        <div className="mt-3 pt-3 border-t border-[#2C3D49] flex items-center justify-between text-xs">
-          {subtitle && <span className="text-[#9EADB7]">{subtitle}</span>}
+        <div className="mt-3 pt-3 border-t border-[#30383D] flex items-center justify-between text-xs">
+          {subtitle && <span className="text-[#9BA5A8]">{subtitle}</span>}
           {trend && (
             <span
               className={cn(
                 'font-semibold px-1.5 py-0.5 rounded font-mono text-[11px]',
-                trend.isPositive ? 'text-[#39B978] bg-[#39B978]/15 border border-[#39B978]/30' : 'text-[#F08A24] bg-[#F08A24]/15 border border-[#F08A24]/30'
+                trend.isPositive ? 'text-[#4F8A62] bg-[#4F8A62]/15 border border-[#4F8A62]/30' : 'text-[#D6A23A] bg-[#D6A23A]/15 border border-[#D6A23A]/30'
               )}
             >
               {trend.value}

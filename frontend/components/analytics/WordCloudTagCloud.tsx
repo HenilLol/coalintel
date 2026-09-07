@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Cloud, Filter } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Cloud } from 'lucide-react';
 import { WordCloudTopicItem } from '@/lib/api/analyticsApi';
 
 interface WordCloudTagCloudProps {
@@ -11,13 +10,13 @@ interface WordCloudTagCloudProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Operational: 'text-[#F2A900] bg-[#3A2C0A] border-[#F2A900]/40',
-  Production: 'text-[#39B978] bg-[#39B978]/15 border-[#39B978]/40',
-  Infrastructure: 'text-[#35D3CE] bg-[#123C43] border-[#18B6B2]/40',
-  Metric: 'text-[#18B6B2] bg-[#18B6B2]/10 border-[#18B6B2]/30',
-  Regulatory: 'text-[#F05B5B] bg-[#F05B5B]/15 border-[#F05B5B]/40',
-  Equipment: 'text-[#9EADB7] bg-[#20313D] border-[#2C3D49]',
-  Logistics: 'text-[#35D3CE] bg-[#123C43]/60 border-[#18B6B2]/30',
+  Operational: 'text-[#C58B3A] bg-[#C58B3A]/15 border-[#C58B3A]/30',
+  Production: 'text-[#4F8A62] bg-[#4F8A62]/15 border-[#4F8A62]/30',
+  Infrastructure: 'text-[#54788A] bg-[#54788A]/15 border-[#54788A]/30',
+  Metric: 'text-[#C58B3A] bg-[#C58B3A]/10 border-[#C58B3A]/30',
+  Regulatory: 'text-[#C94B45] bg-[#C94B45]/15 border-[#C94B45]/30',
+  Equipment: 'text-[#9BA5A8] bg-[#242C30] border-[#30383D]',
+  Logistics: 'text-[#54788A] bg-[#54788A]/20 border-[#54788A]/30',
 };
 
 export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) => {
@@ -41,12 +40,12 @@ export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) 
   };
 
   return (
-    <Card className="border-[#2C3D49] shadow-card-dark bg-[#17232D]">
-      <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
+    <Card className="border-[#30383D] shadow-sm bg-[#1C2226]">
+      <CardHeader className="py-3.5 px-4 bg-[#151A1D] border-b border-[#30383D]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Cloud className="h-4 w-4 text-[#18B6B2]" />
-            <CardTitle className="text-sm font-bold text-[#F1F5F7]">TF-IDF Mining Word Cloud Visualization</CardTitle>
+            <Cloud className="h-4 w-4 text-[#C58B3A]" />
+            <CardTitle className="text-sm font-bold text-[#E8ECEB]">TF-IDF Mining Word Cloud Visualization</CardTitle>
           </div>
 
           {/* Category Filter Pills */}
@@ -55,10 +54,10 @@ export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) 
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 text-xs font-mono rounded-lg transition-all whitespace-nowrap select-none ${
+                className={`px-2.5 py-1 text-xs font-mono rounded-lg transition-colors whitespace-nowrap select-none ${
                   selectedCategory === cat
-                    ? 'bg-[#123C43] text-[#35D3CE] border border-[#18B6B2]/50 font-bold'
-                    : 'text-[#9EADB7] hover:text-[#F1F5F7] hover:bg-[#111B24]'
+                    ? 'bg-[#C58B3A]/15 text-[#C58B3A] border border-[#C58B3A]/50 font-bold'
+                    : 'text-[#9BA5A8] hover:text-[#E8ECEB] hover:bg-[#242C30]'
                 }`}
               >
                 {cat}
@@ -71,14 +70,14 @@ export const WordCloudTagCloud: React.FC<WordCloudTagCloudProps> = ({ topics }) 
       <CardContent className="p-8">
         <div className="flex flex-wrap items-center justify-center gap-4 min-h-[220px]">
           {filteredTopics.map((item, idx) => {
-            const colorClass = CATEGORY_COLORS[item.category] || 'text-[#18B6B2] bg-[#123C43]/50 border-[#18B6B2]/30';
+            const colorClass = CATEGORY_COLORS[item.category] || 'text-[#C58B3A] bg-[#C58B3A]/15 border-[#C58B3A]/30';
             const fontSize = getFontSize(item.weight);
 
             return (
               <div
                 key={idx}
                 style={{ fontSize }}
-                className={`px-3.5 py-1.5 rounded-xl border transition-all duration-200 hover:scale-105 cursor-pointer font-sans font-semibold shadow-sm ${colorClass}`}
+                className={`px-3.5 py-1.5 rounded-lg border transition-colors cursor-pointer font-sans font-semibold shadow-sm ${colorClass}`}
                 title={`Topic: ${item.word} | Category: ${item.category} | Weight: ${item.weight}`}
               >
                 <span>{item.word}</span>

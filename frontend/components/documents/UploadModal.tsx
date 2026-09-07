@@ -149,24 +149,24 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B1117]/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl p-6 rounded-2xl bg-[#17232D] border border-[#2C3D49] shadow-2xl space-y-6 text-[#F1F5F7]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1113]/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl p-6 rounded-lg bg-[#1C2226] border border-[#30383D] shadow-xl space-y-6 text-[#E8ECEB]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#2C3D49] pb-4">
+        <div className="flex items-center justify-between border-b border-[#30383D] pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[#123C43] text-[#35D3CE] border border-[#18B6B2]/40">
+            <div className="p-2 rounded-lg bg-[#C58B3A]/15 text-[#C58B3A] border border-[#C58B3A]/30">
               <Upload className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#F1F5F7]">Ingest Mining Document</h3>
-              <p className="text-xs text-[#9EADB7]">PDF, DOCX, XLSX, CSV up to 100 MB</p>
+              <h3 className="text-lg font-bold text-[#E8ECEB]">Ingest Mining Document</h3>
+              <p className="text-xs text-[#9BA5A8]">PDF, DOCX, XLSX, CSV up to 100 MB</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
             disabled={isUploading}
-            className="p-1.5 rounded-lg text-[#9EADB7] hover:text-[#F1F5F7] hover:bg-[#20313D] transition-colors"
+            className="p-1.5 rounded-lg text-[#9BA5A8] hover:text-[#E8ECEB] hover:bg-[#242C30] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -174,15 +174,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
         {/* Banners */}
         {errorMessage && (
-          <div className="p-3.5 rounded-xl bg-[#F05B5B]/10 border border-[#F05B5B]/40 text-[#F05B5B] text-xs flex items-start gap-2.5">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[#F05B5B]" />
+          <div className="p-3.5 rounded-lg bg-[#C94B45]/10 border border-[#C94B45]/40 text-[#C94B45] text-xs flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[#C94B45]" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {duplicateDocInfo && (
-          <div className="p-3.5 rounded-xl bg-[#F08A24]/10 border border-[#F08A24]/40 text-[#F08A24] text-xs flex items-start gap-2.5">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[#F08A24]" />
+          <div className="p-3.5 rounded-lg bg-[#D6A23A]/10 border border-[#D6A23A]/40 text-[#D6A23A] text-xs flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[#D6A23A]" />
             <div className="space-y-1">
               <span className="font-semibold block">Duplicate SHA-256 Hash Detected</span>
               <span>{duplicateDocInfo}</span>
@@ -198,12 +198,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-150 text-center ${
+            className={`relative flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed cursor-pointer transition-colors duration-150 text-center ${
               dragActive
-                ? 'border-[#18B6B2] bg-[#18B6B2]/10'
+                ? 'border-[#C58B3A] bg-[#C58B3A]/10'
                 : selectedFile
-                ? 'border-[#39B978]/50 bg-[#39B978]/10'
-                : 'border-[#2C3D49] bg-[#111B24] hover:border-[#18B6B2]/60 hover:bg-[#20313D]'
+                ? 'border-[#4F8A62]/50 bg-[#4F8A62]/10'
+                : 'border-[#30383D] bg-[#151A1D] hover:border-[#C58B3A]/60 hover:bg-[#242C30]'
             }`}
           >
             <input
@@ -216,26 +216,26 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
             {selectedFile ? (
               <div className="flex flex-col items-center space-y-2">
-                <div className="p-3 rounded-full bg-[#39B978]/20 text-[#39B978] border border-[#39B978]/30">
+                <div className="p-3 rounded-lg bg-[#4F8A62]/20 text-[#4F8A62] border border-[#4F8A62]/30">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
-                <span className="text-sm font-semibold text-[#F1F5F7] max-w-xs truncate">
+                <span className="text-sm font-semibold text-[#E8ECEB] max-w-xs truncate">
                   {selectedFile.name}
                 </span>
-                <Badge variant="gold" size="sm">
+                <Badge variant="amber" size="sm">
                   {formatFileSize(selectedFile.size)}
                 </Badge>
-                <span className="text-[11px] text-[#9EADB7]">Click or drag another file to replace</span>
+                <span className="text-[11px] text-[#9BA5A8]">Click or drag another file to replace</span>
               </div>
             ) : (
               <div className="flex flex-col items-center space-y-2">
-                <div className="p-3 rounded-full bg-[#20313D] text-[#35D3CE] border border-[#2C3D49] shadow-sm">
+                <div className="p-3 rounded-lg bg-[#242C30] text-[#C58B3A] border border-[#30383D] shadow-sm">
                   <FileText className="h-8 w-8" />
                 </div>
-                <div className="text-xs text-[#9EADB7]">
-                  <span className="font-semibold text-[#35D3CE]">Click to browse</span> or drag and drop document here
+                <div className="text-xs text-[#9BA5A8]">
+                  <span className="font-semibold text-[#C58B3A]">Click to browse</span> or drag and drop document here
                 </div>
-                <span className="text-[10px] text-[#9EADB7] font-mono uppercase tracking-wider">
+                <span className="text-[10px] text-[#9BA5A8] font-mono uppercase tracking-wider">
                   Supported formats: PDF, DOCX, XLSX, CSV (Max 100 MB)
                 </span>
               </div>
@@ -262,13 +262,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           {/* Upload Progress Bar */}
           {isUploading && (
             <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between text-xs font-mono text-[#9EADB7]">
+              <div className="flex items-center justify-between text-xs font-mono text-[#9BA5A8]">
                 <span>Ingesting & Parsing Document...</span>
-                <span className="text-[#35D3CE] font-semibold">{uploadProgress}%</span>
+                <span className="text-[#C58B3A] font-semibold">{uploadProgress}%</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-[#111B24] border border-[#2C3D49] overflow-hidden">
+              <div className="h-2 w-full rounded-full bg-[#151A1D] border border-[#30383D] overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#18B6B2] to-[#35D3CE] transition-all duration-300 rounded-full"
+                  className="h-full bg-[#C58B3A] transition-all duration-300 rounded-full"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -276,7 +276,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           )}
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#2C3D49]">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#30383D]">
             <Button variant="ghost" size="md" onClick={onClose} disabled={isUploading}>
               Cancel
             </Button>

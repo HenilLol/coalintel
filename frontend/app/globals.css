@@ -4,48 +4,49 @@
 
 @layer base {
   :root {
-    --background: #0B1117;
-    --foreground: #F1F5F7;
-    --muted-foreground: #9EADB7;
+    --background: #0E1113;
+    --foreground: #E8ECEB;
+    --muted-foreground: #9BA5A8;
 
-    --nav: #111B24;
-    --card: #17232D;
-    --surface-elevated: #20313D;
-    --border: #2C3D49;
+    --nav: #151A1D;
+    --card: #1C2226;
+    --surface-elevated: #242C30;
+    --border: #30383D;
 
-    --primary: #18B6B2;
-    --primary-hover: #35D3CE;
-    --primary-foreground: #0B1117;
+    --primary: #C58B3A;
+    --primary-hover: #D6A052;
+    --primary-foreground: #0E1113;
 
-    --amber: #F2A900;
-    --success: #39B978;
-    --warning: #F08A24;
-    --danger: #F05B5B;
+    --amber: #C58B3A;
+    --success: #4F8A62;
+    --info: #54788A;
+    --warning: #D6A23A;
+    --danger: #C94B45;
   }
 
   body {
-    background-color: #0B1117;
-    color: #F1F5F7;
+    background-color: #0E1113;
+    color: #E8ECEB;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 }
 
-/* Custom Dark Scrollbar */
+/* Custom Dark Industrial Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B1117;
+  background: #0E1113;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2C3D49;
+  background: #30383D;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #35D3CE;
+  background: #C58B3A;
 }

@@ -38,7 +38,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
   };
 
   return (
-    <Card className="border-[#2C3D49] shadow-lg bg-[#17232D]">
+    <Card className="border-[#30383D] shadow-sm bg-[#1C2226]">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Top Controls: Input Bar & Subsidiary Filter */}
         <div className="flex flex-col lg:flex-row items-stretch gap-3">
@@ -47,8 +47,8 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               placeholder="Ask any natural-language geological, production, OBR, or parliamentary query..."
               value={prompt}
               onChange={(e) => onPromptChange(e.target.value)}
-              leftIcon={<Sparkles className="h-4 w-4 text-[#18B6B2]" />}
-              className="bg-[#111B24] border-[#2C3D49] text-[#F1F5F7] text-sm py-2.5"
+              leftIcon={<Sparkles className="h-4 w-4 text-[#C58B3A]" />}
+              className="bg-[#151A1D] border-[#30383D] text-[#E8ECEB] text-sm py-2.5"
             />
           </div>
 
@@ -57,7 +57,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               value={selectedSubsidiary}
               onChange={(e) => onSubsidiaryChange(e.target.value)}
               options={CIL_SUBSIDIARIES}
-              className="bg-[#111B24] border-[#2C3D49] text-[#F1F5F7] text-xs py-2.5 w-48"
+              className="bg-[#151A1D] border-[#30383D] text-[#E8ECEB] text-xs py-2.5 w-48"
             />
 
             <Button
@@ -74,8 +74,8 @@ export const QueryInput: React.FC<QueryInputProps> = ({
         </div>
 
         {/* Sample Query Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#2C3D49]">
-          <span className="text-[10px] font-mono text-[#9EADB7] uppercase tracking-widest font-semibold shrink-0">
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#30383D]">
+          <span className="text-[10px] font-mono text-[#9BA5A8] uppercase tracking-widest font-semibold shrink-0">
             Sample Queries:
           </span>
           {SAMPLE_QUERIES.map((sq, i) => (
@@ -86,7 +86,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
                 onPromptChange(sq);
                 onSubmit(sq);
               }}
-              className="px-3 py-1 rounded-full bg-[#20313D] border border-[#2C3D49] hover:border-[#18B6B2]/50 hover:bg-[#123C43]/40 text-[#F1F5F7] text-xs transition-all text-left truncate max-w-xs"
+              className="px-3 py-1 rounded-full bg-[#242C30] border border-[#30383D] hover:border-[#C58B3A]/50 hover:bg-[#C58B3A]/10 text-[#E8ECEB] text-xs transition-colors text-left truncate max-w-xs"
             >
               {sq}
             </button>

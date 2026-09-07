@@ -29,7 +29,7 @@ export const Logo: React.FC<LogoProps> = ({
   return (
     <div className={cn('inline-flex items-center gap-3 select-none', className)}>
       {/* COALINTEL Mining & Intelligence Vector Symbol */}
-      <div className={cn('relative flex items-center justify-center rounded-xl bg-gradient-to-br from-[#20313D] via-[#111B24] to-[#0B1117] p-2 shadow-glow-teal border border-[#2C3D49]', iconSizes[size])}>
+      <div className={cn('relative flex items-center justify-center rounded-lg bg-[#1C2226] p-2 border border-[#30383D] shadow-sm', iconSizes[size])}>
         <svg
           viewBox="0 0 40 40"
           fill="none"
@@ -40,30 +40,30 @@ export const Logo: React.FC<LogoProps> = ({
           <polygon
             points="12,4 28,4 36,12 36,28 28,36 12,36 4,28 4,12"
             fill="url(#coalGradient)"
-            stroke="#18B6B2"
+            stroke="#C58B3A"
             strokeWidth="1.5"
             strokeLinejoin="round"
           />
           {/* Inner Data Node Network Matrix */}
           <path
             d="M20 8L30 14V26L20 32L10 26V14L20 8Z"
-            stroke="#35D3CE"
+            stroke="#54788A"
             strokeWidth="1.2"
             strokeDasharray="2 2"
           />
           {/* Center Signal Amber Core Pivot */}
-          <circle cx="20" cy="20" r="4.5" fill="#F2A900" />
+          <circle cx="20" cy="20" r="4.5" fill="#C58B3A" />
           {/* Intersecting Mining Vector Nodes */}
-          <circle cx="20" cy="11" r="2" fill="#35D3CE" />
+          <circle cx="20" cy="11" r="2" fill="#54788A" />
           {/* Radial Axis Lines */}
-          <line x1="20" y1="13" x2="20" y2="15.5" stroke="#F2A900" strokeWidth="1.5" />
-          <line x1="20" y1="24.5" x2="20" y2="27" stroke="#F2A900" strokeWidth="1.5" />
+          <line x1="20" y1="13" x2="20" y2="15.5" stroke="#C58B3A" strokeWidth="1.5" />
+          <line x1="20" y1="24.5" x2="20" y2="27" stroke="#C58B3A" strokeWidth="1.5" />
 
           <defs>
             <linearGradient id="coalGradient" x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#20313D" />
-              <stop offset="0.5" stopColor="#17232D" />
-              <stop offset="1" stopColor="#0B1117" />
+              <stop stopColor="#242C30" />
+              <stop offset="0.5" stopColor="#1C2226" />
+              <stop offset="1" stopColor="#0E1113" />
             </linearGradient>
           </defs>
         </svg>
@@ -72,13 +72,13 @@ export const Logo: React.FC<LogoProps> = ({
       {showText && (
         <div className="flex flex-col">
           <div className={cn('font-bold tracking-wider font-sans leading-none flex items-center', textSizes[size])}>
-            <span className="text-[#F1F5F7]">COAL</span>
-            <span className="text-[#18B6B2] font-extrabold ml-0.5">INTEL</span>
-            <span className="ml-1 text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-[#3A2C0A] text-[#F2A900] border border-[#F2A900]/30">
+            <span className="text-[#E8ECEB]">COAL</span>
+            <span className="text-[#C58B3A] font-extrabold ml-0.5">INTEL</span>
+            <span className="ml-1.5 text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-[#C58B3A]/15 text-[#C58B3A] border border-[#C58B3A]/30">
               V2
             </span>
           </div>
-          <span className="text-[10px] tracking-widest text-[#9EADB7] font-mono uppercase mt-1">
+          <span className="text-[10px] tracking-widest text-[#9BA5A8] font-mono uppercase mt-1">
             Mining Intelligence & Analytics
           </span>
         </div>

@@ -24,15 +24,15 @@ interface DocumentHeaderCardProps {
 const getFileTypeIcon = (fileType: string) => {
   switch (fileType?.toUpperCase()) {
     case 'PDF':
-      return <FileText className="h-6 w-6 text-red-400" />;
+      return <FileText className="h-6 w-6 text-[#C94B45]" />;
     case 'DOCX':
-      return <FileText className="h-6 w-6 text-sky-400" />;
+      return <FileText className="h-6 w-6 text-[#54788A]" />;
     case 'XLSX':
-      return <FileSpreadsheet className="h-6 w-6 text-emerald-400" />;
+      return <FileSpreadsheet className="h-6 w-6 text-[#4F8A62]" />;
     case 'CSV':
-      return <FileCode className="h-6 w-6 text-amber-400" />;
+      return <FileCode className="h-6 w-6 text-[#C58B3A]" />;
     default:
-      return <File className="h-6 w-6 text-slate-400" />;
+      return <File className="h-6 w-6 text-[#9BA5A8]" />;
   }
 };
 
@@ -60,17 +60,17 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
   ];
 
   return (
-    <Card className="space-y-6 bg-[#17232D] border-[#2C3D49]">
+    <Card className="space-y-6 bg-[#1C2226] border-[#30383D]">
       {/* Primary Document Metadata Row */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div className="flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-[#20313D] border border-[#2C3D49] shrink-0">
+          <div className="p-3 rounded-lg bg-[#242C30] border border-[#30383D] shrink-0">
             {getFileTypeIcon(document.file_type)}
           </div>
 
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-extrabold text-[#F1F5F7] tracking-tight font-sans">
+              <h2 className="text-xl font-extrabold text-[#E8ECEB] tracking-tight font-sans">
                 {document.filename}
               </h2>
               <Badge variant={isFailed ? 'danger' : isPending || isProcessing ? 'warning' : 'success'}>
@@ -78,13 +78,13 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
               </Badge>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[#9EADB7] pt-0.5">
-              <span className="flex items-center gap-1 text-[#F1F5F7] font-semibold">
-                <Database className="h-3.5 w-3.5 text-[#18B6B2]" />
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[#9BA5A8] pt-0.5">
+              <span className="flex items-center gap-1 text-[#E8ECEB] font-semibold">
+                <Database className="h-3.5 w-3.5 text-[#C58B3A]" />
                 {document.subsidiary || 'CIL HQ'}
               </span>
               <span>•</span>
-              <span className="text-[#F2A900] font-semibold">{document.fiscal_year || '2023-24'}</span>
+              <span className="text-[#C58B3A] font-semibold">{document.fiscal_year || '2023-24'}</span>
               <span>•</span>
               <span>{document.total_pages || 1} Pages</span>
               <span>•</span>
@@ -94,19 +94,19 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
         </div>
 
         {/* File Hash Badge */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#20313D] border border-[#2C3D49] text-xs font-mono text-[#9EADB7] shrink-0">
-          <Hash className="h-3.5 w-3.5 text-[#9EADB7]" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#242C30] border border-[#30383D] text-xs font-mono text-[#9BA5A8] shrink-0">
+          <Hash className="h-3.5 w-3.5 text-[#9BA5A8]" />
           <span>SHA-256:</span>
-          <span className="text-[#F1F5F7] select-all" title={document.file_hash}>
+          <span className="text-[#E8ECEB] select-all" title={document.file_hash}>
             {document.file_hash ? document.file_hash.substring(0, 18) : 'N/A'}...
           </span>
         </div>
       </div>
 
       {/* Document Processing Pipeline Stepper */}
-      <div className="pt-4 border-t border-[#2C3D49] space-y-2">
-        <p className="text-[10px] font-mono uppercase tracking-widest text-[#9EADB7] font-semibold flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-[#18B6B2]" />
+      <div className="pt-4 border-t border-[#30383D] space-y-2">
+        <p className="text-[10px] font-mono uppercase tracking-widest text-[#9BA5A8] font-semibold flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 text-[#C58B3A]" />
           <span>Document Processing Pipeline Traceability</span>
         </p>
 
@@ -117,21 +117,21 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
                 key={idx}
                 className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition-colors ${
                   step.completed
-                    ? 'bg-[#39B978]/10 border-[#39B978]/30 text-[#39B978]'
+                    ? 'bg-[#4F8A62]/10 border-[#4F8A62]/30 text-[#4F8A62]'
                     : step.active
-                    ? 'bg-[#18B6B2]/10 border-[#18B6B2]/30 text-[#35D3CE] animate-pulse'
+                    ? 'bg-[#C58B3A]/10 border-[#C58B3A]/30 text-[#C58B3A] animate-pulse'
                     : isFailed
-                    ? 'bg-[#F05B5B]/10 border-[#F05B5B]/20 text-[#9EADB7]'
-                    : 'bg-[#111B24] border-[#2C3D49] text-[#9EADB7]'
+                    ? 'bg-[#C94B45]/10 border-[#C94B45]/20 text-[#9BA5A8]'
+                    : 'bg-[#151A1D] border-[#30383D] text-[#9BA5A8]'
                 }`}
               >
                 <span className="font-medium text-[11px] truncate">{step.label}</span>
                 {step.completed ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[#39B978] shrink-0" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#4F8A62] shrink-0" />
                 ) : step.active ? (
-                  <Clock className="h-3.5 w-3.5 text-[#35D3CE] shrink-0 animate-spin" />
+                  <Clock className="h-3.5 w-3.5 text-[#C58B3A] shrink-0 animate-spin" />
                 ) : (
-                  <div className="h-2 w-2 rounded-full bg-[#2C3D49] shrink-0" />
+                  <div className="h-2 w-2 rounded-full bg-[#30383D] shrink-0" />
                 )}
               </div>
             );
@@ -141,11 +141,11 @@ export const DocumentHeaderCard: React.FC<DocumentHeaderCardProps> = ({ document
 
       {/* Failure Alert Banner */}
       {isFailed && (
-        <div className="p-3.5 rounded-lg bg-[#F05B5B]/10 border border-[#F05B5B]/30 text-xs text-[#F05B5B] flex items-start gap-2.5">
-          <AlertCircle className="h-4 w-4 text-[#F05B5B] shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-lg bg-[#C94B45]/10 border border-[#C94B45]/30 text-xs text-[#C94B45] flex items-start gap-2.5">
+          <AlertCircle className="h-4 w-4 text-[#C94B45] shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <span className="font-semibold text-[#F05B5B]">Processing Interrupted:</span>
-            <p className="text-[#9EADB7]">{document.error_message || 'The document processing pipeline encountered an error. Please try re-uploading the file.'}</p>
+            <span className="font-semibold text-[#C94B45]">Processing Interrupted:</span>
+            <p className="text-[#9BA5A8]">{document.error_message || 'The document processing pipeline encountered an error. Please try re-uploading the file.'}</p>
           </div>
         </div>
       )}

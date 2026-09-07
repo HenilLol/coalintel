@@ -16,8 +16,8 @@ export default function RootPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#0B1117] flex items-center justify-center">
-      <div className="animate-pulse text-xs font-mono text-[#18B6B2] font-bold uppercase tracking-widest">
+    <div className="min-h-screen bg-[#0E1113] flex items-center justify-center">
+      <div className="animate-pulse text-xs font-mono text-[#C58B3A] font-bold uppercase tracking-widest">
         Initializing COALINTEL V2...
       </div>
     </div>

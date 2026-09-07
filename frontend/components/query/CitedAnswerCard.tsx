@@ -18,11 +18,11 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* MAIN ANSWER CARD (8 cols) */}
-      <Card className="lg:col-span-8 space-y-4 border-[#2C3D49] shadow-lg bg-[#17232D]">
-        <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49] flex items-center justify-between">
+      <Card className="lg:col-span-8 space-y-4 border-[#30383D] shadow-sm bg-[#1C2226]">
+        <CardHeader className="py-3.5 px-4 bg-[#151A1D] border-b border-[#30383D] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#18B6B2]" />
-            <CardTitle className="text-sm font-bold text-[#F1F5F7]">Evidence-Grounded AI Answer</CardTitle>
+            <Sparkles className="h-4 w-4 text-[#C58B3A]" />
+            <CardTitle className="text-sm font-bold text-[#E8ECEB]">Evidence-Grounded AI Answer</CardTitle>
           </div>
 
           <div className="flex items-center gap-2">
@@ -31,7 +31,7 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
                 Degraded Grounded Mode
               </Badge>
             )}
-            <Badge variant="gold" size="sm">
+            <Badge variant="amber" size="sm">
               Provider: {response.provider || 'Gemini RAG Engine'}
             </Badge>
           </div>
@@ -39,32 +39,32 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
 
         <CardContent className="p-6 space-y-4">
           {/* User Query Context */}
-          <div className="p-3 rounded-lg bg-[#111B24] border border-[#2C3D49] text-xs font-mono text-[#F1F5F7]">
-            <span className="text-[#F2A900] font-bold uppercase mr-2">Query:</span>
+          <div className="p-3 rounded-lg bg-[#151A1D] border border-[#30383D] text-xs font-mono text-[#E8ECEB]">
+            <span className="text-[#C58B3A] font-bold uppercase mr-2">Query:</span>
             <span>&quot;{response.query}&quot;</span>
           </div>
 
           {/* Generated Cited Text */}
-          <div className="p-4 rounded-xl bg-[#111B24] border border-[#2C3D49] text-[#F1F5F7] text-sm leading-relaxed whitespace-pre-line font-sans selection:bg-[#18B6B2]/30">
+          <div className="p-4 rounded-lg bg-[#151A1D] border border-[#30383D] text-[#E8ECEB] text-sm leading-relaxed whitespace-pre-line font-sans selection:bg-[#C58B3A]/30">
             {response.answer}
           </div>
 
           {/* Verification Footer Banner */}
-          <div className="flex flex-wrap items-center justify-between pt-3 border-t border-[#2C3D49] text-xs text-[#9EADB7] gap-2 font-mono">
+          <div className="flex flex-wrap items-center justify-between pt-3 border-t border-[#30383D] text-xs text-[#9BA5A8] gap-2 font-mono">
             {response.degraded_mode ? (
-              <span className="flex items-center gap-1.5 text-warning font-semibold">
+              <span className="flex items-center gap-1.5 text-[#D6A23A] font-semibold">
                 <AlertTriangle className="h-4 w-4" /> Degraded Mode
               </span>
             ) : response.citations && response.citations.length > 0 ? (
-              <span className="flex items-center gap-1.5 text-[#39B978] font-semibold">
+              <span className="flex items-center gap-1.5 text-[#4F8A62] font-semibold">
                 <ShieldCheck className="h-4 w-4" /> Evidence Grounded
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-[#9EADB7] font-semibold">
-                <AlertTriangle className="h-4 w-4 text-[#9EADB7]" /> No Evidence Found
+              <span className="flex items-center gap-1.5 text-[#9BA5A8] font-semibold">
+                <AlertTriangle className="h-4 w-4 text-[#9BA5A8]" /> No Evidence Found
               </span>
             )}
-            <span className="text-[#9EADB7]">
+            <span className="text-[#9BA5A8]">
               {response.citations?.length || 0} Grounded Citations Provided
             </span>
           </div>
@@ -72,16 +72,16 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
       </Card>
 
       {/* CITATION EVIDENCE DRAWER LIST (4 cols) */}
-      <Card className="lg:col-span-4 border-[#2C3D49] shadow-lg bg-[#17232D]">
-        <CardHeader className="py-3.5 px-4 bg-[#20313D] border-b border-[#2C3D49]">
-          <CardTitle className="text-sm font-bold text-[#F1F5F7] flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#18B6B2]" />
+      <Card className="lg:col-span-4 border-[#30383D] shadow-sm bg-[#1C2226]">
+        <CardHeader className="py-3.5 px-4 bg-[#151A1D] border-b border-[#30383D]">
+          <CardTitle className="text-sm font-bold text-[#E8ECEB] flex items-center gap-2">
+            <FileText className="h-4 w-4 text-[#C58B3A]" />
             <span>Source Lineage Citations</span>
           </CardTitle>
         </CardHeader>
 
         <CardContent className="p-4 space-y-3">
-          <p className="text-xs text-[#9EADB7]">
+          <p className="text-xs text-[#9BA5A8]">
             Click any citation tag to inspect raw vector page chunk and text snippet evidence:
           </p>
 
@@ -95,22 +95,22 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
                 <div
                   key={idx}
                   onClick={() => onSelectCitation(c, matchingChunk)}
-                  className="p-3 rounded-xl bg-[#20313D] border border-[#2C3D49] hover:border-[#18B6B2]/60 hover:bg-[#123C43]/40 transition-all cursor-pointer space-y-1.5 group"
+                  className="p-3 rounded-lg bg-[#242C30] border border-[#30383D] hover:border-[#C58B3A]/60 transition-colors cursor-pointer space-y-1.5 group"
                 >
-                  <div className="flex items-center justify-between text-xs font-bold text-[#F1F5F7] group-hover:text-[#35D3CE]">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#E8ECEB] group-hover:text-[#C58B3A]">
                     <span className="truncate max-w-[170px]" title={c.document_name}>
                       {c.document_name}
                     </span>
-                    <Badge variant="gold" size="sm">
+                    <Badge variant="amber" size="sm">
                       Page {c.page_number}
                     </Badge>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] font-mono text-[#9EADB7]">
-                    <span className="bg-[#111B24] px-1.5 py-0.5 rounded text-[#35D3CE] border border-[#2C3D49]">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-[#9BA5A8]">
+                    <span className="bg-[#151A1D] px-1.5 py-0.5 rounded text-[#C58B3A] border border-[#30383D]">
                       {c.citation_tag}
                     </span>
-                    <span className="flex items-center gap-1 text-[#35D3CE] group-hover:text-[#18B6B2] font-sans text-xs">
+                    <span className="flex items-center gap-1 text-[#C58B3A] font-sans text-xs">
                       Inspect <Eye className="h-3.5 w-3.5" />
                     </span>
                   </div>
@@ -118,7 +118,7 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
               );
             })
           ) : (
-            <div className="p-6 text-center text-xs text-[#9EADB7] font-mono">
+            <div className="p-6 text-center text-xs text-[#9BA5A8] font-mono">
               No citations attached to query response.
             </div>
           )}
