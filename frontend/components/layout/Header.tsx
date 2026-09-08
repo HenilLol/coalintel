@@ -4,6 +4,7 @@ import React from 'react';
 import { Menu, Bell, Shield, Database, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
+import { Logo } from '@/components/ui/Logo';
 import { useScope } from '@/context/ScopeContext';
 import { CIL_SUBSIDIARIES } from '@/lib/constants';
 
@@ -22,20 +23,25 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-20 h-16 bg-[#151A1D] border-b border-[#30383D] px-4 lg:px-8 flex items-center justify-between shadow-sm">
-      {/* Left: Mobile Toggle & Context Indicator */}
-      <div className="flex items-center gap-3">
+      {/* Left: Mobile Toggle, Mobile Branding & Context Indicator */}
+      <div className="flex items-center gap-3 min-w-0">
         {onMobileMenuToggle && (
           <button
             onClick={onMobileMenuToggle}
-            className="p-2 rounded-lg bg-[#1C2226] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] lg:hidden transition-colors"
+            className="p-2 rounded-lg bg-[#1C2226] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] lg:hidden transition-colors shrink-0"
             aria-label="Open mobile navigation"
           >
             <Menu className="h-5 w-5" />
           </button>
         )}
 
+        {/* Mobile Header Branding */}
+        <div className="lg:hidden flex items-center min-w-0">
+          <Logo size="sm" showText={true} />
+        </div>
+
         {/* Global Operational Context Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1C2226] border border-[#30383D] text-xs font-mono shadow-sm">
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1C2226] border border-[#30383D] text-xs font-mono shadow-sm shrink-0">
           <Database className="h-3.5 w-3.5 text-[#C58B3A] shrink-0" />
           <span className="text-[#9BA5A8]">Scope:</span>
           <select

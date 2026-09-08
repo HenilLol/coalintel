@@ -125,12 +125,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
     >
       {/* Header & Brand Logo */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-[#30383D]">
-        <Logo size={collapsed ? 'sm' : 'md'} showText={!collapsed} />
+      <div className="flex items-center justify-between h-16 px-3.5 border-b border-[#30383D] gap-2 overflow-hidden">
+        <Logo size={collapsed ? 'sm' : 'md'} showText={!collapsed} className="min-w-0 flex-1" />
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg bg-[#1C2226] hover:bg-[#242C30] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] transition-colors hidden lg:flex items-center justify-center"
+            className="p-1.5 rounded-lg bg-[#1C2226] hover:bg-[#242C30] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] transition-colors hidden lg:flex items-center justify-center shrink-0"
             title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >

@@ -15,32 +15,39 @@ export const Logo: React.FC<LogoProps> = ({
   variant = 'dark',
 }) => {
   const iconSizes = {
-    sm: 'h-7 w-7',
-    md: 'h-9 w-9',
-    lg: 'h-12 w-12',
+    sm: 'h-7 w-7 p-1.5',
+    md: 'h-8.5 w-8.5 p-1.5',
+    lg: 'h-11 w-11 p-2',
   };
 
   const textSizes = {
-    sm: 'text-base',
-    md: 'text-xl',
-    lg: 'text-2xl',
+    sm: 'text-sm',
+    md: 'text-[16px] sm:text-[17px]',
+    lg: 'text-xl sm:text-2xl',
   };
 
   const versionSizes = {
-    sm: 'text-[9px] px-1.5 py-0.5',
-    md: 'text-[10px] px-1.5 py-0.5',
-    lg: 'text-xs px-2 py-0.5',
+    sm: 'text-[8px] px-1 py-0.5',
+    md: 'text-[9px] px-1.5 py-0.5',
+    lg: 'text-[10px] px-2 py-0.5',
+  };
+
+  const subtitleSizes = {
+    sm: 'text-[8px] tracking-tight',
+    md: 'text-[9px] sm:text-[9.5px] tracking-tight',
+    lg: 'text-xs tracking-normal',
   };
 
   return (
-    <div className={cn('inline-flex items-center gap-3 select-none', className)}>
+    <div className={cn('inline-flex items-center gap-2.5 select-none min-w-0', className)}>
       {/* COALINTEL Mining & Intelligence Vector Symbol */}
-      <div className={cn('relative flex items-center justify-center rounded-lg bg-[#1C2226] p-2 border border-[#30383D] shadow-sm', iconSizes[size])}>
+      <div className={cn('relative flex items-center justify-center rounded-lg bg-[#1C2226] border border-[#30383D] shadow-sm shrink-0', iconSizes[size])}>
         <svg
           viewBox="0 0 40 40"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="h-full w-full"
+          aria-hidden="true"
         >
           {/* Outer Octagonal Coal Crystal Shield */}
           <polygon
@@ -76,21 +83,32 @@ export const Logo: React.FC<LogoProps> = ({
       </div>
 
       {showText && (
-        <div className="flex flex-col min-w-0">
-          <div className={cn('font-bold tracking-wider font-sans leading-none flex items-center whitespace-nowrap', textSizes[size])}>
-            <span className="text-[#E8ECEB]">COAL</span>
-            <span className="text-[#C58B3A] font-extrabold ml-0.5">INTEL</span>
+        <div className="flex flex-col min-w-0 justify-center">
+          {/* Main Branding Title + v2 Version Tag */}
+          <div className="flex items-center gap-1.5 whitespace-nowrap leading-none">
+            <span className={cn('font-bold tracking-tight font-sans flex items-center', textSizes[size])}>
+              <span className="text-[#E8ECEB]">COAL</span>
+              <span className="text-[#C58B3A] font-extrabold ml-1">INTEL</span>
+            </span>
             <span
               className={cn(
-                'ml-2 inline-flex items-center justify-center font-mono font-semibold uppercase tracking-wider rounded bg-[#C58B3A]/15 text-[#C58B3A] border border-[#C58B3A]/30 leading-none select-none shrink-0',
+                'inline-flex items-center justify-center font-mono font-bold uppercase rounded bg-[#C58B3A]/15 text-[#C58B3A] border border-[#C58B3A]/30 leading-none select-none shrink-0 self-center',
                 versionSizes[size]
               )}
             >
               v2
             </span>
           </div>
-          <span className="text-[10px] tracking-widest text-[#9BA5A8] font-mono uppercase mt-1 truncate">
-            Mining Intelligence & Analytics
+
+          {/* Subtitle: Mining Intelligence & Analytics */}
+          <span
+            className={cn(
+              'font-sans font-medium text-[#9BA5A8] select-none leading-tight mt-0.5 whitespace-nowrap',
+              subtitleSizes[size]
+            )}
+            title="Mining Intelligence & Analytics"
+          >
+            Mining Intelligence &amp; Analytics
           </span>
         </div>
       )}
