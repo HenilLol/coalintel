@@ -81,6 +81,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
           userName={user?.username || 'CMPDI Analyst'}
           userRole={user?.role || 'Analyst'}
+          showLogoOnDesktop={collapsed}
         />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 animate-page-enter">
