@@ -43,21 +43,31 @@ def get_comparison_options(
     raw_metrics = db.query(distinct(ExtractedMetric.metric_name)).filter(ExtractedMetric.metric_name.isnot(None)).all()
     metrics = sorted(list({m[0] for m in raw_metrics if m[0]}))
 
-    # Distinct Fiscal Years
-    raw_fys = db.query(distinct(ExtractedMetric.fiscal_year)).filter(ExtractedMetric.fiscal_year.isnot(None)).all()
-    fiscal_years = sorted(list({f[0] for f in raw_fys if f[0]}), reverse=True)
+    # Augment with canonical Government of India mines and fiscal years
+    try:
+        from app.models.mine import MineMaster, MineYearlyMetric
+        gov_mines = db.query(MineMaster.mine_name).all()
+        for gm in gov_mines:
+            if gm[0]:
+                entities.append(gm[0])
+        gov_fys = db.query(distinct(MineYearlyMetric.financial_year)).all()
+        for gf in gov_fys:
+            if gf[0]:
+                fiscal_years.append(gf[0])
+    except Exception:
+        pass
 
     # Defaults if DB is empty
     if not metrics:
         metrics = ["Coal Production", "Overburden Removal", "Washing Capacity", "Drilling Meterage"]
     if not fiscal_years:
-        fiscal_years = ["2023-24", "2022-23"]
+        fiscal_years = ["2026-27", "2025-26", "2024-25", "2023-24", "2022-23"]
 
     return {
         "subsidiaries": subsidiaries,
         "entities": sorted(list(set(entities))),
         "metrics": metrics,
-        "fiscal_years": fiscal_years
+        "fiscal_years": sorted(list(set(fiscal_years)), reverse=True)
     }
 
 

@@ -51,6 +51,20 @@ async def lifespan(app: FastAPI):
 
             # Recover any orphaned processing documents from prior crashes/restarts
             recover_stale_processing_documents(db_bootstrap, stale_minutes=15)
+
+            # Idempotent Government of India Mine Master bootstrap
+            try:
+                from app.models.mine import MineMaster
+                from data.government_mine_data_seed import run_seed as seed_government_data
+                mine_count = db_bootstrap.query(MineMaster).count()
+                if mine_count == 0:
+                    logger.info("No canonical mines detected; bootstrapping authentic Government data.")
+                    seed_government_data(db_bootstrap)
+                    logger.info("Government of India mine data bootstrapped successfully.")
+                else:
+                    logger.info(f"Existing canonical mines detected ({mine_count} mines); skipping government data seed.")
+            except Exception as seed_err:
+                logger.warning(f"Note on government data bootstrap: {seed_err}")
         except Exception as startup_err:
             db_bootstrap.rollback()
             logger.error(f"Error during startup bootstrap / recovery: {startup_err}")
@@ -102,6 +116,7 @@ from app.api.analytics import router as analytics_router
 from app.api.audit import router as audit_router
 from app.api.comparison import router as comparison_router
 from app.api.parliamentary import router as parliamentary_router
+from app.api.mines import router as mines_router
 
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(documents_router, prefix=settings.API_V1_STR)
@@ -113,6 +128,7 @@ app.include_router(analytics_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
 app.include_router(comparison_router, prefix=settings.API_V1_STR)
 app.include_router(parliamentary_router, prefix=settings.API_V1_STR)
+app.include_router(mines_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["Root"])
