@@ -3,7 +3,11 @@ import abc
 import logging
 from typing import Dict, Any, List, Optional
 from config import settings
-from app.services.normalization_service import KNOWN_MINES
+from app.services.normalization_service import (
+    KNOWN_MINES,
+    get_base_mine_name,
+    detect_query_fiscal_year,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +113,7 @@ class DegradedLLMProvider(BaseLLMProvider):
         user_query = q_match.group(1).strip() if q_match else prompt
         q_lower = user_query.lower()
 
-        # Target mine detection
+        # Target mine and fiscal year detection
         target_mine = None
         for km in KNOWN_MINES:
             if km.lower() in q_lower:
@@ -122,7 +126,8 @@ class DegradedLLMProvider(BaseLLMProvider):
                     target_mine = rm
                     break
 
-        base_mine = re.sub(r"\s+(?:OC|OpenCast|UG|Underground|Mine|Colliery)\b", "", target_mine, flags=re.IGNORECASE).strip() if target_mine else None
+        base_mine = get_base_mine_name(target_mine) if target_mine else None
+        target_fy = detect_query_fiscal_year(user_query)
 
         if target_mine:
             mine_in_context = target_mine.lower() in context_str.lower() or (base_mine and base_mine.lower() in context_str.lower())
@@ -151,18 +156,19 @@ class DegradedLLMProvider(BaseLLMProvider):
         best_chunk = None
         if target_mine:
             mine_terms = [target_mine.lower()]
-            if base_mine and len(base_mine) >= 3:
+            if base_mine and len(base_mine) >= 3 and base_mine.lower() not in mine_terms:
                 mine_terms.append(base_mine.lower())
 
-            # 1. Look for chunk where structured mine_name matches target mine
+            # 1. Look for chunk where structured mine_name matches target mine or base mine
             for c in parsed_chunks:
                 s_info = self._parse_structured_chunk(c["text"])
                 if s_info and s_info["mine_name"]:
                     m_lower = s_info["mine_name"].lower()
-                    if any(mt in m_lower for mt in mine_terms):
+                    m_base = get_base_mine_name(s_info["mine_name"]).lower()
+                    if any(mt in m_lower or mt in m_base for mt in mine_terms):
                         best_chunk = c
                         break
-            # 2. Look for chunk where raw evidence snippet explicitly contains target mine
+            # 2. Look for chunk where raw evidence snippet explicitly contains target mine or base mine
             if not best_chunk:
                 for c in parsed_chunks:
                     t_lower = c["text"].lower()
@@ -170,7 +176,7 @@ class DegradedLLMProvider(BaseLLMProvider):
                     if any(mt in snippet_part for mt in mine_terms):
                         best_chunk = c
                         break
-            # 3. Check any chunk containing target mine
+            # 3. Check any chunk containing target mine or base mine
             if not best_chunk:
                 for c in parsed_chunks:
                     t_lower = c["text"].lower()
@@ -212,17 +218,40 @@ class DegradedLLMProvider(BaseLLMProvider):
         sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", chunk_text) if s.strip()]
         relevant_sentence = None
         if target_mine:
+            mine_terms = [target_mine.lower()]
+            if base_mine and len(base_mine) >= 3 and base_mine.lower() not in mine_terms:
+                mine_terms.append(base_mine.lower())
+
+            # A. First look for sentence mentioning target mine AND numbers/units
             for s in sentences:
-                if target_mine.lower() in s.lower():
-                    relevant_sentence = s
-                    break
-        if not relevant_sentence and sentences:
-            # Prioritize sentence with numbers/units
+                s_lower = s.lower()
+                if any(mt in s_lower for mt in mine_terms) and re.search(r"\d+(?:\.\d+)?\s*(?:MT|Lakh|Million|Tonnes|M\.Cu\.M|MCuM|%)", s, re.IGNORECASE):
+                    # If target_fy is specified, prioritize sentence with matching temporal token
+                    if target_fy:
+                        fy_short = target_fy[-5:]  # e.g. 23-24
+                        if target_fy in s or fy_short in s:
+                            relevant_sentence = s
+                            break
+                    if not relevant_sentence:
+                        relevant_sentence = s
+
+            # B. If not found, look for any sentence mentioning target/base mine
+            if not relevant_sentence:
+                for s in sentences:
+                    s_lower = s.lower()
+                    if any(mt in s_lower for mt in mine_terms):
+                        relevant_sentence = s
+                        break
+        else:
+            # Generic query (no target mine): pick sentence with numbers and matching FY if available
             for s in sentences:
                 if re.search(r"\d+(?:\.\d+)?\s*(?:MT|Lakh|Million|Tonnes|M\.Cu\.M|MCuM)", s, re.IGNORECASE):
-                    relevant_sentence = s
-                    break
-            if not relevant_sentence:
+                    if target_fy and (target_fy in s or target_fy[-5:] in s):
+                        relevant_sentence = s
+                        break
+                    if not relevant_sentence:
+                        relevant_sentence = s
+            if not relevant_sentence and sentences:
                 relevant_sentence = sentences[0]
 
         if relevant_sentence:
