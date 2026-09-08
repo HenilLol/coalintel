@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { X, FileText, Bookmark, ExternalLink, ShieldCheck, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -18,14 +18,31 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
   chunk,
   onClose,
 }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!citation) return null;
 
   const docId = chunk?.document_id || 1;
   const pageNum = citation.page_number || 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[#0E1113]/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg h-full bg-[#1C2226] border-l border-[#30383D] p-6 flex flex-col justify-between space-y-6 shadow-xl overflow-y-auto text-[#E8ECEB]">
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-[#0E1113]/80 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Citation Evidence Inspection Drawer"
+    >
+      <div
+        className="w-full max-w-lg h-full bg-[#1C2226] border-l border-[#30383D] p-6 flex flex-col justify-between space-y-6 shadow-2xl overflow-y-auto text-[#E8ECEB] animate-slide-in-right"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-[#30383D] pb-4">
@@ -42,6 +59,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-[#9BA5A8] hover:text-[#E8ECEB] hover:bg-[#242C30] transition-colors"
+              aria-label="Close drawer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -50,8 +68,9 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
           {/* Document & Page Summary Header */}
           <div className="p-4 rounded-lg bg-[#242C30] border border-[#30383D] space-y-2">
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-[#C58B3A] font-bold uppercase flex items-center gap-1.5">
-                <FileText className="h-4 w-4 text-[#C58B3A]" /> {citation.document_name}
+              <span className="text-[#C58B3A] font-bold uppercase flex items-center gap-1.5 truncate max-w-[280px]">
+                <FileText className="h-4 w-4 text-[#C58B3A] shrink-0" />
+                <span className="truncate">{citation.document_name}</span>
               </span>
               <Badge variant="amber" size="sm">
                 Page {pageNum}
@@ -111,7 +130,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
               rightIcon={<ExternalLink className="h-4 w-4" />}
               className="w-full"
             >
-              Open Document Canvas (Page {pageNum})
+              Open Canvas (Page {pageNum})
             </Button>
           </Link>
         </div>

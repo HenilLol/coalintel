@@ -22,7 +22,7 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
         <CardHeader className="py-3.5 px-4 bg-[#151A1D] border-b border-[#30383D] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#C58B3A]" />
-            <CardTitle className="text-sm font-bold text-[#E8ECEB]">Evidence-Grounded AI Answer</CardTitle>
+            <CardTitle className="text-sm font-bold text-[#E8ECEB]">Evidence-Grounded Intelligence Synthesis</CardTitle>
           </div>
 
           <div className="flex items-center gap-2">
@@ -39,8 +39,8 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
 
         <CardContent className="p-6 space-y-4">
           {/* User Query Context */}
-          <div className="p-3 rounded-lg bg-[#151A1D] border border-[#30383D] text-xs font-mono text-[#E8ECEB]">
-            <span className="text-[#C58B3A] font-bold uppercase mr-2">Query:</span>
+          <div className="p-3 rounded-lg bg-[#151A1D] border border-[#30383D] text-xs font-mono text-[#E8ECEB] flex items-start gap-2">
+            <span className="text-[#C58B3A] font-bold uppercase shrink-0">Inquiry:</span>
             <span>&quot;{response.query}&quot;</span>
           </div>
 
@@ -65,7 +65,7 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
               </span>
             )}
             <span className="text-[#9BA5A8]">
-              {response.citations?.length || 0} Grounded Citations Provided
+              {response.citations?.length || 0} Grounded Citations Attached
             </span>
           </div>
         </CardContent>
@@ -82,7 +82,7 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
 
         <CardContent className="p-4 space-y-3">
           <p className="text-xs text-[#9BA5A8]">
-            Click any citation tag to inspect raw vector page chunk and text snippet evidence:
+            Click any citation tag below to inspect raw vector page chunks and text snippet provenance:
           </p>
 
           {response.citations && response.citations.length > 0 ? (
@@ -95,9 +95,18 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
                 <div
                   key={idx}
                   onClick={() => onSelectCitation(c, matchingChunk)}
-                  className="p-3 rounded-lg bg-[#242C30] border border-[#30383D] hover:border-[#C58B3A]/60 transition-colors cursor-pointer space-y-1.5 group"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelectCitation(c, matchingChunk);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className="p-3 rounded-lg bg-[#242C30] border border-[#30383D] hover:border-[#C58B3A]/60 transition-all duration-150 cursor-pointer space-y-1.5 group focus:outline-none focus:border-[#C58B3A]"
+                  aria-label={`Inspect evidence for ${c.document_name} page ${c.page_number}`}
                 >
-                  <div className="flex items-center justify-between text-xs font-bold text-[#E8ECEB] group-hover:text-[#C58B3A]">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#E8ECEB] group-hover:text-[#C58B3A] transition-colors">
                     <span className="truncate max-w-[170px]" title={c.document_name}>
                       {c.document_name}
                     </span>
@@ -110,7 +119,7 @@ export const CitedAnswerCard: React.FC<CitedAnswerCardProps> = ({
                     <span className="bg-[#151A1D] px-1.5 py-0.5 rounded text-[#C58B3A] border border-[#30383D]">
                       {c.citation_tag}
                     </span>
-                    <span className="flex items-center gap-1 text-[#C58B3A] font-sans text-xs">
+                    <span className="flex items-center gap-1 text-[#C58B3A] font-sans text-xs group-hover:underline">
                       Inspect <Eye className="h-3.5 w-3.5" />
                     </span>
                   </div>

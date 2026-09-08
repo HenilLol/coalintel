@@ -33,6 +33,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [duplicateDocInfo, setDuplicateDocInfo] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isUploading) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isUploading, onClose]);
+
   if (!isOpen) return null;
 
   const validateFile = (file: File): boolean => {
@@ -149,8 +159,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1113]/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl p-6 rounded-lg bg-[#1C2226] border border-[#30383D] shadow-xl space-y-6 text-[#E8ECEB]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1113]/80 backdrop-blur-sm animate-fade-in"
+      onClick={() => !isUploading && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ingest Mining Document Modal"
+    >
+      <div
+        className="relative w-full max-w-xl p-6 rounded-lg bg-[#1C2226] border border-[#30383D] shadow-2xl space-y-6 text-[#E8ECEB] animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#30383D] pb-4">
           <div className="flex items-center gap-3">
