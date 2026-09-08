@@ -26,6 +26,12 @@ export const Logo: React.FC<LogoProps> = ({
     lg: 'text-2xl',
   };
 
+  const versionSizes = {
+    sm: 'text-[9px] px-1.5 py-0.5',
+    md: 'text-[10px] px-1.5 py-0.5',
+    lg: 'text-xs px-2 py-0.5',
+  };
+
   return (
     <div className={cn('inline-flex items-center gap-3 select-none', className)}>
       {/* COALINTEL Mining & Intelligence Vector Symbol */}
@@ -70,15 +76,20 @@ export const Logo: React.FC<LogoProps> = ({
       </div>
 
       {showText && (
-        <div className="flex flex-col">
-          <div className={cn('font-bold tracking-wider font-sans leading-none flex items-center', textSizes[size])}>
+        <div className="flex flex-col min-w-0">
+          <div className={cn('font-bold tracking-wider font-sans leading-none flex items-center whitespace-nowrap', textSizes[size])}>
             <span className="text-[#E8ECEB]">COAL</span>
             <span className="text-[#C58B3A] font-extrabold ml-0.5">INTEL</span>
-            <span className="ml-1.5 text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-[#C58B3A]/15 text-[#C58B3A] border border-[#C58B3A]/30">
-              V2
+            <span
+              className={cn(
+                'ml-2 inline-flex items-center justify-center font-mono font-semibold uppercase tracking-wider rounded bg-[#C58B3A]/15 text-[#C58B3A] border border-[#C58B3A]/30 leading-none select-none shrink-0',
+                versionSizes[size]
+              )}
+            >
+              v2
             </span>
           </div>
-          <span className="text-[10px] tracking-widest text-[#9BA5A8] font-mono uppercase mt-1">
+          <span className="text-[10px] tracking-widest text-[#9BA5A8] font-mono uppercase mt-1 truncate">
             Mining Intelligence & Analytics
           </span>
         </div>
