@@ -8,7 +8,10 @@ from app.models.extracted_metric import ExtractedMetric
 from app.services.storage_service import file_exists
 from app.services.parsing_service import parse_document_file
 from app.services.chunking_service import chunk_text_by_tokens
-from app.services.normalization_service import extract_entity_tuples_from_text
+from app.services.normalization_service import (
+    extract_entity_tuples_from_text,
+    classify_document_authority,
+)
 from app.services.vector_store_service import add_chunks_to_vector_store, delete_document_vectors
 
 logger = logging.getLogger(__name__)
@@ -73,6 +76,10 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
         all_metrics = []
 
         # Step 3: Iterate pages -> Chunking & Metric Extraction
+        doc_origin = getattr(doc, "data_origin", None) or getattr(doc, "authority", None)
+        if not doc_origin:
+            doc_origin = classify_document_authority(doc.filename)
+
         for page_info in pages_data:
             page_num = page_info["page_number"]
             page_text = page_info["text"]
@@ -111,7 +118,8 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
                     fiscal_year=m["fiscal_year"],
                     confidence_score=m["confidence_score"],
                     validation_status=m.get("validation_status", "VALIDATED"),
-                    raw_snippet=m["raw_snippet"]
+                    raw_snippet=m["raw_snippet"],
+                    data_origin=doc_origin
                 ))
 
         logger.info(f"Document #{doc.id} chunking completed ({len(all_chunks)} chunks).")

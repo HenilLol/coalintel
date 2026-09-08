@@ -538,3 +538,122 @@ def extract_entity_tuples_from_text(
         })
 
     return extracted_tuples
+
+
+def chunk_has_metric_for_entity(
+    chunk_text: str,
+    target_mines: Optional[List[str]] = None,
+    metric_domain: Optional[Dict[str, Any]] = None,
+    target_metric: Optional[str] = None
+) -> bool:
+    """
+    Evaluates whether a text chunk provides semantic evidence specifically linking
+    the queried entity/mine with the requested metric domain.
+    Prevents unrelated official metrics (e.g. Coal Production 59.11 MT) from satisfying
+    a distinct metric query (e.g. Overburden Removal) merely because they appear in the same document/chunk.
+    """
+    if not chunk_text:
+        return False
+
+    chunk_lower = chunk_text.lower()
+
+    # Determine metric keywords and patterns
+    domain_terms: List[str] = []
+    domain_patterns: List[str] = []
+    if metric_domain:
+        domain_terms.extend([t.lower() for t in metric_domain.get("db_metric_names", [])])
+        if metric_domain.get("canonical_name"):
+            domain_terms.append(metric_domain["canonical_name"].lower())
+        domain_patterns.extend(metric_domain.get("patterns", []))
+    elif target_metric:
+        domain_terms.append(target_metric.lower())
+
+    # If no metric constraint, only check mine presence (if any)
+    if not domain_terms and not domain_patterns:
+        if not target_mines:
+            return True
+        for tm in target_mines:
+            if tm.lower() in chunk_lower:
+                return True
+            base_tm = get_base_mine_name(tm)
+            if base_tm and len(base_tm) >= 3 and base_tm.lower() in chunk_lower:
+                return True
+        return False
+
+    # Check for structured extraction format:
+    # "Mine Entity: ... | Metric: ... | Raw Extracted Value: ... | Normalized Value: ... | Fiscal Year: ..."
+    if "mine entity:" in chunk_lower or "metric:" in chunk_lower:
+        mine_m = re.search(r"Mine Entity:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        metric_m = re.search(r"Metric:\s*([^\|\n]+)", chunk_text, re.IGNORECASE)
+        s_mine = mine_m.group(1).strip() if mine_m else None
+        s_metric = metric_m.group(1).strip() if metric_m else None
+
+        if s_metric:
+            s_metric_lower = s_metric.lower()
+            metric_matches = any(dt in s_metric_lower for dt in domain_terms) or any(
+                re.search(pat, s_metric, re.IGNORECASE) for pat in domain_patterns
+            )
+            if not metric_matches:
+                return False
+
+            if not target_mines:
+                return True
+
+            if s_mine:
+                s_mine_lower = s_mine.lower()
+                s_mine_base = get_base_mine_name(s_mine).lower()
+                for tm in target_mines:
+                    tm_l = tm.lower()
+                    base_l = get_base_mine_name(tm).lower()
+                    if tm_l in s_mine_lower or tm_l in s_mine_base or base_l in s_mine_lower or base_l in s_mine_base:
+                        return True
+
+    # Unstructured text evaluation:
+    # If no target mines specified (e.g. broad CIL metric query):
+    if not target_mines:
+        return any(dt in chunk_lower for dt in domain_terms) or any(
+            re.search(pat, chunk_text, re.IGNORECASE) for pat in domain_patterns
+        )
+
+    # Specific target mine(s) queried:
+    mine_terms = []
+    for tm in target_mines:
+        mine_terms.append(tm.lower())
+        base_tm = get_base_mine_name(tm)
+        if base_tm and len(base_tm) >= 3 and base_tm.lower() not in mine_terms:
+            mine_terms.append(base_tm.lower())
+
+    # Check if mine is mentioned in the chunk at all
+    if not any(mt in chunk_lower for mt in mine_terms):
+        return False
+
+    # Break chunk into logical lines/sentences
+    segments = [seg.strip() for seg in re.split(r"(?:[\r\n]+|(?<=[.!?])\s+)", chunk_text) if seg.strip()]
+
+    # First check: Does any single segment contain both the entity AND the metric terms?
+    for seg in segments:
+        seg_lower = seg.lower()
+        has_mine = any(mt in seg_lower for mt in mine_terms)
+        if has_mine:
+            has_metric = any(dt in seg_lower for dt in domain_terms) or any(
+                re.search(pat, seg, re.IGNORECASE) for pat in domain_patterns
+            )
+            if has_metric:
+                return True
+
+    # Second check: In multi-line tabular/bullet contexts, check adjacent 2-segment windows (line N and line N+1)
+    for i in range(len(segments) - 1):
+        window = segments[i] + " " + segments[i + 1]
+        window_lower = window.lower()
+        if any(mt in window_lower for mt in mine_terms):
+            has_metric = any(dt in window_lower for dt in domain_terms) or any(
+                re.search(pat, window, re.IGNORECASE) for pat in domain_patterns
+            )
+            if has_metric:
+                # Disqualify window if the second segment explicitly attributes the metric to a different entity (e.g. corporate CIL)
+                different_entity_phrases = ["cil as a whole", "total cil", "cil total", "overall cil", "corporate cil"]
+                if any(dep in segments[i + 1].lower() for dep in different_entity_phrases) and not any(mt in segments[i + 1].lower() for mt in mine_terms):
+                    continue
+                return True
+
+    return False

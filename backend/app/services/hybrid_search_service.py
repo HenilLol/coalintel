@@ -238,7 +238,7 @@ def execute_hybrid_search(
                 "document_id": item["document_id"],
                 "filename": item["filename"],
                 "page_number": item["page_number"],
-                "chunk_index": item["chunk_index"],
+                "chunk_index": item.get("chunk_index", 0),
                 "text": item["text"],
                 "vector_score": item.get("vector_score", 0.0),
                 "keyword_score": 0.0,

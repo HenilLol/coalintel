@@ -23,12 +23,12 @@ def get_audit_logs(
     """
     logs = db.query(AuditLog, User.username).\
         outerjoin(User, AuditLog.user_id == User.id).\
-        order_by(AuditLog.created_at.desc()).\
+        order_by(AuditLog.timestamp.desc()).\
         limit(limit).all()
 
     result = []
     for log, username in logs:
-        ts_str = log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "2026-08-29 12:00:00"
+        ts_str = log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "2026-08-29 12:00:00"
         result.append(AuditLogResponse(
             id=log.id,
             user=username or "system",
