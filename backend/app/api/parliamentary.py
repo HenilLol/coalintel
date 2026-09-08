@@ -69,7 +69,7 @@ def generate_parliamentary_briefing(
     fy = payload.fiscal_year or "2023-24"
     q_type = (payload.question_type or "GENERAL").upper()
 
-    # 1. Parse question intent, target entities, and temporal context (Component 6)
+    # 1. Parse question intent, target entities, and temporal context
     q_entities = detect_query_entities(question_text)
     target_mines = q_entities.get("mines", [])
     target_metric = q_entities.get("metric")
@@ -79,51 +79,73 @@ def generate_parliamentary_briefing(
 
     effective_fy = detected_fy or fy
     effective_sub = scope
-    if scope.upper() in ["ALL", "ALL CIL"] and detected_sub:
+    if scope.upper() in ["ALL", "ALL CIL"] and detected_sub and detected_sub.upper() not in ["CIL", "CIL HQ", "ALL", "ALL CIL"]:
         effective_sub = detected_sub
 
-    # 2. Query structured DB metrics with entity, metric, and fiscal year grounding
-    metric_query = db.query(ExtractedMetric, Document).join(
-        Document, ExtractedMetric.document_id == Document.id
-    )
+    # Component 5: Resolve selected_scope with priority:
+    # 1. Explicit UI/user scope when supplied and not "ALL" / "ALL CIL"
+    # 2. Detected specific target mine/entity (e.g. "Gevra OC")
+    # 3. Detected operating subsidiary when applicable (e.g. SECL, ECL, BCCL, WCL, MCL, CCL, NCL)
+    # 4. Otherwise "ALL CIL"
+    if payload.subsidiary_filter and payload.subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
+        resolved_selected_scope = payload.subsidiary_filter
+    elif target_mines:
+        resolved_selected_scope = target_mines[0]
+    elif detected_sub and detected_sub.upper() not in ["CIL", "CIL HQ", "ALL", "ALL CIL"]:
+        resolved_selected_scope = detected_sub
+    else:
+        resolved_selected_scope = "ALL CIL"
 
-    if effective_sub.upper() not in ["ALL", "ALL CIL"]:
-        metric_query = metric_query.filter(Document.subsidiary == effective_sub)
-
-    if effective_fy and effective_fy.upper() != "ALL":
-        metric_query = metric_query.filter(ExtractedMetric.fiscal_year == effective_fy)
-
-    # Specific mine question: filter for target mine / base mine
-    if target_mines:
-        mine_conds = []
-        for tm in target_mines:
-            mine_conds.append(ExtractedMetric.mine_name.ilike(f"%{tm}%"))
-            base_tm = get_base_mine_name(tm)
-            if base_tm and base_tm.lower() != tm.lower():
-                mine_conds.append(ExtractedMetric.mine_name.ilike(f"%{base_tm}%"))
-        metric_query = metric_query.filter(or_(*mine_conds))
-
-    # Metric domain filtering
-    if metric_domain:
-        domain_terms = metric_domain.get("db_metric_names", [])
-        if domain_terms:
-            metric_conds = [ExtractedMetric.metric_name.ilike(f"%{dm}%") for dm in domain_terms]
-            metric_query = metric_query.filter(or_(*metric_conds))
-    elif target_metric:
-        metric_query = metric_query.filter(ExtractedMetric.metric_name.ilike(f"%{target_metric}%"))
-
-    extracted_records = metric_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
-
-    # If entity/metric filtering returned nothing for a broad question, fallback to broader query
-    if not extracted_records and not target_mines:
-        broad_query = db.query(ExtractedMetric, Document).join(
+    # 2. Query structured DB metrics with entity, metric, and fiscal year grounding (Component 6 Failure Safety)
+    try:
+        metric_query = db.query(ExtractedMetric, Document).join(
             Document, ExtractedMetric.document_id == Document.id
         )
+
         if effective_sub.upper() not in ["ALL", "ALL CIL"]:
-            broad_query = broad_query.filter(Document.subsidiary == effective_sub)
+            metric_query = metric_query.filter(Document.subsidiary == effective_sub)
+
         if effective_fy and effective_fy.upper() != "ALL":
-            broad_query = broad_query.filter(ExtractedMetric.fiscal_year == effective_fy)
-        extracted_records = broad_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
+            metric_query = metric_query.filter(ExtractedMetric.fiscal_year == effective_fy)
+
+        # Specific mine question: filter for target mine / base mine
+        if target_mines:
+            mine_conds = []
+            for tm in target_mines:
+                mine_conds.append(ExtractedMetric.mine_name.ilike(f"%{tm}%"))
+                base_tm = get_base_mine_name(tm)
+                if base_tm and base_tm.lower() != tm.lower():
+                    mine_conds.append(ExtractedMetric.mine_name.ilike(f"%{base_tm}%"))
+            metric_query = metric_query.filter(or_(*mine_conds))
+
+        # Metric domain filtering
+        if metric_domain:
+            domain_terms = metric_domain.get("db_metric_names", [])
+            if domain_terms:
+                metric_conds = [ExtractedMetric.metric_name.ilike(f"%{dm}%") for dm in domain_terms]
+                metric_query = metric_query.filter(or_(*metric_conds))
+        elif target_metric:
+            metric_query = metric_query.filter(ExtractedMetric.metric_name.ilike(f"%{target_metric}%"))
+
+        extracted_records = metric_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
+
+        # If entity/metric filtering returned nothing for a broad question, fallback to broader query
+        # ONLY if neither specific mine NOR specific metric was queried (prevent falling back to unrelated metrics!)
+        if not extracted_records and not target_mines and not metric_domain and not target_metric:
+            broad_query = db.query(ExtractedMetric, Document).join(
+                Document, ExtractedMetric.document_id == Document.id
+            )
+            if effective_sub.upper() not in ["ALL", "ALL CIL"]:
+                broad_query = broad_query.filter(Document.subsidiary == effective_sub)
+            if effective_fy and effective_fy.upper() != "ALL":
+                broad_query = broad_query.filter(ExtractedMetric.fiscal_year == effective_fy)
+            extracted_records = broad_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
+    except Exception as db_err:
+        logger.error(f"Database query or schema integrity error in parliamentary briefing: {db_err}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database schema or query integrity failure during parliamentary briefing extraction: {str(db_err)}"
+        )
 
     # 3. Execute Hybrid RAG Search for context & citations
     rag_result = execute_rag_query(
@@ -141,10 +163,10 @@ def generate_parliamentary_briefing(
             question=question_text,
             question_type=q_type,
             fiscal_year=effective_fy,
-            selected_scope=scope,
+            selected_scope=resolved_selected_scope,
             executive_summary=(
                 f"No official document records or extracted evidence were found in the database "
-                f"matching target scope '{scope}' for Fiscal Year {effective_fy}."
+                f"matching target scope '{resolved_selected_scope}' for Fiscal Year {effective_fy}."
             ),
             key_findings=[
                 "Insufficient evidence available in ingested repository.",
@@ -169,12 +191,12 @@ def generate_parliamentary_briefing(
         subsidiary_metrics.append(
             SubsidiaryMetricItem(
                 mine_name=m.mine_name,
-                subsidiary=doc.subsidiary,
+                subsidiary=doc.subsidiary or "CIL",
                 metric_name=m.metric_name,
-                numeric_value=m.numeric_value,
+                numeric_value=float(m.numeric_value or 0.0),
                 unit=m.unit,
-                standard_value=m.standard_value,
-                standard_unit=m.standard_unit,
+                standard_value=float(m.standard_value) if m.standard_value is not None else float(m.numeric_value or 0.0),
+                standard_unit=m.standard_unit or m.unit or "MT",
                 fiscal_year=m.fiscal_year or effective_fy,
                 page_number=m.page_number,
                 document_filename=doc.filename
@@ -183,8 +205,15 @@ def generate_parliamentary_briefing(
 
     # 6. Filter Cross-Document Discrepancies relevant to question entities, domain & scope
     discrepancies: List[FlaggedDiscrepancyItem] = []
-    conflicts_query = db.query(DataConflict).filter(DataConflict.status.in_(["ACTIVE", "OPEN"]))
-    active_conflicts = conflicts_query.order_by(DataConflict.id.desc()).all()
+    try:
+        conflicts_query = db.query(DataConflict).filter(DataConflict.status.in_(["ACTIVE", "OPEN"]))
+        active_conflicts = conflicts_query.order_by(DataConflict.id.desc()).all()
+    except Exception as conflict_err:
+        logger.error(f"Database conflict query error in parliamentary briefing: {conflict_err}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database query error during conflict retrieval: {str(conflict_err)}"
+        )
 
     for c in active_conflicts:
         doc_a_name = c.doc_a.filename if c.doc_a else f"Document #{c.doc_a_id}"
@@ -270,7 +299,7 @@ def generate_parliamentary_briefing(
     # 8. Synthesize Executive Summary & Question-Specific Key Findings
     rag_answer = rag_result.get("answer", "")
     exec_summary = (
-        f"Parliamentary Briefing Note compiled for target scope '{scope}' ({effective_fy}). "
+        f"Parliamentary Briefing Note compiled for target scope '{resolved_selected_scope}' ({effective_fy}). "
         f"{rag_answer}"
     )
 
@@ -316,7 +345,7 @@ def generate_parliamentary_briefing(
         question=question_text,
         question_type=q_type,
         fiscal_year=fy,
-        selected_scope=scope,
+        selected_scope=resolved_selected_scope,
         executive_summary=exec_summary,
         key_findings=key_findings,
         subsidiary_metrics=subsidiary_metrics,

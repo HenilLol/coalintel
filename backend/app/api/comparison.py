@@ -43,6 +43,10 @@ def get_comparison_options(
     raw_metrics = db.query(distinct(ExtractedMetric.metric_name)).filter(ExtractedMetric.metric_name.isnot(None)).all()
     metrics = sorted(list({m[0] for m in raw_metrics if m[0]}))
 
+    # Distinct Fiscal Years
+    raw_fys = db.query(distinct(ExtractedMetric.fiscal_year)).filter(ExtractedMetric.fiscal_year.isnot(None)).all()
+    fiscal_years = [f[0] for f in raw_fys if f[0]]
+
     # Augment with canonical Government of India mines and fiscal years
     try:
         from app.models.mine import MineMaster, MineYearlyMetric

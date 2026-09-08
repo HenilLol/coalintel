@@ -15,8 +15,8 @@ class SubsidiaryMetricItem(BaseModel):
     metric_name: str
     numeric_value: float
     unit: str
-    standard_value: float
-    standard_unit: str
+    standard_value: Optional[float] = None
+    standard_unit: Optional[str] = "MT"
     fiscal_year: str
     page_number: Optional[int] = None
     document_filename: Optional[str] = None

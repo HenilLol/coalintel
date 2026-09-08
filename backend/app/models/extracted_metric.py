@@ -27,7 +27,12 @@ class ExtractedMetric(Base):
         index=True
     )  # 'VALIDATED', 'WARNING_ARITHMETIC', 'CONFLICT_DETECTED', 'UNVERIFIED'
     raw_snippet = Column(Text, nullable=True)
-    data_origin = Column(String(30), default="government", nullable=False, index=True)  # 'government', 'calculated', 'demo'
+    data_origin = Column(
+        String(30),
+        default="UNKNOWN",
+        nullable=True,
+        index=True
+    )  # 'OFFICIAL', 'SYNTHETIC_TEST', 'INTERNAL', 'UNKNOWN'
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationships
