@@ -19,6 +19,9 @@ export const CIL_SUBSIDIARIES = [
 ] as const;
 
 export const FISCAL_YEARS = [
+  { value: '2026-27', label: 'FY 2026-27 (YTD Provisional)' },
+  { value: '2025-26', label: 'FY 2025-26' },
+  { value: '2024-25', label: 'FY 2024-25' },
   { value: '2023-24', label: 'FY 2023-24' },
   { value: '2022-23', label: 'FY 2022-23' },
   { value: '2021-22', label: 'FY 2021-22' },
@@ -33,6 +36,7 @@ export const REPORT_TEMPLATES = [
 
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Executive Dashboard', icon: 'LayoutDashboard' },
+  { href: '/mines', label: 'Mines Intelligence', icon: 'Mountain' },
   { href: '/documents', label: 'Document Library', icon: 'FileText' },
   { href: '/query', label: 'Ask COALINTEL', icon: 'Sparkles' },
   { href: '/parliamentary', label: 'Parliamentary Briefing', icon: 'Landmark' },

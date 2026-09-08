@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   History,
   Landmark,
+  Mountain,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -33,6 +34,7 @@ interface SidebarProps {
 
 const iconMap: Record<string, React.ReactNode> = {
   LayoutDashboard: <LayoutDashboard className="h-4 w-4" />,
+  Mountain: <Mountain className="h-4 w-4" />,
   FileText: <FileText className="h-4 w-4" />,
   Sparkles: <Sparkles className="h-4 w-4" />,
   Landmark: <Landmark className="h-4 w-4" />,
@@ -59,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return item.roles.includes(userRole);
   });
 
-  const operationsHrefs = ['/dashboard', '/documents', '/comparison', '/validation'];
+  const operationsHrefs = ['/dashboard', '/mines', '/documents', '/comparison', '/validation'];
   const operationsNav = filteredNav.filter((i) => operationsHrefs.includes(i.href));
   const intelligenceNav = filteredNav.filter((i) => !operationsHrefs.includes(i.href));
 
