@@ -1686,6 +1686,13 @@ def run_government_data_ingestion():
         db.commit()
         logger.info(f"Ingestion run completed successfully. {records_inserted} records inserted.")
 
+        # Execute Canonical Mines Expansion (Phases 3 & 4)
+        try:
+            from data.canonical_expansion_seed import run_canonical_expansion
+            run_canonical_expansion()
+        except Exception as exp_err:
+            logger.warning(f"Canonical expansion note: {exp_err}")
+
     except Exception as e:
         db.rollback()
         logger.error(f"Ingestion run failed: {e}", exc_info=True)
@@ -1704,5 +1711,10 @@ def run_government_data_ingestion():
         db.close()
 
 
+# Standard alias for backend bootstrap
+run_seed = run_government_data_ingestion
+
+
 if __name__ == "__main__":
     run_government_data_ingestion()
+

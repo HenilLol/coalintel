@@ -67,6 +67,12 @@ class MineMonthlyMetricResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class DimensionCountResponse(BaseModel):
+    name: str
+    count: int
+    code: Optional[str] = None
+
+
 class MineSummaryResponse(BaseModel):
     mine_id: str
     mine_name: str
@@ -75,8 +81,10 @@ class MineSummaryResponse(BaseModel):
     subsidiary_name: Optional[str] = None
     state: str
     district: Optional[str] = None
+    coal_or_lignite: str = "Coal"
     mine_type: Optional[str] = None
-    operational_status: str
+    mining_method: Optional[str] = None
+    operational_status: str = "PRODUCING"
     ownership_type: Optional[str] = None
     data_origin: str = "government"
     

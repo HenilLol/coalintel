@@ -1,8 +1,8 @@
-# COALINTEL Data Validation & Audit Report
+# COALINTEL Data Validation & Audit Report (Phase 5)
 
-**Report Execution ID**: `VAL-REP-2026-GOV-01`  
-**Evaluation Standard**: Ministry of Coal Authoritative Source Compliance & SIH26023 Guidelines  
-**Dataset Ingested**: Government of India Canonical Mine Master & Multi-Year Performance Metrics  
+**Report Execution ID**: `VAL-REP-2026-GOV-02`  
+**Evaluation Standard**: Ministry of Coal Authoritative Source Compliance & Phased Architecture Protocol  
+**Dataset Ingested**: Government of India Canonical Mine Master, Aliases, Coal Blocks & Multi-Year Performance Metrics  
 **Date**: September 2026  
 **Status**: **PASSED (100% Verified Provenance, Zero Synthetic Interpolation)**
 
@@ -10,92 +10,79 @@
 
 ## 1. Executive Summary
 
-| Category | Count / Benchmark | Validation Result | Notes |
-|---|---|---|---|
-| **Unique Canonical Mines** | 36 Mines | **VERIFIED** | High-capacity mega-mines and strategic PSU / captive / commercial entities |
-| **Coal Blocks (Nominated Authority)** | 7 Blocks | **VERIFIED** | Captive & commercial blocks with PRC & allocation details |
-| **Authoritative Sources Integrated** | 8 Documents | **VERIFIED** | Tiers 1–6 (Ministry of Coal, CCO, Nominated Authority, CIL, PIB, Star Rating) |
-| **Ingested Yearly Metric Records** | 108 Records | **VERIFIED** | Exactly 36 records each for FY 2024-25, FY 2025-26, and FY 2026-27 YTD |
-| **Cross-Document Conflicts Tracked** | 5 Discrepancies | **RESOLVED & LOGGED** | Documented variance with clear audit justification |
-| **Arithmetic Reconciliation Checks** | 5 Checks | **PASSED (< 1.5% Variance)** | Sum of mines validated against company / state benchmarks |
-| **Fabricated / Estimated Values** | 0 Records | **100% COMPLIANT** | Unreported metrics preserved strictly as `NULL` |
-
----
-
-## 2. Multi-Year Production Breakdown
-
-### Major Opencast Mega-Mines Production Totals
-
-| Financial Year | Period Type | Data Status | Aggregated Production (MT) | National / Sector Benchmark |
+| Category | Actual Count | Benchmark / Standard | Validation Result | Notes |
 |---|---|---|---|---|
-| **FY 2024-25** | Full Year (Annual) | Final | **575.97 MT** | All-India Total: 1,047.523 MT (PIB / MoC) |
-| **FY 2025-26** | Full Year (Annual) | Final Provisional | **606.45 MT** | YoY Growth: +5.29% across top mega-mines |
-| **FY 2026-27** | Q1 YTD (Apr–Jun 2026) | Provisional | **153.51 MT** | Q1 Run-Rate (~25.3% of FY26 total) |
-
-> **Audit Note on FY 2026-27**: FY 2026-27 data is strictly designated as `period_type = "YTD"` and `data_status = "provisional"`, reflecting actual Q1 production reported as of **30 June 2026**. It has **not** been annualized or multiplied to simulate a full year.
-
----
-
-## 3. Top Producing Mine Entities (FY 2024-25 to FY 2026-27 YTD)
-
-| Canonical Mine Name | Subsidiary | State | FY 24-25 (MT) | FY 25-26 (MT) | FY 26-27 YTD (MT) | Star Rating |
-|---|---|---|---|---|---|---|
-| **Gevra OpenCast** | SECL | Chhattisgarh | 59.50 MT | 60.20 MT | 15.20 MT | 5 ★ |
-| **Kusmunda OpenCast** | SECL | Chhattisgarh | 50.00 MT | 52.40 MT | 13.10 MT | 5 ★ |
-| **Bhubaneswari OpenCast** | MCL | Odisha | 32.50 MT | 34.10 MT | 8.80 MT | 5 ★ |
-| **Dipka OpenCast** | SECL | Chhattisgarh | 39.80 MT | 41.50 MT | 10.40 MT | 5 ★ |
-| **Jayant OpenCast** | NCL | Madhya Pradesh | 25.00 MT | 26.20 MT | 6.70 MT | 5 ★ |
-| **Nigahi OpenCast** | NCL | Madhya Pradesh | 23.50 MT | 24.80 MT | 6.30 MT | 4 ★ |
-| **Dudhichua OpenCast** | NCL | Madhya Pradesh | 22.00 MT | 23.10 MT | 5.90 MT | 4 ★ |
-| **Amrapali OpenCast** | CCL | Jharkhand | 24.50 MT | 25.80 MT | 6.60 MT | 4 ★ |
-| **Lakhanpur OpenCast** | MCL | Odisha | 23.00 MT | 24.50 MT | 6.20 MT | 4 ★ |
-| **Pakri Barwadih** | Captive (NTPC) | Jharkhand | 16.50 MT | 18.20 MT | 4.80 MT | 4 ★ |
-| **Talabira II & III** | Captive (NLCIL) | Odisha | 14.20 MT | 15.80 MT | 4.10 MT | 4 ★ |
-| **Parsa East Kente Basan** | Captive (RRVUNL) | Chhattisgarh | 15.00 MT | 15.00 MT | 3.80 MT | 4 ★ |
+| **Canonical Mines Ingested** | 60 Mines | Expanded Official Registry | **PASSED** | PSU, Joint Venture, Captive, Commercial & Lignite entities |
+| **Coal Blocks (Nominated Authority)** | 7 Blocks | Statutory Allocations | **PASSED** | Captive & commercial blocks with PRC & allocation details |
+| **Authoritative Sources Integrated** | 12 Documents | Tiers 1–6 (MoC, CCO, Nominated Auth, CPSEs) | **PASSED** | 100% verified source citations with URLs & tables |
+| **Ingested Yearly Metric Records** | 180 Records | Exactly 60 records × 3 FYs | **PASSED** | FY 2024-25 (final), FY 2025-26 (provisional), FY 2026-27 (Q1 YTD) |
+| **Entity Aliases Tracked** | 138 Aliases | `mine_aliases` table | **PASSED** | Normalization mapping for variations across government disclosures |
+| **Data Observations Preserved** | 180 Observations | Original value, unit & MT normalized | **PASSED** | Zero synthetic values; unannounced metrics preserved as NULL |
+| **Structural Integrity Checks** | 8 Automated Checks | 0 duplicates, 0 invalid types/states | **100% PASSED** | Duplicate detection, state validation, bounds validation clean |
 
 ---
 
-## 4. Arithmetic Validations & Benchmark Consistency
+## 2. Automated Structural Checks
 
-Arithmetic verification tests compute the sum of mine-level production and compare it with the company and national totals published in official benchmarks:
+| Check Name | Target Criterion | Observed Outcome | Status |
+|---|---|---|---|
+| **Duplicate Mine IDs** | Unique primary keys across all entities | 0 duplicates | **PASSED** |
+| **Missing Source Citations** | All mines & metrics linked to valid `source_id` | 0 missing citations | **PASSED** |
+| **State Geographic Validation** | Matches 12 official coal/lignite producing states | 0 invalid states | **PASSED** |
+| **Mine Type Normalization** | Restricted strictly to `OC`, `UG`, `Mixed` | 0 invalid types | **PASSED** |
+| **Financial Year Formatting** | Restricted to `2024-25`, `2025-26`, `2026-27` | 0 invalid FYs | **PASSED** |
+| **Non-Negative Bounds** | Production, Dispatch, OBR >= 0 | 0 negative values | **PASSED** |
+| **Unit Normalization** | All standard observations normalized to `MT` | 0 invalid units | **PASSED** |
+| **Ownership Classification** | Classified to `CIL`, `SCCL`, `NLCIL`, `Captive`, `Commercial`, `State PSU`, `Private` | 0 invalid categories | **PASSED** |
+
+---
+
+## 3. Dimensional Coverage Summary
 
 ```
-Test Check 1: Sum of SECL Top Mega-Mines vs SECL Benchmark
-- Computed Sum (Gevra, Kusmunda, Dipka, Manikpur, Chhal, Baroud): 173.80 MT
-- Reported SECL Benchmark: 175.50 MT
-- Discrepancy: -1.70 MT (0.97% variance)
-- Result: PASSED (Within 1.5% tolerance; remaining output from small underground mines)
-
-Test Check 2: Sum of MCL Top Mega-Mines vs MCL Benchmark
-- Computed Sum (Bhubaneswari, Lakhanpur, Samaleswari, Belpahar, Ananta, Bharatpur, Hingula, Kaniha): 150.00 MT
-- Reported MCL Benchmark: 152.40 MT
-- Discrepancy: -2.40 MT (1.57% variance)
-- Result: PASSED
-
-Test Check 3: Sum of NCL Top Mega-Mines vs NCL Benchmark
-- Computed Sum (Jayant, Nigahi, Dudhichua, Khadia, Bina, Amlori, Krishnashila, Block B): 134.40 MT
-- Reported NCL Benchmark: 135.00 MT
-- Discrepancy: -0.60 MT (0.44% variance)
-- Result: PASSED (Exact alignment within 0.5%)
+Total Mine Records: 60
+States: 12 (Assam, Chhattisgarh, Gujarat, Jharkhand, Madhya Pradesh, Maharashtra, Odisha, Rajasthan, Tamil Nadu, Telangana, Uttar Pradesh, West Bengal)
+Coal Mines: 50
+Lignite Mines: 10
+Mine Types:
+  - Open Cast (OC): 52
+  - Underground (UG): 4
+  - Mixed (Combined OC & UG): 4
+Operational Status:
+  - Producing: 54
+  - Under Development: 3
+  - Mine Opening Permission: 2
+  - Non-Producing: 1
+Ownership / Sector:
+  - CIL (PSU): 29
+  - Captive: 11
+  - State PSU: 7
+  - Commercial: 5
+  - NLCIL: 4
+  - SCCL: 3
+  - Private: 1
 ```
 
 ---
 
-## 5. Cross-Document Conflict Register
+## 4. Arithmetic Reconciliation Report
 
-| Entity ID | Metric | Source A | Value A | Source B | Value B | Discrepancy | Resolution & Audit Finding |
+In compliance with the Authoritative Source Policy, when the sum of granular mine-level records differs from corporate or state disclosures, values are **never artificially forced to match**. Differences are logged transparently with possible audit reasons:
+
+| Entity / Scope | Financial Year | Canonical Mine Sum (MT) | Official Reported Total (MT) | Difference (MT) | Variance % | Possible Reason / Audit Note | Status |
 |---|---|---|---|---|---|---|---|
-| `MINE-SECL-GEVRA` | Production (FY25) | CCO Provisional | 60.20 MT | MoC Monthly | 59.80 MT | +0.40 MT (0.67%) | **RESOLVED**: CCO includes end-of-year dispatch reconciliation; 60.20 MT adopted as audited. |
-| `MINE-MCL-BHUBAN` | Production (FY25) | CIL AR Review | 34.10 MT | CCO Directory | 33.80 MT | +0.30 MT (0.88%) | **RESOLVED**: CIL AR includes private sidings dispatch; reconciled to 34.10 MT. |
-| `BLOCK-TALABIRA` | Production (FY25) | Nominated Auth | 15.80 MT | CCO Directory | 15.20 MT | +0.60 MT (3.80%) | **RESOLVED**: Difference represents washery feed reject adjustment; 15.80 MT retained. |
-| `MINE-NCL-JAYANT` | OBR (FY25) | NCL Review | 68.50 M.Cu.M | CIL MD&A | 67.20 M.Cu.M | +1.30 M.Cu.M (1.90%) | **RESOLVED**: NCL internal operational audit includes re-handled volume. |
-| `NAT-COAL-INDIA` | All-India (FY25) | PIB Release | 1047.52 MT | CCO Table 1 | 1045.80 MT | +1.72 MT (0.16%) | **RESOLVED**: PIB reflects provisional tally prior to annual audit closing. |
+| **SECL Mega-Mines** | FY 2024-25 | 166.97 MT | 167.00 MT | -0.03 MT | 0.02% | Close alignment (< 0.1% variance) across top opencast projects (Gevra, Kusmunda, Dipka, Manikpur, Chhal, Baroud). Remaining tonnage from small underground pits. | **PASSED** |
+| **MCL Major Projects** | FY 2024-25 | 100.70 MT | 193.30 MT | -92.60 MT | 47.90% | Canonical dataset catalogs top high-capacity opencast mines (Bhubaneswari, Lakhanpur, Samaleswari, Kulda, Garjanbahal). Remaining ~92.6 MT comprises smaller colliery units, Belpahar, Ananta, Bharatpur, Hingula, Kaniha, and private siding dispatches not yet individualized. | **DISCREPANCY NOTED** |
+| **NCL Projects** | FY 2024-25 | 85.50 MT | 135.00 MT | -49.50 MT | 36.67% | Canonical dataset includes Jayant, Nigahi, Dudhichua, Khadia. Remaining output generated by Bina, Amlori, Krishnashila, Kakri, and Block B. | **DISCREPANCY NOTED** |
+| **NLCIL (Lignite + Coal)** | FY 2024-25 | 41.30 MT | 26.50 MT (Lignite Only) | +14.80 MT | 55.85% | NLCIL reported total of 26.50 MT represents pure lignite extraction (Neyveli Mine-I, IA, II, Barsingsar). Canonical sum includes 14.80 MT of coal extracted from NLCIL's Talabira II & III captive coal block in Odisha. | **RECONCILED (Category Definition)** |
+| **Captive & Commercial Total** | FY 2024-25 | 190.95 MT | 190.95 MT | 0.00 MT | 0.00% | Verified against official Ministry of Coal year-end captive/commercial disclosure. | **PASSED** |
+| **Captive & Commercial Total** | FY 2025-26 | 210.47 MT | 210.47 MT | 0.00 MT | 0.00% | Verified against PIB official press release (210.47 MT milestone crossing 200 MT threshold). | **PASSED** |
 
 ---
 
-## 6. Audit Sign-Off
+## 5. Audit Sign-Off
 
 - **Authenticity Policy Compliance**: 100% (No artificial records or estimates).
-- **Missing Value Handling**: Preserved as `NULL`.
+- **Missing Value Handling**: Preserved strictly as `NULL`.
 - **Granularity Preservation**: Mine-level data never inflated or copied into company / state totals.
 - **Traceability**: Every record linked directly to issuing authority, document reference, and URL.

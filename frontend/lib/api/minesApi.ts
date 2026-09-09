@@ -8,7 +8,9 @@ export interface MineSummary {
   subsidiary_name?: string;
   state: string;
   district?: string;
+  coal_or_lignite?: string;
   mine_type?: string;
+  mining_method?: string;
   operational_status: string;
   ownership_type?: string;
   data_origin: string;
@@ -25,6 +27,12 @@ export interface MineSummary {
   production_fy25_26?: number;
   production_fy26_27_ytd?: number;
   yoy_growth_percent?: number;
+}
+
+export interface DimensionCountItem {
+  name: string;
+  count: number;
+  code?: string;
 }
 
 export interface MineYearlyMetric {
@@ -172,6 +180,27 @@ export interface MinesSummaryStats {
   authoritative_sources_count: number;
   cross_document_conflicts_count: number;
   validation_checks_count: number;
+  coverage?: {
+    total_canonical_records: number;
+    states_covered: number;
+    districts_covered: number;
+    companies_count: number;
+    subsidiaries_count: number;
+    coal_mines_count: number;
+    lignite_mines_count: number;
+    producing_mines_count: number;
+    non_producing_mines_count: number;
+    records_with_source_citations: number;
+    records_missing_key_fields: number;
+  };
+  breakdowns?: {
+    by_state: Record<string, number>;
+    by_subsidiary: Record<string, number>;
+    by_type: Record<string, number>;
+    by_sector: Record<string, number>;
+    by_status: Record<string, number>;
+    by_fuel: Record<string, number>;
+  };
   major_mines_production: {
     fy_2024_25_mt: number;
     fy_2025_26_mt: number;
@@ -193,11 +222,24 @@ export interface MineFilterParams {
   subsidiary?: string;
   company?: string;
   state?: string;
+  district?: string;
   mine_type?: string;
   sector?: string;
+  ownership?: string;
+  coal_or_lignite?: string;
+  status?: string;
   search?: string;
+  sort_by?: string;
+  sort_order?: string;
+  page?: number;
+  page_size?: number;
   skip?: number;
   limit?: number;
+}
+
+export interface MinesListResult {
+  items: MineSummary[];
+  total: number;
 }
 
 export const minesApi = {
@@ -206,8 +248,44 @@ export const minesApi = {
     return res.data;
   },
 
+  getMinesWithCount: async (params?: MineFilterParams): Promise<MinesListResult> => {
+    const res = await apiClient.get<MineSummary[]>('/mines', { params });
+    const total = parseInt(res.headers['x-total-count'] || '0', 10) || res.data.length;
+    return { items: res.data, total };
+  },
+
   getMineDetails: async (mineId: string): Promise<MineDetail> => {
     const res = await apiClient.get<MineDetail>(`/mines/${encodeURIComponent(mineId)}`);
+    return res.data;
+  },
+
+  getStats: async (): Promise<MinesSummaryStats> => {
+    const res = await apiClient.get<MinesSummaryStats>('/mines/stats');
+    return res.data;
+  },
+
+  getStates: async (): Promise<DimensionCountItem[]> => {
+    const res = await apiClient.get<DimensionCountItem[]>('/mines/states');
+    return res.data;
+  },
+
+  getSubsidiaries: async (): Promise<DimensionCountItem[]> => {
+    const res = await apiClient.get<DimensionCountItem[]>('/mines/subsidiaries');
+    return res.data;
+  },
+
+  getSectors: async (): Promise<DimensionCountItem[]> => {
+    const res = await apiClient.get<DimensionCountItem[]>('/mines/sectors');
+    return res.data;
+  },
+
+  getMineTypes: async (): Promise<DimensionCountItem[]> => {
+    const res = await apiClient.get<DimensionCountItem[]>('/mines/types');
+    return res.data;
+  },
+
+  getCompanies: async (): Promise<DimensionCountItem[]> => {
+    const res = await apiClient.get<DimensionCountItem[]>('/mines/companies');
     return res.data;
   },
 

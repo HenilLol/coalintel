@@ -4,14 +4,14 @@
   "/page": "app/page.js",
   "/(dashboard)/audit/page": "app/(dashboard)/audit/page.js",
   "/(dashboard)/analytics/page": "app/(dashboard)/analytics/page.js",
+  "/(dashboard)/comparison/page": "app/(dashboard)/comparison/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
   "/(dashboard)/documents/[id]/page": "app/(dashboard)/documents/[id]/page.js",
   "/(dashboard)/conflicts/page": "app/(dashboard)/conflicts/page.js",
-  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/mines/page": "app/(dashboard)/mines/page.js",
   "/(dashboard)/documents/page": "app/(dashboard)/documents/page.js",
   "/(dashboard)/parliamentary/page": "app/(dashboard)/parliamentary/page.js",
   "/(dashboard)/query/page": "app/(dashboard)/query/page.js",
   "/(dashboard)/reports/page": "app/(dashboard)/reports/page.js",
-  "/(dashboard)/validation/page": "app/(dashboard)/validation/page.js",
-  "/(dashboard)/mines/page": "app/(dashboard)/mines/page.js",
-  "/(dashboard)/comparison/page": "app/(dashboard)/comparison/page.js"
+  "/(dashboard)/validation/page": "app/(dashboard)/validation/page.js"
 }
