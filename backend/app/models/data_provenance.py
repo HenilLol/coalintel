@@ -15,6 +15,7 @@ class DataSource(Base):
     url = Column(Text, nullable=True)
     page_number = Column(Integer, nullable=True)
     table_number = Column(String(100), nullable=True)
+    chapter = Column(String(100), nullable=True)
     section_name = Column(String(200), nullable=True)
     retrieved_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     source_priority = Column(Integer, default=1, nullable=False)  # Tier 1 to 6

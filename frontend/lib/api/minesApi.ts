@@ -5,14 +5,22 @@ export interface MineSummary {
   mine_name: string;
   canonical_name: string;
   company_name: string;
+  parent_company?: string;
   subsidiary_name?: string;
   state: string;
   district?: string;
+  block?: string;
+  coalfield?: string;
   coal_or_lignite?: string;
   mine_type?: string;
   mining_method?: string;
-  operational_status: string;
+  sector?: string;
   ownership_type?: string;
+  captive_or_commercial?: string;
+  operational_status: string;
+  production_status?: string;
+  financial_year?: string;
+  verification_status?: string;
   data_origin: string;
   latest_production_mt?: number;
   latest_target_mt?: number;
@@ -88,6 +96,7 @@ export interface DataSourceItem {
   url?: string;
   page_number?: number;
   table_number?: string;
+  chapter?: string;
   section_name?: string;
   source_priority: number;
   verification_status: string;
@@ -99,30 +108,41 @@ export interface MineDetail {
   normalized_mine_name: string;
   original_mine_name?: string;
   company_name: string;
+  parent_company?: string;
   subsidiary_name?: string;
   state: string;
   district?: string;
+  block?: string;
+  coalfield?: string;
   coal_or_lignite: string;
   mine_type?: string;
   mining_method?: string;
+  sector?: string;
   ownership_type?: string;
   allocation_type?: string;
   end_use?: string;
   operational_status: string;
   production_status?: string;
   mine_opening_permission?: string;
+  captive_or_commercial?: string;
+  financial_year?: string;
   source_id?: string;
   source_document?: string;
   source_url?: string;
   source_page?: number;
   source_table?: string;
+  source_chapter?: string;
   source_publication_date?: string;
+  retrieved_at?: string;
   last_verified_at?: string;
+  verification_status?: string;
+  data_origin?: string;
   yearly_metrics: MineYearlyMetric[];
   monthly_metrics: MineMonthlyMetric[];
   aliases: string[];
   provenance_sources: DataSourceItem[];
 }
+
 
 export interface CoalBlockItem {
   coal_block_id: string;

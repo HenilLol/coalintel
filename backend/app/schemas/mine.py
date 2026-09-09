@@ -78,14 +78,22 @@ class MineSummaryResponse(BaseModel):
     mine_name: str
     canonical_name: str
     company_name: str
+    parent_company: Optional[str] = None
     subsidiary_name: Optional[str] = None
     state: str
     district: Optional[str] = None
+    block: Optional[str] = None
+    coalfield: Optional[str] = None
     coal_or_lignite: str = "Coal"
     mine_type: Optional[str] = None
     mining_method: Optional[str] = None
-    operational_status: str = "PRODUCING"
+    sector: Optional[str] = None
     ownership_type: Optional[str] = None
+    captive_or_commercial: Optional[str] = None
+    operational_status: str = "PRODUCING"
+    production_status: Optional[str] = None
+    financial_year: Optional[str] = None
+    verification_status: str = "verified"
     data_origin: str = "government"
     
     # Latest/Filtered metric view
@@ -114,25 +122,35 @@ class MineDetailResponse(BaseModel):
     normalized_mine_name: str
     original_mine_name: Optional[str] = None
     company_name: str
+    parent_company: Optional[str] = None
     subsidiary_name: Optional[str] = None
     state: str
     district: Optional[str] = None
+    block: Optional[str] = None
+    coalfield: Optional[str] = None
     coal_or_lignite: str
     mine_type: Optional[str] = None
     mining_method: Optional[str] = None
+    sector: Optional[str] = None
     ownership_type: Optional[str] = None
     allocation_type: Optional[str] = None
     end_use: Optional[str] = None
     operational_status: str
     production_status: Optional[str] = None
     mine_opening_permission: Optional[str] = None
+    captive_or_commercial: Optional[str] = None
+    financial_year: Optional[str] = None
     source_id: Optional[str] = None
     source_document: Optional[str] = None
     source_url: Optional[str] = None
     source_page: Optional[int] = None
     source_table: Optional[str] = None
+    source_chapter: Optional[str] = None
     source_publication_date: Optional[str] = None
+    retrieved_at: Optional[datetime] = None
     last_verified_at: Optional[datetime] = None
+    verification_status: str = "verified"
+    data_origin: str = "government"
 
     # Relationships
     yearly_metrics: List[MineMetricResponse] = []
@@ -141,6 +159,7 @@ class MineDetailResponse(BaseModel):
     provenance_sources: List[DataSourceResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class CoalBlockResponse(BaseModel):
