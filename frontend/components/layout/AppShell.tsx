@@ -30,6 +30,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     return { username: 'analyst', role: 'Analyst', subsidiary: 'CMPDI' };
   });
 
+  // Lock body scroll when mobile drawer is open
+  React.useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('coalintel_token');
@@ -72,6 +84,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           userName={user?.username || 'CMPDI Analyst'}
           userSubsidiary={user?.subsidiary || 'CMPDI'}
           onLogout={handleLogout}
+          onNavigate={() => setMobileOpen(false)}
         />
       </div>
 
@@ -84,7 +97,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           showLogoOnDesktop={collapsed}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 animate-page-enter">
+        <main className="flex-1 p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 animate-page-enter">
           {children}
         </main>
 
