@@ -704,7 +704,7 @@ export default function MinesPage() {
                         {mine.production_fy24_25 !== null && mine.production_fy24_25 !== undefined ? (
                           <span>{mine.production_fy24_25.toFixed(2)}</span>
                         ) : (
-                          <span className="text-[#9BA5A8] font-normal italic">NULL</span>
+                          <span className="text-[#9BA5A8] text-[11px] font-normal italic" title="Not reported by official government source">Not Available</span>
                         )}
                       </td>
 
@@ -713,7 +713,7 @@ export default function MinesPage() {
                         {mine.production_fy25_26 !== null && mine.production_fy25_26 !== undefined ? (
                           <span>{mine.production_fy25_26.toFixed(2)}</span>
                         ) : (
-                          <span className="text-[#9BA5A8] font-normal italic">NULL</span>
+                          <span className="text-[#9BA5A8] text-[11px] font-normal italic" title="Not reported by official government source">Not Available</span>
                         )}
                       </td>
 
@@ -725,9 +725,10 @@ export default function MinesPage() {
                             <span className="text-[9px] text-[#D6A23A] block font-normal">Q1 YTD</span>
                           </div>
                         ) : (
-                          <span className="text-[#9BA5A8] font-normal italic">NULL</span>
+                          <span className="text-[#9BA5A8] text-[11px] font-normal italic" title="Not reported by official government source">Not Available</span>
                         )}
                       </td>
+
 
                       {/* Status */}
                       <td className="py-3 px-3 text-center">

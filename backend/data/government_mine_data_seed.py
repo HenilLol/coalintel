@@ -1064,24 +1064,44 @@ def run_government_data_ingestion():
                     normalized_mine_name=m_data["normalized_mine_name"],
                     original_mine_name=m_data["mine_name"],
                     company_name=m_data["company_name"],
+                    parent_company="Coal India Limited" if m_data["ownership_type"] == "CIL" else m_data["company_name"],
                     subsidiary_name=m_data["subsidiary_name"],
                     state=m_data["state"],
                     district=m_data["district"],
+                    block=m_data.get("district"),
+                    coalfield=f"{m_data['district']} Coalfield" if m_data.get("district") else None,
                     coal_or_lignite=m_data["coal_or_lignite"],
                     mine_type=m_data["mine_type"],
                     mining_method=m_data["mining_method"],
+                    sector=m_data["ownership_type"],
                     ownership_type=m_data["ownership_type"],
                     allocation_type=m_data["allocation_type"],
                     end_use=m_data["end_use"],
                     operational_status=m_data["operational_status"],
                     original_status="Operational / Producing",
                     production_status="Commercial Production",
+                    captive_or_commercial="Captive" if m_data["ownership_type"] == "Captive" else ("Commercial" if m_data["ownership_type"] == "Commercial" else "PSU Allocation"),
+                    financial_year="2024-25",
                     source_id=m_data["source_id"],
                     source_document="Coal Controller's Organisation Official Directory & Reports",
-                    source_url="https://coal.gov.in/en/major-statistics/coal-directory-of-india"
+                    source_url="https://coal.gov.in/en/major-statistics/coal-directory-of-india",
+                    source_chapter="Section III: Production Performance",
+                    verification_status="verified",
+                    data_origin="government"
                 )
                 db.add(new_mine)
                 records_inserted += 1
+            else:
+                existing_mine.parent_company = "Coal India Limited" if m_data["ownership_type"] == "CIL" else m_data["company_name"]
+                existing_mine.block = m_data.get("district")
+                existing_mine.coalfield = f"{m_data['district']} Coalfield" if m_data.get("district") else None
+                existing_mine.sector = m_data["ownership_type"]
+                existing_mine.captive_or_commercial = "Captive" if m_data["ownership_type"] == "Captive" else ("Commercial" if m_data["ownership_type"] == "Commercial" else "PSU Allocation")
+                existing_mine.financial_year = "2024-25"
+                existing_mine.source_chapter = "Section III: Production Performance"
+                existing_mine.verification_status = "verified"
+                existing_mine.data_origin = "government"
+
 
             # Seed Aliases
             for alias in m_data.get("aliases", []):

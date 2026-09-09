@@ -12,12 +12,16 @@ class MineMaster(Base):
     normalized_mine_name = Column(String(150), nullable=False, index=True)
     original_mine_name = Column(String(150), nullable=True)
     company_name = Column(String(150), nullable=False, index=True)
+    parent_company = Column(String(150), nullable=True)
     subsidiary_name = Column(String(100), nullable=True, index=True)
     state = Column(String(100), nullable=False, index=True)
     district = Column(String(100), nullable=True, index=True)
+    block = Column(String(150), nullable=True)
+    coalfield = Column(String(150), nullable=True)
     coal_or_lignite = Column(String(50), default="Coal", nullable=False)
     mine_type = Column(String(50), nullable=True)  # 'OC', 'UG', 'Mixed'
     mining_method = Column(String(100), nullable=True)
+    sector = Column(String(50), nullable=True, index=True)  # 'CIL', 'Captive', 'Commercial', 'State PSU', 'NLCIL', 'SCCL', 'Private'
     ownership_type = Column(String(50), nullable=True, index=True)  # 'CIL', 'SCCL', 'Captive', 'Commercial', 'State PSU', 'Private'
     allocation_type = Column(String(50), nullable=True)  # 'Nominated', 'Auctioned', 'Allotted'
     end_use = Column(String(100), nullable=True)  # 'Power', 'Steel', 'Cement', 'Commercial Sale'
@@ -25,15 +29,22 @@ class MineMaster(Base):
     original_status = Column(String(100), nullable=True)  # Preserves raw government wording
     production_status = Column(String(50), nullable=True)
     mine_opening_permission = Column(String(50), nullable=True)
+    captive_or_commercial = Column(String(50), nullable=True)
+    financial_year = Column(String(20), nullable=True, default="2024-25")
     
-    # Source provenance
+    # Source provenance & authenticity
     source_id = Column(String(100), nullable=True, index=True)
     source_document = Column(String(200), nullable=True)
     source_url = Column(Text, nullable=True)
     source_page = Column(Integer, nullable=True)
     source_table = Column(String(100), nullable=True)
+    source_chapter = Column(String(100), nullable=True)
     source_publication_date = Column(String(50), nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_verified_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    verification_status = Column(String(50), default="verified", nullable=False)
+    data_origin = Column(String(30), default="government", nullable=False, index=True)
+
 
     # Relationships
     aliases = relationship("MineAlias", back_populates="mine", cascade="all, delete-orphan")
