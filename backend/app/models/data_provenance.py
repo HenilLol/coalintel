@@ -115,4 +115,3 @@ class IngestionRun(Base):
 
     def __repr__(self):
         return f"<IngestionRun(id='{self.run_id}', status='{self.status}', inserted={self.records_inserted})>"
-

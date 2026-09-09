@@ -33,6 +33,24 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("PostgreSQL database tables verified and created successfully.")
 
+        # Read-Only Database Schema Compatibility Check (Phase 9C Production Hardening)
+        # Note: Startup MUST NOT execute DDL or mutate existing database schemas.
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(engine)
+            if "extracted_metrics" in inspector.get_table_names():
+                existing_cols = {c["name"] for c in inspector.get_columns("extracted_metrics")}
+                if "data_origin" not in existing_cols:
+                    logger.warning(
+                        "DATABASE COMPATIBILITY NOTICE: 'data_origin' column is missing from 'extracted_metrics' table. "
+                        "The application will operate in backward-compatibility mode. To reconcile production database schema, "
+                        "execute backend/migrations/001_add_data_origin_to_extracted_metrics.sql via authorized DBA workflow."
+                    )
+                else:
+                    logger.info("Schema compatibility verified: 'extracted_metrics.data_origin' column is present.")
+        except Exception as schema_check_err:
+            logger.warning(f"Schema compatibility check note: {schema_check_err}")
+
         # Idempotent default users bootstrap & Stale processing recovery
         from database import SessionLocal
         from app.models.user import User
@@ -51,6 +69,20 @@ async def lifespan(app: FastAPI):
 
             # Recover any orphaned processing documents from prior crashes/restarts
             recover_stale_processing_documents(db_bootstrap, stale_minutes=15)
+
+            # Idempotent Government of India Mine Master bootstrap
+            try:
+                from app.models.mine import MineMaster
+                from data.government_mine_data_seed import run_seed as seed_government_data
+                mine_count = db_bootstrap.query(MineMaster).count()
+                if mine_count == 0:
+                    logger.info("No canonical mines detected; bootstrapping authentic Government data.")
+                    seed_government_data(db_bootstrap)
+                    logger.info("Government of India mine data bootstrapped successfully.")
+                else:
+                    logger.info(f"Existing canonical mines detected ({mine_count} mines); skipping government data seed.")
+            except Exception as seed_err:
+                logger.warning(f"Note on government data bootstrap: {seed_err}")
         except Exception as startup_err:
             db_bootstrap.rollback()
             logger.error(f"Error during startup bootstrap / recovery: {startup_err}")

@@ -13,6 +13,9 @@ from app.services.normalization_service import (
     SUBSIDIARIES,
     normalize_subsidiary_scope,
     detect_query_metric_domain,
+    get_base_mine_name,
+    detect_query_fiscal_year,
+    classify_document_authority,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,12 +58,14 @@ def detect_query_entities(query_text: str) -> Dict[str, Any]:
 
     is_comparison = "compare" in q_lower or "versus" in q_lower or "vs" in q_lower or ("total" in q_lower and len(target_mines) > 0)
     is_subsidiary_total_only = "total" in q_lower and not target_mines
+    target_fy = detect_query_fiscal_year(query_text)
 
     return {
         "mines": target_mines,
         "subsidiary": target_subsidiary,
         "metric": target_metric,
         "metric_domain": domain_info,
+        "fiscal_year": target_fy,
         "is_comparison": is_comparison,
         "is_subsidiary_total_only": is_subsidiary_total_only
     }
@@ -78,8 +83,8 @@ def execute_hybrid_search(
     2. ChromaDB Cosine Vector Search (Semantic)
     3. PostgreSQL Keyword Search (BM25)
 
-    Applies Reciprocal Rank Fusion (RRF k=60) with entity-aware rank boosting:
-    Prioritizes exact mine/entity matches over subsidiary aggregates for mine queries.
+    Applies Reciprocal Rank Fusion (RRF k=60) with entity, temporal, and authority-aware rank boosting:
+    Prioritizes exact mine/entity matches, exact fiscal years, and official publications.
     """
     if not query_text or not query_text.strip():
         return []
@@ -88,6 +93,7 @@ def execute_hybrid_search(
     target_mines = entities["mines"]
     target_metric = entities["metric"]
     metric_domain = entities.get("metric_domain")
+    target_fy = entities.get("fiscal_year")
 
     # Scope normalization: "ALL", "ALL CIL", "", None -> None
     norm_sub = normalize_subsidiary_scope(subsidiary_filter)
@@ -108,7 +114,7 @@ def execute_hybrid_search(
         if target_mines:
             mine_filters = []
             for m in target_mines:
-                base_name = re.sub(r"\s+(?:OC|OpenCast|UG|Mine|Colliery)\b", "", m, flags=re.IGNORECASE).strip()
+                base_name = get_base_mine_name(m)
                 if base_name and base_name.lower() != m.lower():
                     mine_filters.append(or_(
                         ExtractedMetric.mine_name.ilike(f"%{m}%"),
@@ -125,7 +131,14 @@ def execute_hybrid_search(
         elif target_metric:
             metric_query = metric_query.filter(ExtractedMetric.metric_name.ilike(f"%{target_metric}%"))
 
-        metric_records = metric_query.limit(top_k * 4).all()
+        # Prioritize exact target fiscal year in structured metrics if specified
+        if target_fy:
+            exact_fy_query = metric_query.filter(ExtractedMetric.fiscal_year == target_fy)
+            metric_records = exact_fy_query.limit(top_k * 4).all()
+            if not metric_records:
+                metric_records = metric_query.limit(top_k * 4).all()
+        else:
+            metric_records = metric_query.limit(top_k * 4).all()
 
         # Prioritize metric records where:
         # 1. Raw snippet confirms target mine
@@ -178,7 +191,9 @@ def execute_hybrid_search(
                 "vector_score": 0.95,
                 "keyword_score": 0.95,
                 "is_metric": True,
-                "mine_name": m.mine_name
+                "mine_name": m.mine_name,
+                "fiscal_year": m.fiscal_year,
+                "authority": classify_document_authority(filename)
             })
     except Exception as err:
         logger.warning(f"ExtractedMetric search query note: {err}")
@@ -207,7 +222,9 @@ def execute_hybrid_search(
             "text": item["text"],
             "vector_score": item.get("vector_score", 0.0),
             "keyword_score": item.get("keyword_score", 0.0),
-            "rrf_score": rrf_score_component + 0.05  # Base boost for verified structured metric
+            "rrf_score": rrf_score_component + 0.05,  # Base boost for verified structured metric
+            "fiscal_year": item.get("fiscal_year"),
+            "authority": item.get("authority", classify_document_authority(item["filename"]))
         }
 
     # Process Vector Results
@@ -221,11 +238,13 @@ def execute_hybrid_search(
                 "document_id": item["document_id"],
                 "filename": item["filename"],
                 "page_number": item["page_number"],
-                "chunk_index": item["chunk_index"],
+                "chunk_index": item.get("chunk_index", 0),
                 "text": item["text"],
                 "vector_score": item.get("vector_score", 0.0),
                 "keyword_score": 0.0,
-                "rrf_score": rrf_score_component
+                "rrf_score": rrf_score_component,
+                "fiscal_year": detect_query_fiscal_year(item["text"]),
+                "authority": classify_document_authority(item["filename"])
             }
         else:
             if not fused_candidates[key].get("chunk_id") and item.get("chunk_id"):
@@ -248,7 +267,9 @@ def execute_hybrid_search(
                 "text": item["text"],
                 "vector_score": 0.0,
                 "keyword_score": item.get("keyword_score", 0.0),
-                "rrf_score": rrf_score_component
+                "rrf_score": rrf_score_component,
+                "fiscal_year": detect_query_fiscal_year(item["text"]),
+                "authority": classify_document_authority(item["filename"])
             }
         else:
             if not fused_candidates[key].get("chunk_id") and item.get("chunk_id"):
@@ -256,7 +277,7 @@ def execute_hybrid_search(
             fused_candidates[key]["keyword_score"] = item.get("keyword_score", 0.0)
             fused_candidates[key]["rrf_score"] += rrf_score_component
 
-    # 4. Entity & Metric-Aware Rank Boosting
+    # 4. Entity, Temporal, and Authority-Aware Rank Boosting
     metric_domain_terms = []
     if metric_domain:
         metric_domain_terms = [t.lower() for t in metric_domain["db_metric_names"]]
@@ -267,13 +288,14 @@ def execute_hybrid_search(
     if target_mines:
         for tm in target_mines:
             target_mine_terms.add(tm.lower())
-            base_name = re.sub(r"\s+(?:OC|OpenCast|UG|Mine|Colliery)\b", "", tm, flags=re.IGNORECASE).strip()
+            base_name = get_base_mine_name(tm)
             if base_name:
                 target_mine_terms.add(base_name.lower())
 
     for cand in fused_candidates.values():
         text_lower = cand["text"].lower()
 
+        # A. Mine entity relevance
         if target_mine_terms:
             snippet_part = text_lower.split("raw evidence snippet:")[-1] if "raw evidence snippet:" in text_lower else text_lower
             if any(term in snippet_part for term in target_mine_terms):
@@ -281,8 +303,27 @@ def execute_hybrid_search(
             elif any(term in text_lower for term in target_mine_terms):
                 cand["rrf_score"] += 0.08
 
+        # B. Metric domain relevance
         if metric_domain_terms and any(term in text_lower for term in metric_domain_terms):
             cand["rrf_score"] += 0.06
+
+        # C. Temporal relevance (Component 4)
+        if target_fy:
+            cand_fy = cand.get("fiscal_year")
+            fy_short = target_fy[-5:]  # e.g. "23-24"
+            if cand_fy == target_fy or target_fy in text_lower or fy_short in text_lower:
+                cand["rrf_score"] += 0.10
+            elif cand_fy and cand_fy != target_fy:
+                # Explicit conflicting fiscal year: demote
+                cand["rrf_score"] -= 0.15
+
+        # D. Source Authority relevance (Component 5)
+        auth = cand.get("authority") or classify_document_authority(cand.get("filename", ""))
+        cand["authority"] = auth
+        if auth == "OFFICIAL":
+            cand["rrf_score"] += 0.08
+        elif auth == "SYNTHETIC_TEST":
+            cand["rrf_score"] -= 0.05
 
     # 5. Sort candidates descending by RRF score
     sorted_chunks = sorted(fused_candidates.values(), key=lambda x: x["rrf_score"], reverse=True)
