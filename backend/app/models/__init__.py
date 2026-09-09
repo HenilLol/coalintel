@@ -5,6 +5,13 @@ from app.models.document_chunk import DocumentChunk
 from app.models.data_conflict import DataConflict
 from app.models.report import Report
 from app.models.audit_log import AuditLog
+from app.models.data_provenance import (
+    DataSource,
+    DataObservation,
+    DataConflictRecord,
+    DataValidationResult,
+    IngestionRun,
+)
 from app.models.mine import (
     MineMaster,
     MineAlias,
@@ -12,13 +19,6 @@ from app.models.mine import (
     MineMonthlyMetric,
     CoalBlock,
     StarRating,
-)
-from app.models.data_provenance import (
-    DataSource,
-    DataObservation,
-    DataConflictRecord,
-    DataValidationResult,
-    IngestionRun,
 )
 from app.models.parliamentary_qa import ParliamentaryQA
 
@@ -30,16 +30,17 @@ __all__ = [
     "DataConflict",
     "Report",
     "AuditLog",
+    "DataSource",
+    "DataObservation",
+    "DataConflictRecord",
+    "DataValidationResult",
+    "IngestionRun",
     "MineMaster",
     "MineAlias",
     "MineYearlyMetric",
     "MineMonthlyMetric",
     "CoalBlock",
     "StarRating",
-    "DataSource",
-    "DataObservation",
-    "DataConflictRecord",
-    "DataValidationResult",
-    "IngestionRun",
     "ParliamentaryQA",
 ]
+

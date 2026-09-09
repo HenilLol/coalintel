@@ -48,9 +48,11 @@ def get_mines_list(
         query = query.filter(
             or_(
                 MineMaster.mine_name.ilike(search_pattern),
+                MineMaster.normalized_mine_name.ilike(search_pattern),
                 MineMaster.mine_id.ilike(search_pattern),
                 MineMaster.state.ilike(search_pattern),
-                MineMaster.district.ilike(search_pattern)
+                MineMaster.district.ilike(search_pattern),
+                MineMaster.subsidiary_name.ilike(search_pattern)
             )
         )
 
