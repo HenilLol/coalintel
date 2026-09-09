@@ -5,10 +5,13 @@ from typing import Dict, Any, List, Optional
 from config import settings
 from app.services.normalization_service import (
     KNOWN_MINES,
+    GENERIC_MINE_PHRASES,
     get_base_mine_name,
     detect_query_fiscal_year,
     chunk_has_metric_for_entity,
     classify_document_authority,
+    is_historical_evidence_snippet,
+    is_corporate_context_snippet,
 )
 from app.services.hybrid_search_service import detect_query_entities
 
@@ -136,6 +139,7 @@ class DegradedLLMProvider(BaseLLMProvider):
         q_entities = detect_query_entities(user_query)
         metric_domain = q_entities.get("metric_domain")
         target_metric = q_entities.get("metric")
+        is_corporate = q_entities.get("is_corporate_query", False)
 
         if target_mine:
             mine_in_context = target_mine.lower() in context_str.lower() or (base_mine and base_mine.lower() in context_str.lower())
@@ -157,6 +161,17 @@ class DegradedLLMProvider(BaseLLMProvider):
             return "Insufficient evidence found for this query."
 
         candidate_chunks = matching_chunks if matching_chunks else parsed_chunks
+
+        # Disqualify candidate chunks that are historical inception context when answering modern FY queries
+        if target_fy:
+            non_historical = [
+                c for c in candidate_chunks
+                if not is_historical_evidence_snippet(c["text"], target_fy=target_fy)
+            ]
+            if non_historical:
+                candidate_chunks = non_historical
+            else:
+                return "Insufficient evidence found for this query."
 
         # Authority sorting: prioritize OFFICIAL over SYNTHETIC_TEST unless explicit test query
         is_explicit_test_query = any(w in q_lower for w in ["synthetic", "mock", "test data", "demo data"])
@@ -218,14 +233,37 @@ class DegradedLLMProvider(BaseLLMProvider):
                         best_chunk = c
                         break
         else:
-            # Check if query asks for aggregate/total
-            if "total" in q_lower:
-                for c in candidate_chunks:
-                    if "total" in c["text"].lower() or "as a whole" in c["text"].lower():
-                        best_chunk = c
-                        break
-            if not best_chunk:
-                best_chunk = candidate_chunks[0]
+            if is_corporate:
+                def score_corporate_chunk(c):
+                    t = c["text"].lower()
+                    score = 0
+                    if is_corporate_context_snippet(c["text"]):
+                        score += 15
+                    if "cil" in t or "coal india" in t:
+                        score += 8
+                    if target_fy and (target_fy in t or target_fy[-5:] in t):
+                        score += 6
+                    if "total" in t or "as a whole" in t or "all subsidiaries" in t:
+                        score += 4
+                    # Demote individual subsidiary mines for corporate query
+                    if any(km.lower() in t for km in KNOWN_MINES):
+                        score -= 5
+                    return score
+
+                sorted_corp = sorted(candidate_chunks, key=score_corporate_chunk, reverse=True)
+                if sorted_corp and score_corporate_chunk(sorted_corp[0]) > 0:
+                    best_chunk = sorted_corp[0]
+                else:
+                    return "Insufficient evidence found for this query."
+            else:
+                # Check if query asks for aggregate/total
+                if "total" in q_lower:
+                    for c in candidate_chunks:
+                        if "total" in c["text"].lower() or "as a whole" in c["text"].lower():
+                            best_chunk = c
+                            break
+                if not best_chunk:
+                    best_chunk = candidate_chunks[0]
 
         if not best_chunk:
             return "Insufficient evidence found for this query."
@@ -241,12 +279,16 @@ class DegradedLLMProvider(BaseLLMProvider):
             m_val = s_info["value"]
             m_fy = s_info["fiscal_year"]
 
-            if not m_name or m_name == "Unspecified Mine":
+            # Grounded entity naming: protect against legacy entity labels for corporate queries
+            if is_corporate or is_corporate_context_snippet(chunk_text):
+                entity_display = "CIL"
+            elif not m_name or m_name.lower() in GENERIC_MINE_PHRASES:
                 sub_m = re.search(r"\b([A-Z]{3,4})\b", best_chunk["filename"] + " " + chunk_text)
-                sub_label = f"{sub_m.group(1)} total" if sub_m else "Total"
-                return f"According to ingested document evidence {tag}, {sub_label} {m_metric.lower()} was {m_val} in {m_fy}."
+                entity_display = f"{sub_m.group(1)} total" if sub_m else "Total"
             else:
-                return f"According to ingested document evidence {tag}, {m_name} {m_metric.lower()} was {m_val} in {m_fy}."
+                entity_display = m_name
+
+            return f"According to ingested document evidence {tag}, {entity_display} {m_metric.lower()} was {m_val} in {m_fy}."
 
         # 2. Dynamic synthesis from unstructured text chunk
         sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", chunk_text) if s.strip()]
@@ -291,12 +333,14 @@ class DegradedLLMProvider(BaseLLMProvider):
         else:
             # Generic query (no target mine): pick sentence matching metric and numbers
             for s in sentences:
+                if target_fy and is_historical_evidence_snippet(s, target_fy=target_fy):
+                    continue
                 has_met = chunk_has_metric_for_entity(
                     s,
                     metric_domain=metric_domain,
                     target_metric=target_metric
                 )
-                if has_met and re.search(r"\d+(?:\.\d+)?\s*(?:MT|Lakh|Million|Tonnes|M\.Cu\.M|MCuM|cum)", s, re.IGNORECASE):
+                if has_met and re.search(r"\d+(?:\.\d+)?\s*(?:MT|Lakh|Million|Tonnes|M\.Cu\.M|MCuM|%|cum)", s, re.IGNORECASE):
                     if target_fy and (target_fy in s or target_fy[-5:] in s):
                         relevant_sentence = s
                         break
@@ -304,6 +348,8 @@ class DegradedLLMProvider(BaseLLMProvider):
                         relevant_sentence = s
             if not relevant_sentence and sentences:
                 for s in sentences:
+                    if target_fy and is_historical_evidence_snippet(s, target_fy=target_fy):
+                        continue
                     if chunk_has_metric_for_entity(s, metric_domain=metric_domain, target_metric=target_metric):
                         relevant_sentence = s
                         break

@@ -109,6 +109,55 @@ def classify_document_authority(filename: str) -> str:
     return "INTERNAL"
 
 
+HISTORICAL_INCEPTION_PATTERNS = [
+    r"\b(?:came\s+into\s+being|year\s+of\s+its\s+inception|at\s+(?:the\s+)?inception|since\s+inception)\b",
+    r"\b(?:established|incorporated|founded)\s+in\s+19\d{2}\b",
+    r"\b(?:modest\s+production\s+of|inception\s+in)\s+19\d{2}\b",
+    r"\b(?:taking\s+over\s+private\s+coal\s+mines|in\s+November\s+1975|in\s+1975)\b",
+]
+
+
+def is_historical_evidence_snippet(text: Optional[str], target_fy: Optional[str] = None) -> bool:
+    """
+    Identifies historical / inception context snippets (e.g. 1975 CIL inception)
+    that must not be confused with modern fiscal year operational metrics.
+    """
+    if not text:
+        return False
+    t_lower = text.lower()
+    for pat in HISTORICAL_INCEPTION_PATTERNS:
+        if re.search(pat, t_lower, re.IGNORECASE):
+            if target_fy:
+                target_short = target_fy[-5:] if len(target_fy) >= 5 else target_fy
+                # If target fiscal year is NOT present in text, this is clearly historical
+                if target_fy not in text and target_short not in text:
+                    return True
+                # If target FY is present elsewhere in chunk, check whether inception phrasing qualifies the metric
+                if re.search(r"\b(?:modest\s+production\s+of|at\s+(?:the\s+)?inception|came\s+into\s+being)\b", t_lower):
+                    return True
+            else:
+                return True
+    return False
+
+
+def is_corporate_context_snippet(text: Optional[str]) -> bool:
+    """
+    Identifies corporate / overarching CIL aggregate context in text snippets.
+    e.g. CIL milestones, national coal production, annual corporate target, etc.
+    """
+    if not text:
+        return False
+    corp_patterns = [
+        r"\b(?:coal\s+production\s+of\s+[\d\.]+\s*MT\s+during\b|\bmilestones\s+in\b)",
+        r"\b(?:cil\s+as\s+a\s+whole|total\s+production\s+of\s+cil|all\s+mines\s+of\s+cil|corporate\s+cil)\b",
+        r"\b(?:annual\s+target\s+of\s+[\d\.]+\s*MT|growth\s+over\s+last\s+fiscal\s+year)\b",
+        r"\b(?:cil['’]?s\s+subsidiaries|across\s+all\s+subsidiaries|single\s+largest\s+coal\s+producer)\b",
+    ]
+    t_lower = text.lower()
+    return any(re.search(pat, t_lower, re.IGNORECASE) for pat in corp_patterns)
+
+
+
 # Specificity Precedence Rules for Metric Classification
 # Evaluated strictly against local line/sentence context (bare 'coal' removed from triggers)
 METRIC_CLASSIFICATION_RULES = [
