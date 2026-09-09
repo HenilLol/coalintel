@@ -13,7 +13,7 @@ import { ValidationFeedWidget } from '@/components/dashboard/ValidationFeedWidge
 import { dashboardApi } from '@/lib/api/dashboardApi';
 import { DashboardKpis, ProductionSeriesItem, ValidationFeedItem } from '@/types/dashboard';
 import { useScope } from '@/context/ScopeContext';
-import { Upload, FileText, Activity, ArrowRight, Database } from 'lucide-react';
+import { Upload, FileText, Activity, ArrowRight, Database, Mountain } from 'lucide-react';
 
 export default function DashboardPage() {
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear, setSelectedFiscalYear } = useScope();
@@ -61,15 +61,22 @@ export default function DashboardPage() {
       {/* Page Header */}
       <PageHeader
         title="Executive Mining Intelligence Dashboard"
-        description="Unified operational insights, unit-normalized production metrics, arithmetic validation, and cross-document discrepancy tracking across CIL subsidiaries."
+        description="Unified operational insights, unit-normalized production metrics, arithmetic validation, and cross-document discrepancy tracking across CIL subsidiaries and canonical Government of India mines."
         breadcrumbs={[{ label: 'Executive Dashboard' }]}
-        badge={<Badge variant="amber">V2 Live Platform</Badge>}
+        badge={<Badge variant="gold">Government Verified Data</Badge>}
         actions={
-          <Link href="/documents">
-            <Button variant="primary" leftIcon={<Upload className="h-4 w-4" />}>
-              Ingest Mining Document
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/mines">
+              <Button variant="secondary" leftIcon={<Mountain className="h-4 w-4 text-[#C58B3A]" />}>
+                Mines Intelligence
+              </Button>
+            </Link>
+            <Link href="/documents">
+              <Button variant="primary" leftIcon={<Upload className="h-4 w-4" />}>
+                Ingest Document
+              </Button>
+            </Link>
+          </div>
         }
       />
 
