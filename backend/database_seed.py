@@ -264,7 +264,15 @@ def init_db(db: Session) -> None:
             db.commit()
             doc_ids.append(existing_doc.id)
 
-    # 3. Seed Extracted Mining Metrics
+    # 3. Trigger Real Ingestion/Chunking Pipeline for Document Chunks
+    try:
+        from app.services.processing_pipeline import execute_document_processing_pipeline
+        for did in doc_ids:
+            execute_document_processing_pipeline(db, did)
+    except Exception as pipe_err:
+        logger.warning(f"Note executing document processing pipeline during seed: {pipe_err}")
+
+    # 4. Seed Extracted Mining Metrics (Curated test fixtures with deterministic confidence scores)
     if doc_ids:
         default_metrics = [
             {
@@ -379,17 +387,11 @@ def init_db(db: Session) -> None:
                 existing_m.raw_unit = m["raw_unit"]
                 existing_m.standard_value = m["standard_value"]
                 existing_m.standard_unit = m["standard_unit"]
+                existing_m.confidence_score = m["confidence_score"]
+                existing_m.validation_status = m["validation_status"]
                 existing_m.raw_snippet = m["raw_snippet"]
 
     db.commit()
-
-    # 4. Trigger Real Ingestion/Chunking Pipeline for Document Chunks
-    try:
-        from app.services.processing_pipeline import execute_document_processing_pipeline
-        for did in doc_ids:
-            execute_document_processing_pipeline(db, did)
-    except Exception as pipe_err:
-        logger.warning(f"Note executing document processing pipeline during seed: {pipe_err}")
 
     logger.info("Database seeding completed successfully.")
 

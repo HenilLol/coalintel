@@ -11,36 +11,46 @@ from app.services.keyword_search_service import search_keyword_store
 from app.services.normalization_service import (
     KNOWN_MINES,
     SUBSIDIARIES,
+    GENERIC_MINE_PHRASES,
     normalize_subsidiary_scope,
     detect_query_metric_domain,
     get_base_mine_name,
     detect_query_fiscal_year,
     classify_document_authority,
+    is_historical_evidence_snippet,
+    is_corporate_context_snippet,
 )
 
 logger = logging.getLogger(__name__)
 
 RRF_K_CONSTANT = 60  # Frozen RRF Constant k=60
+OPERATING_SUBSIDIARIES = ["ECL", "BCCL", "CCL", "WCL", "SECL", "NCL", "MCL", "NEC"]
 
 
 def detect_query_entities(query_text: str) -> Dict[str, Any]:
     """Extracts target mine names, subsidiaries, and metric types from query text."""
     q_lower = query_text.lower()
     
+    # Explicitly recognize parent corporate identity before generic mine candidate extraction
+    has_parent_corporate = bool(re.search(r"\b(?:coal\s+india(?:\s+limited)?|cil['’]?s?)\b", q_lower))
+
+    # Mask corporate terms so "India" or "CIL" are not extracted as generic mine names
+    text_for_mines = re.sub(r"\b(?:coal\s+india(?:\s+limited)?|cil['’]?s?)\b", "", query_text, flags=re.IGNORECASE)
+
     target_mines = []
     for km in KNOWN_MINES:
-        if km.lower() in q_lower:
+        if km.lower() in text_for_mines.lower():
             target_mines.append(km)
     
     # Generic mine name regex check (e.g. "Rajmahal", "Gevra", "Samaleswari")
     if not target_mines:
-        mine_match = re.findall(r"\b([A-Z][a-z]+(?:\s+(?:OC|OpenCast|Mine|Colliery))?)\b", query_text)
+        mine_match = re.findall(r"\b([A-Z][a-z]+(?:\s+(?:OC|OpenCast|Mine|Colliery))?)\b", text_for_mines)
         for mm in mine_match:
-            if mm.lower() not in ["what", "where", "total", "coal", "production", "overburden", "fiscal", "year"]:
+            if mm.lower() not in ["what", "where", "total", "coal", "production", "overburden", "fiscal", "year", "annual"]:
                 target_mines.append(mm)
 
     target_subsidiary = None
-    for sub in SUBSIDIARIES:
+    for sub in OPERATING_SUBSIDIARIES:
         if re.search(r"\b" + sub + r"\b", query_text, re.IGNORECASE):
             target_subsidiary = sub
             break
@@ -60,6 +70,17 @@ def detect_query_entities(query_text: str) -> Dict[str, Any]:
     is_subsidiary_total_only = "total" in q_lower and not target_mines
     target_fy = detect_query_fiscal_year(query_text)
 
+    # Corporate query intent: CIL corporate / ALL CIL without specific mine or operating subsidiary
+    is_corporate = False
+    if not target_mines and not target_subsidiary:
+        corp_keywords = [
+            r"\bcil\b", r"\bcoal\s+india\b", r"\bcorporate\b", r"\bcompany\b",
+            r"\borganization\b", r"\bpan-india\b", r"\bnational\b",
+            r"\ball\s+subsidiaries\b", r"\boverall\b", r"\ball\s+cil\b"
+        ]
+        if has_parent_corporate or any(re.search(pat, q_lower, re.IGNORECASE) for pat in corp_keywords) or is_subsidiary_total_only:
+            is_corporate = True
+
     return {
         "mines": target_mines,
         "subsidiary": target_subsidiary,
@@ -67,7 +88,8 @@ def detect_query_entities(query_text: str) -> Dict[str, Any]:
         "metric_domain": domain_info,
         "fiscal_year": target_fy,
         "is_comparison": is_comparison,
-        "is_subsidiary_total_only": is_subsidiary_total_only
+        "is_subsidiary_total_only": is_subsidiary_total_only,
+        "is_corporate_query": is_corporate,
     }
 
 
@@ -109,7 +131,7 @@ def execute_hybrid_search(
             join(Document, ExtractedMetric.document_id == Document.id)
 
         if norm_sub:
-            metric_query = metric_query.filter(ExtractedMetric.subsidiary == norm_sub)
+            metric_query = metric_query.filter(Document.subsidiary == norm_sub)
 
         if target_mines:
             mine_filters = []
@@ -131,20 +153,17 @@ def execute_hybrid_search(
         elif target_metric:
             metric_query = metric_query.filter(ExtractedMetric.metric_name.ilike(f"%{target_metric}%"))
 
-        # Prioritize exact target fiscal year in structured metrics if specified
+        # Prioritize exact target fiscal year in structured metrics if specified (deterministic SQL ordering before limit)
         if target_fy:
-            exact_fy_query = metric_query.filter(ExtractedMetric.fiscal_year == target_fy)
-            metric_records = exact_fy_query.limit(top_k * 4).all()
+            exact_fy_query = metric_query.filter(ExtractedMetric.fiscal_year == target_fy).order_by(ExtractedMetric.id.desc())
+            metric_records = exact_fy_query.limit(top_k * 6).all()
             if not metric_records:
-                metric_records = metric_query.limit(top_k * 4).all()
+                metric_records = metric_query.order_by(ExtractedMetric.id.desc()).limit(top_k * 6).all()
         else:
-            metric_records = metric_query.limit(top_k * 4).all()
+            metric_records = metric_query.order_by(ExtractedMetric.id.desc()).limit(top_k * 6).all()
 
-        # Prioritize metric records where:
-        # 1. Raw snippet confirms target mine
-        # 2. Raw snippet does not conflate with company/subsidiary total ("as a whole")
-        # 3. Home subsidiary matches document
-        # 4. Confidence score
+        is_corp = entities.get("is_corporate_query", False)
+
         def is_conflated_subsidiary_total(m) -> bool:
             snippet = (m.raw_snippet or "").lower()
             unit = (m.unit or "").lower()
@@ -153,29 +172,81 @@ def execute_hybrid_search(
                     return True
             return False
 
-        if target_mines:
-            mine_terms = set()
-            for tm in target_mines:
-                mine_terms.add(tm.lower())
-                base_name = re.sub(r"\s+(?:OC|OpenCast|UG|Mine|Colliery)\b", "", tm, flags=re.IGNORECASE).strip()
-                if base_name:
-                    mine_terms.add(base_name.lower())
+        def rank_metric_record(rec) -> tuple:
+            m, filename = rec
+            snippet = (m.raw_snippet or "").lower()
+            m_name = (m.mine_name or "").lower()
 
-            metric_records.sort(
-                key=lambda rec: (
-                    any(term in (rec[0].raw_snippet or "").lower() for term in mine_terms),
-                    not is_conflated_subsidiary_total(rec[0]) if not entities.get("is_comparison") and not entities.get("is_subsidiary_total_only") else True,
-                    (rec[0].subsidiary or "") in (rec[1] or ""),
-                    float(rec[0].confidence_score or 0.0)
-                ),
-                reverse=True
+            # 1. Historical inception penalty (disqualify/demote historical inception for requested FY)
+            is_hist = is_historical_evidence_snippet(m.raw_snippet, target_fy=target_fy)
+
+            # 2. Target mine matching
+            mine_match = 0
+            conflated_penalty = 0
+            if target_mines:
+                mine_terms = set()
+                for tm in target_mines:
+                    mine_terms.add(tm.lower())
+                    base_name = re.sub(r"\s+(?:OC|OpenCast|UG|Mine|Colliery)\b", "", tm, flags=re.IGNORECASE).strip()
+                    if base_name:
+                        mine_terms.add(base_name.lower())
+                if any(term in snippet for term in mine_terms) or any(term in m_name for term in mine_terms):
+                    mine_match = 1
+                if not entities.get("is_comparison") and not entities.get("is_subsidiary_total_only"):
+                    if is_conflated_subsidiary_total(m):
+                        conflated_penalty = -1
+
+            # 3. Corporate context scoring
+            corp_score = 0
+            if is_corp:
+                if is_corporate_context_snippet(m.raw_snippet) or "cil" in snippet or "coal india" in snippet:
+                    corp_score += 2
+                if m_name in GENERIC_MINE_PHRASES or m_name in ["cil", "cil corporate", "corporate", "overall mine", "unspecified mine"]:
+                    corp_score += 1
+                elif any(km.lower() in m_name for km in KNOWN_MINES):
+                    corp_score -= 1
+
+            # 4. Valid non-zero value boost
+            has_val = 1 if (m.standard_value is not None and float(m.standard_value) > 0) else 0
+
+            # 5. Authority
+            auth_score = 1 if classify_document_authority(filename) == "OFFICIAL" else 0
+
+            # 6. Base confidence
+            conf_val = float(m.confidence_score or 0.0)
+
+            # 7. Sub-to-doc match
+            sub_match = 1 if (m.subsidiary or "") in (filename or "") else 0
+
+            return (
+                not is_hist,
+                mine_match if target_mines else 0,
+                conflated_penalty if target_mines else 0,
+                corp_score if is_corp else 0,
+                has_val,
+                sub_match,
+                auth_score,
+                conf_val,
+                int(m.id or 0)
             )
+
+        metric_records.sort(key=rank_metric_record, reverse=True)
+        metric_records = metric_records[:top_k * 4]
 
         for m, filename in metric_records:
             num_val_str = f"{float(m.numeric_value):.2f}" if m.numeric_value is not None else "N/A"
             std_val_str = f"{float(m.standard_value):.2f}" if m.standard_value is not None else "N/A"
+            display_mine = m.mine_name
+            # Corporate relabeling is allowed ONLY when raw evidence supports corporate/aggregate context
+            is_generic_unattached = (
+                m.mine_name.lower() in GENERIC_MINE_PHRASES and
+                (not m.subsidiary or m.subsidiary.upper() in ["CIL", "CIL HQ", "MINISTRY OF COAL"])
+            )
+            if is_corp and (is_corporate_context_snippet(m.raw_snippet) or is_generic_unattached):
+                display_mine = "CIL Corporate"
+
             formatted_text = (
-                f"Mine Entity: {m.mine_name} | Metric: {m.metric_name} | "
+                f"Mine Entity: {display_mine} | Metric: {m.metric_name} | "
                 f"Raw Extracted Value: {num_val_str} {m.unit} | "
                 f"Normalized Value: {std_val_str} {m.standard_unit or 'MT'} | "
                 f"Fiscal Year: {m.fiscal_year}\n"
@@ -191,7 +262,7 @@ def execute_hybrid_search(
                 "vector_score": 0.95,
                 "keyword_score": 0.95,
                 "is_metric": True,
-                "mine_name": m.mine_name,
+                "mine_name": display_mine,
                 "fiscal_year": m.fiscal_year,
                 "authority": classify_document_authority(filename)
             })

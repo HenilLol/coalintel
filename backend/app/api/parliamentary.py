@@ -24,7 +24,15 @@ from app.schemas.parliamentary import (
 )
 from app.services.rag_service import execute_rag_query
 from app.services.hybrid_search_service import detect_query_entities
-from app.services.normalization_service import get_base_mine_name, detect_query_fiscal_year
+from app.services.normalization_service import (
+    get_base_mine_name,
+    detect_query_fiscal_year,
+    classify_document_authority,
+    is_historical_evidence_snippet,
+    is_corporate_context_snippet,
+    GENERIC_MINE_PHRASES,
+    KNOWN_MINES,
+)
 from app.services.conflict_service import (
     get_metric_domain,
     are_units_compatible,
@@ -96,6 +104,60 @@ def generate_parliamentary_briefing(
     else:
         resolved_selected_scope = "ALL CIL"
 
+    is_corporate_query = q_entities.get("is_corporate_query", False) or (
+        resolved_selected_scope in ["ALL", "ALL CIL"]
+        and not target_mines
+        and not (detected_sub and detected_sub.upper() not in ["CIL", "CIL HQ", "ALL", "ALL CIL"])
+    )
+
+    def rank_parliamentary_metric(rec) -> tuple:
+        m, doc = rec
+        snippet = (m.raw_snippet or "").lower()
+        m_name = (m.mine_name or "").lower()
+        doc_sub = (doc.subsidiary or "").upper()
+
+        # 1. Historical inception penalty
+        is_hist = is_historical_evidence_snippet(m.raw_snippet, effective_fy)
+
+        # 2. Mine matching
+        mine_match = 0
+        if target_mines:
+            for tm in target_mines:
+                if tm.lower() in m_name or get_base_mine_name(tm).lower() in m_name:
+                    mine_match = 1
+                    break
+
+        # 3. Subsidiary matching
+        sub_match = 0
+        if effective_sub.upper() not in ["ALL", "ALL CIL"]:
+            if doc_sub == effective_sub.upper() or (m.subsidiary and m.subsidiary.upper() == effective_sub.upper()):
+                sub_match = 1
+
+        # 4. Corporate relevance
+        corp_score = 0
+        if is_corporate_query:
+            if is_corporate_context_snippet(m.raw_snippet) or "cil" in snippet or "coal india" in snippet:
+                corp_score += 2
+            if m_name in GENERIC_MINE_PHRASES or m_name in ["cil", "cil corporate", "corporate", "overall mine", "unspecified mine"]:
+                corp_score += 1
+            elif any(km.lower() in m_name for km in KNOWN_MINES):
+                corp_score -= 1
+
+        has_val = 1 if (m.standard_value is not None and float(m.standard_value) > 0) else 0
+        auth_score = 1 if classify_document_authority(doc.filename) == "OFFICIAL" else 0
+        conf_val = float(m.confidence_score or 0.0)
+
+        return (
+            not is_hist,
+            mine_match if target_mines else 0,
+            sub_match if effective_sub.upper() not in ["ALL", "ALL CIL"] else 0,
+            corp_score if is_corporate_query else 0,
+            has_val,
+            auth_score,
+            conf_val,
+            int(m.id or 0)
+        )
+
     # 2. Query structured DB metrics with entity, metric, and fiscal year grounding (Component 6 Failure Safety)
     try:
         metric_query = db.query(ExtractedMetric, Document).join(
@@ -127,7 +189,9 @@ def generate_parliamentary_briefing(
         elif target_metric:
             metric_query = metric_query.filter(ExtractedMetric.metric_name.ilike(f"%{target_metric}%"))
 
-        extracted_records = metric_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
+        candidate_records = metric_query.order_by(ExtractedMetric.id.desc()).limit(60).all()
+        candidate_records.sort(key=rank_parliamentary_metric, reverse=True)
+        extracted_records = candidate_records[:20]
 
         # If entity/metric filtering returned nothing for a broad question, fallback to broader query
         # ONLY if neither specific mine NOR specific metric was queried (prevent falling back to unrelated metrics!)
@@ -139,7 +203,9 @@ def generate_parliamentary_briefing(
                 broad_query = broad_query.filter(Document.subsidiary == effective_sub)
             if effective_fy and effective_fy.upper() != "ALL":
                 broad_query = broad_query.filter(ExtractedMetric.fiscal_year == effective_fy)
-            extracted_records = broad_query.order_by(ExtractedMetric.id.desc()).limit(20).all()
+            b_candidates = broad_query.order_by(ExtractedMetric.id.desc()).limit(60).all()
+            b_candidates.sort(key=rank_parliamentary_metric, reverse=True)
+            extracted_records = b_candidates[:20]
     except Exception as db_err:
         logger.error(f"Database query or schema integrity error in parliamentary briefing: {db_err}", exc_info=True)
         raise HTTPException(
@@ -188,10 +254,21 @@ def generate_parliamentary_briefing(
     # 5. Format Subsidiary Metrics
     subsidiary_metrics: List[SubsidiaryMetricItem] = []
     for m, doc in extracted_records:
+        display_sub = doc.subsidiary or "CIL"
+        display_mine = m.mine_name
+        # Grounded entity naming: relabel to CIL Corporate ONLY when evidence actually supports corporate context
+        is_generic_unattached = (
+            m.mine_name.lower() in GENERIC_MINE_PHRASES and
+            (not doc.subsidiary or doc.subsidiary.upper() in ["CIL", "CIL HQ", "MINISTRY OF COAL"])
+        )
+        if is_corporate_query and (is_corporate_context_snippet(m.raw_snippet) or is_generic_unattached):
+            display_mine = "CIL Corporate"
+            display_sub = "CIL"
+
         subsidiary_metrics.append(
             SubsidiaryMetricItem(
-                mine_name=m.mine_name,
-                subsidiary=doc.subsidiary or "CIL",
+                mine_name=display_mine,
+                subsidiary=display_sub,
                 metric_name=m.metric_name,
                 numeric_value=float(m.numeric_value or 0.0),
                 unit=m.unit,
@@ -313,15 +390,35 @@ def generate_parliamentary_briefing(
         key_findings.append(
             f"Recorded {matching_m.metric_name} for {matching_m.mine_name} ({matching_m.subsidiary}) in FY {matching_m.fiscal_year}: {matching_m.standard_value:.2f} {matching_m.standard_unit}."
         )
+    elif is_corporate_query and subsidiary_metrics:
+        # For corporate CIL query, look for a corporate-relevant metric
+        corp_m = next(
+            (m for m in subsidiary_metrics if m.mine_name == "CIL Corporate" or m.subsidiary == "CIL"),
+            None
+        )
+        if corp_m and corp_m.standard_value > 0:
+            key_findings.append(
+                f"Recorded {corp_m.metric_name} for {corp_m.mine_name} in FY {corp_m.fiscal_year}: {corp_m.standard_value:.2f} {corp_m.standard_unit}."
+            )
+        else:
+            key_findings.append(
+                f"Retrieved {len(subsidiary_metrics)} verified operational metrics across CIL entities for FY {effective_fy}."
+            )
     elif subsidiary_metrics:
-        first_m = subsidiary_metrics[0]
+        # Specific subsidiary query
+        sub_m = next(
+            (m for m in subsidiary_metrics if m.subsidiary.upper() == effective_sub.upper()),
+            subsidiary_metrics[0]
+        )
         key_findings.append(
-            f"Recorded {first_m.metric_name} for {first_m.mine_name} ({first_m.subsidiary}) in FY {first_m.fiscal_year}: {first_m.standard_value:.2f} {first_m.standard_unit}."
+            f"Recorded {sub_m.metric_name} for {sub_m.mine_name} ({sub_m.subsidiary}) in FY {sub_m.fiscal_year}: {sub_m.standard_value:.2f} {sub_m.standard_unit}."
         )
 
     if len(subsidiary_metrics) > 1:
         if target_mines:
             key_findings.append(f"Identified {len(subsidiary_metrics)} verified operational metrics matching {', '.join(target_mines)}.")
+        elif not is_corporate_query and effective_sub.upper() not in ["ALL", "ALL CIL"]:
+            key_findings.append(f"Total {len(subsidiary_metrics)} verified operational metrics extracted across official {effective_sub} documents.")
         else:
             key_findings.append(f"Total {len(subsidiary_metrics)} verified operational metrics extracted across official CIL documents.")
 
@@ -333,8 +430,61 @@ def generate_parliamentary_briefing(
     else:
         key_findings.append("No active metric discrepancies detected across requested scope documents.")
 
-    confidence_rating = "HIGH" if len(evidence_list) >= 3 else ("MEDIUM" if len(evidence_list) >= 1 else "LOW")
-    confidence_val = 0.95 if confidence_rating == "HIGH" else (0.75 if confidence_rating == "MEDIUM" else 0.50)
+    # Deterministic explainable confidence calculation
+    if not evidence_list:
+        confidence_val = 0.0
+        confidence_rating = "INSUFFICIENT_EVIDENCE"
+    else:
+        conf_calc = 0.50
+        if len(evidence_list) >= 3:
+            conf_calc += 0.10
+
+        # Fiscal year grounding check
+        top_ev = evidence_list[0]
+        top_text = top_ev.text_snippet.lower()
+        if effective_fy and (effective_fy in top_text or effective_fy[-5:] in top_text):
+            conf_calc += 0.15
+
+        # Metric domain match check
+        if metric_domain:
+            canonical_m = metric_domain.get("canonical_name", "").lower()
+            d_terms = [t.lower() for t in metric_domain.get("db_metric_names", [])]
+            if canonical_m in top_text or any(dt in top_text for dt in d_terms):
+                conf_calc += 0.15
+
+        # Scope / Entity match check
+        if target_mines:
+            if any(tm.lower() in top_text or get_base_mine_name(tm).lower() in top_text for tm in target_mines):
+                conf_calc += 0.10
+            else:
+                conf_calc -= 0.20
+        elif is_corporate_query:
+            if is_corporate_context_snippet(top_text) or "cil" in top_text or "corporate" in top_text:
+                conf_calc += 0.10
+            elif any(km.lower() in top_text for km in KNOWN_MINES):
+                # Subsidiary mine evidence for corporate query reduces confidence
+                conf_calc -= 0.15
+        elif effective_sub.upper() not in ["ALL", "ALL CIL"]:
+            if effective_sub.lower() in top_text:
+                conf_calc += 0.10
+            else:
+                conf_calc -= 0.15
+
+        # Historical inception contamination penalty
+        if is_historical_evidence_snippet(top_text, effective_fy):
+            conf_calc -= 0.30
+
+        # Discrepancy penalty
+        if discrepancies:
+            conf_calc -= 0.10
+
+        # Insufficient evidence penalty in synthesized answer
+        if "insufficient" in rag_answer.lower():
+            conf_calc = min(conf_calc, 0.40)
+
+        # Clamp between 0.10 and 0.95
+        confidence_val = round(max(0.10, min(0.95, conf_calc)), 2)
+        confidence_rating = "HIGH" if confidence_val >= 0.85 else ("MEDIUM" if confidence_val >= 0.65 else "LOW")
 
     limitations = [
         "Analysis relies exclusively on ingested official reports and indexed database metrics.",
