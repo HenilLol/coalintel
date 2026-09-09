@@ -491,6 +491,257 @@ class TestPhase9DCorporateGrounding(unittest.TestCase):
 
         self.assertIn("Insufficient evidence found for this query.", answer)
 
+    # =========================================================================
+    # FORENSIC REMEDIATION TESTS: F-01 through F-05
+    # =========================================================================
+
+    def test_11_corporate_relabeling_safety_f01(self):
+        """
+        F-01 Remediation:
+        Corporate relabeling is allowed ONLY when raw evidence supports corporate/aggregate context.
+        Legitimate subsidiary mines (e.g. 'ECL Mine', 'Rajmahal OC') must NOT be relabeled 'CIL Corporate'
+        even during a corporate query, unless evidence explicitly supports corporate context.
+        """
+        # Test 1: Corporate snippet -> CIL Corporate
+        corp_doc = Document(
+            id=101, filename="CIL_Corporate_Report.pdf", file_path="/mock/cil.pdf",
+            file_hash="h101", file_type="PDF", file_size_bytes=1000,
+            subsidiary="CIL", fiscal_year="2023-24", total_pages=10, status="PARSED"
+        )
+        self.db.add(corp_doc)
+        
+        m_corp = ExtractedMetric(
+            id=101, document_id=101, mine_name="CIL Mine", metric_name="Production",
+            numeric_value=773.65, unit="MT", standard_value=773.65, standard_unit="MT",
+            fiscal_year="2023-24", confidence_score=0.95,
+            raw_snippet="CIL achieved company-wide production of 773.65 MT across all subsidiaries."
+        )
+        self.db.add(m_corp)
+
+        # Test 2: Legitimate ECL mine snippet during corporate query -> must remain ECL Mine
+        ecl_doc = Document(
+            id=102, filename="ECL_Report.pdf", file_path="/mock/ecl.pdf",
+            file_hash="h102", file_type="PDF", file_size_bytes=1000,
+            subsidiary="ECL", fiscal_year="2023-24", total_pages=10, status="PARSED"
+        )
+        self.db.add(ecl_doc)
+
+        m_ecl = ExtractedMetric(
+            id=102, document_id=102, mine_name="ECL Mine", metric_name="Production",
+            numeric_value=5.0, unit="MT", standard_value=5.0, standard_unit="MT",
+            fiscal_year="2023-24", confidence_score=0.90,
+            raw_snippet="ECL mine produced 5 MT in FY2023-24."
+        )
+        self.db.add(m_ecl)
+
+        # Test 3: Rajmahal mine snippet during corporate query -> must remain Rajmahal OC
+        m_raj = ExtractedMetric(
+            id=103, document_id=102, mine_name="Rajmahal OC", metric_name="Production",
+            numeric_value=10.0, unit="MT", standard_value=10.0, standard_unit="MT",
+            fiscal_year="2023-24", confidence_score=0.92,
+            raw_snippet="Rajmahal OC produced 10 MT in FY2023-24."
+        )
+        self.db.add(m_raj)
+        self.db.commit()
+
+        # Hybrid search for corporate query
+        results = execute_hybrid_search(
+            db=self.db,
+            query_text="What was CIL coal production in FY2023-24?",
+            top_k=10
+        )
+
+        res_by_id = {r.get("chunk_index"): r for r in results if r.get("chunk_index") is not None}
+
+        # Corporate record (-101) must be relabeled to CIL Corporate
+        self.assertIn(-101, res_by_id)
+        self.assertIn("Mine Entity: CIL Corporate", res_by_id[-101]["text"])
+
+        # ECL mine record (-102) must NOT be relabeled to CIL Corporate
+        self.assertIn(-102, res_by_id)
+        self.assertIn("Mine Entity: ECL Mine", res_by_id[-102]["text"])
+        self.assertNotIn("Mine Entity: CIL Corporate", res_by_id[-102]["text"])
+
+        # Rajmahal OC record (-103) must NOT be relabeled to CIL Corporate
+        self.assertIn(-103, res_by_id)
+        self.assertIn("Mine Entity: Rajmahal OC", res_by_id[-103]["text"])
+        self.assertNotIn("Mine Entity: CIL Corporate", res_by_id[-103]["text"])
+
+    def test_12_confidence_ranking_f02(self):
+        """
+        F-02 Remediation:
+        Confidence score participates in deterministic ranking BEFORE the final ID tie-breaker.
+        When candidates have equal semantic relevance dimensions, higher confidence wins.
+        """
+        doc = Document(
+            id=201, filename="CIL_Production_Report.pdf", file_path="/mock/cil201.pdf",
+            file_hash="h201", file_type="PDF", file_size_bytes=1000,
+            subsidiary="CIL", fiscal_year="2023-24", total_pages=10, status="PARSED"
+        )
+        self.db.add(doc)
+
+        # Candidate A: lower ID (10) but HIGHER confidence (0.95)
+        mA = ExtractedMetric(
+            id=10, document_id=201, mine_name="CIL Corporate", metric_name="Coal Production",
+            numeric_value=773.65, unit="MT", standard_value=773.65, standard_unit="MT",
+            fiscal_year="2023-24", confidence_score=0.95,
+            raw_snippet="Milestones in 2023-24: Coal production of 773.65 MT during 2023-24."
+        )
+        # Candidate B: higher ID (99) but LOWER confidence (0.75)
+        mB = ExtractedMetric(
+            id=99, document_id=201, mine_name="CIL Corporate", metric_name="Coal Production",
+            numeric_value=770.00, unit="MT", standard_value=770.00, standard_unit="MT",
+            fiscal_year="2023-24", confidence_score=0.75,
+            raw_snippet="Milestones in 2023-24: Coal production of 770.00 MT during 2023-24."
+        )
+        self.db.add(mA)
+        self.db.add(mB)
+        self.db.commit()
+
+        results = execute_hybrid_search(
+            db=self.db,
+            query_text="What was CIL coal production in FY2023-24?",
+            top_k=5
+        )
+
+        metric_chunks = [r for r in results if r.get("chunk_index") in [-10, -99]]
+        self.assertGreaterEqual(len(metric_chunks), 2)
+        # Higher confidence (id 10, conf 0.95) MUST rank before lower confidence (id 99, conf 0.75)
+        self.assertEqual(metric_chunks[0]["chunk_index"], -10)
+        self.assertEqual(metric_chunks[1]["chunk_index"], -99)
+
+    def test_13_coal_india_corporate_intent_f03(self):
+        """
+        F-03 Remediation:
+        Verify semantic detection of 'Coal India', 'Coal India Limited', 'CIL', 'CIL\'s'
+        as parent corporate identity without extracting 'India' as a target mine.
+        """
+        queries = [
+            "What was Coal India production in FY2023-24?",
+            "What was Coal India Limited production in FY2023-24?",
+            "What was CIL production in FY2023-24?",
+            "What was CIL's production in FY2023-24?",
+            "What was total CIL production in FY2023-24?",
+            "What was the company's production in FY2023-24?",
+        ]
+
+        for q in queries:
+            entities = detect_query_entities(q)
+            self.assertTrue(
+                entities["is_corporate_query"],
+                f"Expected is_corporate_query=True for: '{q}', got {entities}"
+            )
+            self.assertEqual(
+                entities["mines"],
+                [],
+                f"Expected target_mines=[] (no 'India' extracted) for: '{q}', got {entities['mines']}"
+            )
+            self.assertIsNone(
+                entities["subsidiary"],
+                f"Expected target_subsidiary=None for: '{q}', got {entities['subsidiary']}"
+            )
+
+        # Preserve legitimate subsidiary targets
+        ecl_entities = detect_query_entities("What was ECL production in FY2023-24?")
+        self.assertEqual(ecl_entities["subsidiary"], "ECL")
+        self.assertFalse(ecl_entities["is_corporate_query"])
+
+        # Preserve legitimate mine names
+        gevra_entities = detect_query_entities("What was Gevra OC production in FY2023-24?")
+        self.assertEqual(gevra_entities["mines"], ["Gevra OC"])
+
+        rajmahal_entities = detect_query_entities("What was Rajmahal OC production in FY2023-24?")
+        self.assertIn("Rajmahal OC", rajmahal_entities["mines"])
+
+    def test_14_corporate_context_generalization_f04(self):
+        """
+        F-04 Remediation:
+        Verify generalization of is_corporate_context_snippet() across semantic phrasing,
+        while strictly avoiding individual mine snippets.
+        No hardcoding of answer values.
+        """
+        positive_examples = [
+            "Coal India Limited recorded company-wide production of 500 MT during FY2025-26.",
+            "Corporate production reached 700 MT across all subsidiaries in FY2024-25.",
+            "Corporate-level performance was reviewed by the Ministry of Coal.",
+            "The company as a whole produced 773 MT during the fiscal year.",
+            "Coal India as a whole achieved record milestones in coal output.",
+            "Total production of Coal India was 750 MT for the financial year.",
+            "Consolidated production reached 800 MT across the nation.",
+            "Organization-wide coal off-take registered significant growth.",
+            "Group-wide output surpassed annual corporate target.",
+            "Nationwide production target was achieved across all subsidiaries.",
+            "Overall CIL production achieved 99.2% of target.",
+            "Milestones in 2023-24: Coal production of 773.65 MT during 2023-24.",
+        ]
+        for snip in positive_examples:
+            self.assertTrue(
+                is_corporate_context_snippet(snip),
+                f"Expected True for corporate snippet: '{snip}'"
+            )
+
+        negative_examples = [
+            "ECL mine produced 5 MT in FY2023-24.",
+            "Rajmahal OC produced 10 MT in FY2023-24.",
+            "Gevra OC production was 59.11 MT during the period.",
+            "CCL mine production reached 12 MT.",
+            "Overburden removal at Gevra OpenCast stood at 310.50 M.Cu.M.",
+            "Dipka OC achieved annual output of 35 MT.",
+        ]
+        for snip in negative_examples:
+            self.assertFalse(
+                is_corporate_context_snippet(snip),
+                f"Expected False for individual mine snippet: '{snip}'"
+            )
+
+    def test_15_sql_candidate_ordering_before_limit_f05(self):
+        """
+        F-05 Remediation:
+        Candidate selection must be deterministic with SQL ORDER BY before LIMIT.
+        """
+        doc = Document(
+            id=301, filename="CIL_SQL_Test.pdf", file_path="/mock/cil301.pdf",
+            file_hash="h301", file_type="PDF", file_size_bytes=1000,
+            subsidiary="CIL", fiscal_year="2023-24", total_pages=10, status="PARSED"
+        )
+        self.db.add(doc)
+
+        # Insert 15 metrics to verify stable ordering
+        for i in range(1, 16):
+            self.db.add(ExtractedMetric(
+                id=300 + i,
+                document_id=301,
+                mine_name="CIL Corporate",
+                metric_name="Coal Production",
+                numeric_value=float(700 + i),
+                unit="MT",
+                standard_value=float(700 + i),
+                standard_unit="MT",
+                fiscal_year="2023-24",
+                confidence_score=0.90,
+                raw_snippet="Milestones in 2023-24: company-wide coal production."
+            ))
+        self.db.commit()
+
+        # Run hybrid search with top_k=2 (which queries limit(top_k * 6) = 12 items)
+        results = execute_hybrid_search(
+            db=self.db,
+            query_text="What was CIL coal production in FY2023-24?",
+            top_k=2
+        )
+        self.assertGreater(len(results), 0)
+        # Verify query executes deterministically and retrieves metrics stably
+        results_second_run = execute_hybrid_search(
+            db=self.db,
+            query_text="What was CIL coal production in FY2023-24?",
+            top_k=2
+        )
+        self.assertEqual(
+            [r["chunk_index"] for r in results],
+            [r["chunk_index"] for r in results_second_run],
+            "Candidate ordering must be 100% deterministic across executions"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -145,6 +145,7 @@ def generate_parliamentary_briefing(
 
         has_val = 1 if (m.standard_value is not None and float(m.standard_value) > 0) else 0
         auth_score = 1 if classify_document_authority(doc.filename) == "OFFICIAL" else 0
+        conf_val = float(m.confidence_score or 0.0)
 
         return (
             not is_hist,
@@ -153,6 +154,7 @@ def generate_parliamentary_briefing(
             corp_score if is_corporate_query else 0,
             has_val,
             auth_score,
+            conf_val,
             int(m.id or 0)
         )
 
@@ -254,8 +256,12 @@ def generate_parliamentary_briefing(
     for m, doc in extracted_records:
         display_sub = doc.subsidiary or "CIL"
         display_mine = m.mine_name
-        # Grounded entity naming: for corporate query, don't label corporate milestones with legacy mine name
-        if is_corporate_query and (is_corporate_context_snippet(m.raw_snippet) or m.mine_name.lower() in GENERIC_MINE_PHRASES or "ecl mine" in m.mine_name.lower() or "cil mine" in m.mine_name.lower()):
+        # Grounded entity naming: relabel to CIL Corporate ONLY when evidence actually supports corporate context
+        is_generic_unattached = (
+            m.mine_name.lower() in GENERIC_MINE_PHRASES and
+            (not doc.subsidiary or doc.subsidiary.upper() in ["CIL", "CIL HQ", "MINISTRY OF COAL"])
+        )
+        if is_corporate_query and (is_corporate_context_snippet(m.raw_snippet) or is_generic_unattached):
             display_mine = "CIL Corporate"
             display_sub = "CIL"
 

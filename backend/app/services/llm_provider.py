@@ -279,8 +279,8 @@ class DegradedLLMProvider(BaseLLMProvider):
             m_val = s_info["value"]
             m_fy = s_info["fiscal_year"]
 
-            # Grounded entity naming: protect against legacy entity labels for corporate queries
-            if is_corporate or is_corporate_context_snippet(chunk_text):
+            # Grounded entity naming: only use "CIL" if evidence chunk actually supports corporate context or entity is CIL Corporate
+            if is_corporate_context_snippet(chunk_text) or (m_name and m_name.lower() in ["cil corporate", "cil"]):
                 entity_display = "CIL"
             elif not m_name or m_name.lower() in GENERIC_MINE_PHRASES:
                 sub_m = re.search(r"\b([A-Z]{3,4})\b", best_chunk["filename"] + " " + chunk_text)

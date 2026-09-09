@@ -143,15 +143,18 @@ def is_historical_evidence_snippet(text: Optional[str], target_fy: Optional[str]
 def is_corporate_context_snippet(text: Optional[str]) -> bool:
     """
     Identifies corporate / overarching CIL aggregate context in text snippets.
-    e.g. CIL milestones, national coal production, annual corporate target, etc.
+    e.g. company-wide production, CIL milestones, national coal production, annual corporate target, etc.
     """
     if not text:
         return False
     corp_patterns = [
-        r"\b(?:coal\s+production\s+of\s+[\d\.]+\s*MT\s+during\b|\bmilestones\s+in\b)",
-        r"\b(?:cil\s+as\s+a\s+whole|total\s+production\s+of\s+cil|all\s+mines\s+of\s+cil|corporate\s+cil)\b",
-        r"\b(?:annual\s+target\s+of\s+[\d\.]+\s*MT|growth\s+over\s+last\s+fiscal\s+year)\b",
-        r"\b(?:cil['’]?s\s+subsidiaries|across\s+all\s+subsidiaries|single\s+largest\s+coal\s+producer)\b",
+        r"\b(?:company-wide|organization-wide|group-wide|nationwide)\b",
+        r"\b(?:corporate-level|corporate\s+production|consolidated\s+production|aggregate\s+production)\b",
+        r"\b(?:milestones\s+in\s+20\d{2}|annual\s+(?:corporate\s+)?target|growth\s+over\s+last\s+fiscal\s+year)\b",
+        r"\b(?:cil\s+as\s+a\s+whole|coal\s+india\s+as\s+a\s+whole|company\s+as\s+a\s+whole)\b",
+        r"\b(?:total\s+production\s+of\s+(?:cil|coal\s+india)|all\s+mines\s+of\s+cil|corporate\s+cil|overall\s+cil\s+production)\b",
+        r"\b(?:cil['’]?s\s+subsidiaries|across\s+all\s+subsidiaries|all\s+subsidiaries\s+of\s+cil|single\s+largest\s+coal\s+producer)\b",
+        r"\b(?:coal\s+production\s+of\s+[\d\.]+\s*(?:mt|million\s+tonnes)\s+during\b)",
     ]
     t_lower = text.lower()
     return any(re.search(pat, t_lower, re.IGNORECASE) for pat in corp_patterns)
