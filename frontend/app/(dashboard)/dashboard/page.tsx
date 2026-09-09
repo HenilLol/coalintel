@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
@@ -11,7 +11,9 @@ import { KpiGrid } from '@/components/dashboard/KpiGrid';
 import { ProductionChart } from '@/components/dashboard/ProductionChart';
 import { ValidationFeedWidget } from '@/components/dashboard/ValidationFeedWidget';
 import { dashboardApi } from '@/lib/api/dashboardApi';
+import { documentApi } from '@/lib/api/documentApi';
 import { DashboardKpis, ProductionSeriesItem, ValidationFeedItem } from '@/types/dashboard';
+import { DocumentItem } from '@/types/document';
 import { useScope } from '@/context/ScopeContext';
 import { Upload, FileText, Activity, ArrowRight, Database, Mountain } from 'lucide-react';
 
@@ -23,14 +25,19 @@ export default function DashboardPage() {
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [productionData, setProductionData] = useState<ProductionSeriesItem[]>([]);
   const [validationItems, setValidationItems] = useState<ValidationFeedItem[]>([]);
+  const [recentDocuments, setRecentDocuments] = useState<DocumentItem[]>([]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [kpiRes, chartRes, feedRes] = await Promise.allSettled([
+      const [kpiRes, chartRes, feedRes, docRes] = await Promise.allSettled([
         dashboardApi.getKpis(),
         dashboardApi.getCharts(),
         dashboardApi.getValidationFeed(),
+        documentApi.getDocuments({
+          subsidiary_filter: selectedSubsidiary,
+          limit: 5,
+        }),
       ]);
 
       if (kpiRes.status === 'fulfilled' && kpiRes.value) {
@@ -45,16 +52,20 @@ export default function DashboardPage() {
       if (feedRes.status === 'fulfilled' && Array.isArray(feedRes.value)) {
         setValidationItems(feedRes.value);
       }
+
+      if (docRes.status === 'fulfilled' && docRes.value?.items) {
+        setRecentDocuments(docRes.value.items);
+      }
     } catch (error) {
       console.warn('Dashboard API fetch note:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedSubsidiary]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [selectedSubsidiary, selectedFiscalYear]);
+  }, [fetchDashboardData, selectedFiscalYear]);
 
   return (
     <div className="space-y-6">
@@ -129,44 +140,62 @@ export default function DashboardPage() {
 
           <CardContent>
             <div className="divide-y divide-[#30383D]">
-              <div className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C58B3A]">
-                    <FileText className="h-4 w-4" />
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="py-3 px-2 flex items-center justify-between animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-[#242C30]" />
+                      <div className="space-y-1">
+                        <div className="h-4 w-48 bg-[#242C30] rounded" />
+                        <div className="h-3 w-32 bg-[#242C30] rounded" />
+                      </div>
+                    </div>
+                    <div className="h-5 w-24 bg-[#242C30] rounded" />
                   </div>
-                  <div>
-                    <span className="font-bold text-[#E8ECEB] block font-sans">ECL_Annual_Report_2023-24.pdf</span>
-                    <span className="text-[#9BA5A8] text-[11px] font-mono">84 Pages • PDF • SHA-256 Verified • ECL</span>
-                  </div>
+                ))
+              ) : recentDocuments.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#9BA5A8] font-mono">
+                  No recently ingested documents found in this scope. Ingest a document or select another subsidiary.
                 </div>
-                <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
-              </div>
+              ) : (
+                recentDocuments.map((doc) => {
+                  const statusVariant =
+                    doc.status === 'PARSED' || doc.status === 'INDEXED'
+                      ? 'success'
+                      : doc.status === 'FAILED'
+                      ? 'danger'
+                      : 'warning';
 
-              <div className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C94B45]">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#E8ECEB] block font-sans">BCCL_Production_Audit_Q4.pdf</span>
-                    <span className="text-[#9BA5A8] text-[11px] font-mono">42 Pages • PDF • SHA-256 Verified • BCCL</span>
-                  </div>
-                </div>
-                <Badge variant="danger" size="sm">DISCREPANCY DETECTED</Badge>
-              </div>
-
-              <div className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#4F8A62]">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#E8ECEB] block font-sans">MCL_Samaleswari_Performance.xlsx</span>
-                    <span className="text-[#9BA5A8] text-[11px] font-mono">12 Pages • XLSX • SHA-256 Verified • MCL</span>
-                  </div>
-                </div>
-                <Badge variant="success" size="sm">PARSED & INDEXED</Badge>
-              </div>
+                  return (
+                    <Link
+                      key={doc.id}
+                      href={`/documents/${doc.id}`}
+                      className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C58B3A] group-hover:border-[#C58B3A]/40 shrink-0">
+                          <FileText className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <span
+                            className="font-bold text-[#E8ECEB] group-hover:text-[#C58B3A] transition-colors block font-sans truncate max-w-xs sm:max-w-md"
+                            title={doc.filename}
+                          >
+                            {doc.filename}
+                          </span>
+                          <span className="text-[#9BA5A8] text-[11px] font-mono truncate block">
+                            {doc.total_pages || 1} Pages • {doc.file_type || 'PDF'} • SHA-256:{' '}
+                            {doc.file_hash ? doc.file_hash.substring(0, 12) : 'N/A'}... • {doc.subsidiary || 'CIL HQ'}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge variant={statusVariant} size="sm" className="shrink-0 self-start sm:self-center">
+                        {doc.status}
+                      </Badge>
+                    </Link>
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>

@@ -28,7 +28,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
 
   if (!citation) return null;
 
-  const docId = chunk?.document_id || 1;
+  const docId = chunk?.document_id || (citation as any)?.document_id || 1;
   const pageNum = citation.page_number || 1;
 
   return (
@@ -40,7 +40,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
       aria-label="Citation Evidence Inspection Drawer"
     >
       <div
-        className="w-full max-w-lg h-full bg-[#1C2226] border-l border-[#30383D] p-6 flex flex-col justify-between space-y-6 shadow-2xl overflow-y-auto text-[#E8ECEB] animate-slide-in-right"
+        className="w-full max-w-lg h-full bg-[#1C2226] border-l border-[#30383D] p-4 sm:p-6 flex flex-col justify-between space-y-4 sm:space-y-6 shadow-2xl overflow-y-auto text-[#E8ECEB] animate-slide-in-right"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -1,4 +1,4 @@
-// File: D:\Coalintel\coalintel-main\frontend\app\(dashboard)\comparison\page.tsx
+// File: C:\Users\Henil Patel\COALINTEL\frontend\app\(dashboard)\comparison\page.tsx
 import * as entry from '../../../../../app/(dashboard)/comparison/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

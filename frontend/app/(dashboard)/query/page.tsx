@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -12,7 +13,8 @@ import { queryApi, QueryResponse, CitationItem, EvidenceChunkItem } from '@/lib/
 import { useScope } from '@/context/ScopeContext';
 import { Sparkles, Bot, ShieldCheck } from 'lucide-react';
 
-export default function QueryPage() {
+function QueryContent() {
+  const searchParams = useSearchParams();
   const { selectedSubsidiary, setSelectedSubsidiary } = useScope();
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -24,35 +26,42 @@ export default function QueryPage() {
     chunk?: EvidenceChunkItem;
   } | null>(null);
 
-  const handleRunQuery = async (queryText?: string) => {
-    const textToRun = queryText || prompt;
-    if (!textToRun || !textToRun.trim()) return;
+  const handleRunQuery = React.useCallback(
+    async (queryText?: string) => {
+      const textToRun = queryText || prompt;
+      if (!textToRun || !textToRun.trim()) return;
 
-    setIsLoading(true);
-    setError(null);
-    setSelectedCitation(null);
+      setIsLoading(true);
+      setError(null);
+      setSelectedCitation(null);
 
-    try {
-      const data = await queryApi.askQuery(textToRun, {
-        subsidiary_filter: selectedSubsidiary,
-      });
-      setActiveResponse(data);
-    } catch (err: any) {
-      console.warn('Query API error:', err);
-      const detail = err.response?.data?.detail || 'Query execution failed. Please verify backend connection.';
-      setError(detail);
-      setActiveResponse({
-        query: textToRun,
-        answer: 'Failed to retrieve evidence grounded response from AI assistant. Please check backend connection.',
-        citations: [],
-        evidence_chunks: [],
-        degraded_mode: true,
-        provider: 'Degraded Mode',
-      });
-    } finally {
-      setIsLoading(false);
+      try {
+        const data = await queryApi.askQuery(textToRun, {
+          subsidiary_filter: selectedSubsidiary,
+        });
+        setActiveResponse(data);
+      } catch (err: any) {
+        console.warn('Query API error:', err);
+        const detail =
+          err.response?.data?.detail ||
+          err.message ||
+          'Query execution failed. Please verify backend connection.';
+        setError(detail);
+        setActiveResponse(null);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [prompt, selectedSubsidiary]
+  );
+
+  useEffect(() => {
+    const queryParam = searchParams.get('q');
+    if (queryParam && queryParam.trim()) {
+      setPrompt(queryParam.trim());
+      handleRunQuery(queryParam.trim());
     }
-  };
+  }, [searchParams, handleRunQuery]);
 
   return (
     <div className="space-y-6">
@@ -75,7 +84,13 @@ export default function QueryPage() {
       />
 
       {/* Error Alert */}
-      {error && <ErrorState message={error} />}
+      {error && (
+        <ErrorState
+          title="Query Retrieval Alert"
+          message={error}
+          onRetry={() => handleRunQuery()}
+        />
+      )}
 
       {/* Loading Indicator */}
       {isLoading && <LoadingState label="Searching ChromaDB Vector Embeddings & Grounding Citations..." />}
@@ -95,5 +110,13 @@ export default function QueryPage() {
         onClose={() => setSelectedCitation(null)}
       />
     </div>
+  );
+}
+
+export default function QueryPage() {
+  return (
+    <Suspense fallback={<LoadingState label="Loading Cited Q&A Assistant..." />}>
+      <QueryContent />
+    </Suspense>
   );
 }

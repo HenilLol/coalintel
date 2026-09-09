@@ -45,22 +45,22 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0E1113] flex flex-col lg:flex-row relative overflow-hidden font-sans select-none">
-      {/* Left Column: Institutional Brand & Operational Storytelling (Desktop) */}
-      <div className="relative flex-1 flex flex-col justify-between p-8 lg:p-16 z-10 bg-[#151A1D] border-b lg:border-b-0 lg:border-r border-[#30383D]">
+      {/* Institutional Brand & Operational Storytelling */}
+      <div className="relative flex-1 flex flex-col justify-between p-6 sm:p-8 lg:p-16 z-10 bg-[#151A1D] border-b lg:border-b-0 lg:border-r border-[#30383D] order-2 lg:order-1">
         <div>
           <Logo size="lg" />
 
-          <div className="mt-12 space-y-6 max-w-xl">
+          <div className="mt-8 lg:mt-12 space-y-4 lg:space-y-6 max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#C58B3A]/15 border border-[#C58B3A]/30 text-[#C58B3A] text-xs font-mono">
               <Sparkles className="h-3.5 w-3.5" />
               <span>SIH26023 Enterprise Platform</span>
             </div>
 
-            <h1 className="text-3xl lg:text-5xl font-extrabold tracking-tight text-[#E8ECEB] font-sans leading-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-5xl font-extrabold tracking-tight text-[#E8ECEB] font-sans leading-tight">
               AI-Powered Evidence-Driven <span className="text-[#C58B3A]">Mining Intelligence</span> & Reporting
             </h1>
 
-            <p className="text-sm lg:text-base text-[#9BA5A8] leading-relaxed">
+            <p className="text-xs sm:text-sm lg:text-base text-[#9BA5A8] leading-relaxed">
               Automated geological and production document processing, unit-normalized extraction,
               arithmetic validation, and institutional parliamentary report generation for Coal India Limited and CMPDI.
             </p>
@@ -68,7 +68,7 @@ export default function LoginPage() {
         </div>
 
         {/* Operational Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
+        <div className="hidden sm:grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 lg:mt-12">
           <div className="p-4 rounded-lg bg-[#1C2226] border border-[#30383D] space-y-2">
             <div className="p-2 rounded-lg bg-[#242C30] text-[#C58B3A] w-fit">
               <Database className="h-4 w-4" />
@@ -94,13 +94,13 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-[#30383D] text-xs text-[#9BA5A8] font-mono">
+        <div className="mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-[#30383D] text-xs text-[#9BA5A8] font-mono">
           Ministry of Coal • Coal India Limited (CIL) • CMPDI Technical Platform
         </div>
       </div>
 
-      {/* Right Column: Authentication Panel */}
-      <div className="relative flex-1 flex items-center justify-center p-6 lg:p-16 z-10 bg-[#0E1113]">
+      {/* Authentication Panel */}
+      <div className="relative flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-16 z-10 bg-[#0E1113] order-1 lg:order-2">
         <div className="w-full max-w-md space-y-8 p-8 rounded-lg bg-[#1C2226] border border-[#30383D] shadow-sm">
           <div className="space-y-2 text-center sm:text-left">
             <h2 className="text-2xl font-bold tracking-tight text-[#E8ECEB]">Sign in to Platform</h2>

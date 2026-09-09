@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Menu, Bell, Shield, Database, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
@@ -22,12 +23,32 @@ export const Header: React.FC<HeaderProps> = ({
   userRole = 'Analyst',
   showLogoOnDesktop = true,
 }) => {
+  const router = useRouter();
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear } = useScope();
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    router.push(`/query?q=${encodeURIComponent(searchQuery.trim())}`);
+  };
 
   return (
-    <header className="sticky top-0 z-20 h-16 bg-[#151A1D] border-b border-[#30383D] px-3.5 sm:px-4 lg:px-6 flex items-center justify-between shadow-sm gap-2 sm:gap-4">
+    <header className="sticky top-0 z-20 h-16 bg-[#151A1D] border-b border-[#30383D] px-3 sm:px-4 lg:px-6 flex items-center justify-between shadow-sm gap-2 sm:gap-4">
       {/* Left: Mobile Toggle, Header Branding & Context Indicator */}
-      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {onMobileMenuToggle && (
           <button
             onClick={onMobileMenuToggle}
@@ -44,13 +65,13 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Global Operational Context Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#1C2226] border border-[#30383D] text-xs font-mono shadow-sm shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-[#1C2226] border border-[#30383D] text-[11px] sm:text-xs font-mono shadow-sm shrink-0">
           <Database className="h-3.5 w-3.5 text-[#C58B3A] shrink-0" />
-          <span className="text-[#9BA5A8]">Scope:</span>
+          <span className="text-[#9BA5A8] hidden xs:inline">Scope:</span>
           <select
             value={selectedSubsidiary}
             onChange={(e) => setSelectedSubsidiary(e.target.value)}
-            className="bg-[#151A1D] border border-[#30383D] text-[#E8ECEB] font-bold rounded-md px-1.5 py-0.5 focus:outline-none focus:border-[#C58B3A] text-xs transition-colors cursor-pointer"
+            className="bg-[#151A1D] border border-[#30383D] text-[#E8ECEB] font-bold rounded-md px-1 sm:px-1.5 py-0.5 focus:outline-none focus:border-[#C58B3A] text-[11px] sm:text-xs transition-colors cursor-pointer max-w-[110px] sm:max-w-none truncate"
             aria-label="Select Subsidiary Scope"
           >
             <option value="ALL CIL">ALL CIL (Corporate)</option>
@@ -60,15 +81,18 @@ export const Header: React.FC<HeaderProps> = ({
               </option>
             ))}
           </select>
-          <span className="text-[#30383D]">|</span>
-          <span className="text-[#C58B3A] font-semibold">{selectedFiscalYear}</span>
+          <span className="text-[#30383D] hidden md:inline">|</span>
+          <span className="text-[#C58B3A] font-semibold hidden md:inline">{selectedFiscalYear}</span>
         </div>
       </div>
 
       {/* Center Search Affordance */}
-      <div className="hidden lg:flex w-60 xl:w-80 relative items-center">
+      <form onSubmit={handleSearchSubmit} className="hidden lg:flex w-56 xl:w-80 relative items-center">
         <Input
-          placeholder="Search mining metrics, documents, mines..."
+          ref={searchInputRef}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search mining metrics, documents..."
           leftIcon={<Search className="h-4 w-4 text-[#9BA5A8]" />}
           className="bg-[#151A1D] border-[#30383D] text-[#E8ECEB] placeholder:text-[#9BA5A8]/70 text-xs py-2 pr-12 focus:border-[#C58B3A]"
         />
@@ -77,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({
             Ctrl K
           </kbd>
         </div>
-      </div>
+      </form>
 
       {/* Right User & System Status */}
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
