@@ -1,5 +1,5 @@
-from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from typing import List, Optional, Any, Dict
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -9,7 +9,8 @@ from app.schemas.mine import (
     CoalBlockResponse,
     DataSourceResponse,
     DataConflictRecordResponse,
-    DataValidationResultResponse
+    DataValidationResultResponse,
+    DimensionCountResponse
 )
 from app.services import mine_service
 
@@ -18,33 +19,106 @@ router = APIRouter(tags=["Government Mine Intelligence"])
 
 @router.get("/mines", response_model=List[MineSummaryResponse])
 def get_mines(
+    response: Response,
     fiscal_year: Optional[str] = Query(None, description="Fiscal year filter, e.g. '2024-25', '2025-26', '2026-27'"),
     subsidiary: Optional[str] = Query(None, description="Subsidiary filter, e.g. 'SECL', 'MCL', 'NCL'"),
     company: Optional[str] = Query(None, description="Company filter, e.g. 'Coal India Limited', 'NTPC'"),
-    state: Optional[str] = Query(None, description="State filter, e.g. 'Chhattisgarh', 'Odisha', 'Madhya Pradesh'"),
-    mine_type: Optional[str] = Query(None, description="Mine type, e.g. 'Open Cast', 'Underground'"),
-    sector: Optional[str] = Query(None, description="Sector, e.g. 'PSU', 'Captive', 'Commercial'"),
-    search: Optional[str] = Query(None, description="Search term for mine name, district, or coalfield"),
+    state: Optional[str] = Query(None, description="State filter, e.g. 'Chhattisgarh', 'Odisha', 'Tamil Nadu'"),
+    district: Optional[str] = Query(None, description="District filter"),
+    mine_type: Optional[str] = Query(None, description="Mine type, e.g. 'OC', 'UG', 'Mixed'"),
+    sector: Optional[str] = Query(None, description="Sector/Ownership filter, e.g. 'CIL', 'Captive', 'Commercial'"),
+    ownership: Optional[str] = Query(None, description="Ownership filter"),
+    coal_or_lignite: Optional[str] = Query(None, description="Fuel filter, e.g. 'Coal', 'Lignite'"),
+    status: Optional[str] = Query(None, description="Operational status, e.g. 'PRODUCING', 'UNDER_DEVELOPMENT'"),
+    search: Optional[str] = Query(None, description="Search term for mine name, ID, state, district, or company"),
+    sort_by: Optional[str] = Query("name", description="Sort by 'name', 'production', 'state', 'subsidiary', 'type', 'status'"),
+    sort_order: Optional[str] = Query("asc", description="Sort order 'asc' or 'desc'"),
+    page: Optional[int] = Query(None, ge=1, description="1-indexed page number"),
+    page_size: Optional[int] = Query(None, ge=1, le=500, description="Items per page"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db)
 ):
     """
     Returns authentic Government of India canonical mines data.
-    Preserves exact granularity without fabrication or estimation.
+    Supports search, multi-field filtering, sorting, and pagination.
+    Emits X-Total-Count header for pagination awareness.
     """
-    return mine_service.get_mines_list(
+    # Calculate skip/limit if page/page_size provided
+    actual_skip = skip
+    actual_limit = limit
+    if page is not None and page_size is not None:
+        actual_skip = (page - 1) * page_size
+        actual_limit = page_size
+    elif page_size is not None:
+        actual_limit = page_size
+
+    items, total_count = mine_service.get_mines_list(
         db=db,
         fiscal_year=fiscal_year,
         subsidiary=subsidiary,
         company=company,
         state=state,
+        district=district,
         mine_type=mine_type,
         sector=sector,
+        ownership=ownership,
+        coal_or_lignite=coal_or_lignite,
+        status=status,
         search=search,
-        skip=skip,
-        limit=limit
+        sort_by=sort_by,
+        sort_order=sort_order,
+        skip=actual_skip,
+        limit=actual_limit
     )
+
+    response.headers["X-Total-Count"] = str(total_count)
+    return items
+
+
+@router.get("/mines/stats")
+def get_mines_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Returns comprehensive summary statistics and dimensional breakdowns
+    across canonical mines, fuel types, mine types, states, and sectors.
+    """
+    return mine_service.get_mines_stats_data(db=db)
+
+
+@router.get("/mines/states", response_model=List[DimensionCountResponse])
+def get_mines_states(db: Session = Depends(get_db)):
+    """Returns dynamic list of all represented states with canonical mine counts."""
+    return mine_service.get_states_list(db=db)
+
+
+@router.get("/mines/subsidiaries", response_model=List[DimensionCountResponse])
+def get_mines_subsidiaries(db: Session = Depends(get_db)):
+    """Returns dynamic list of all operating subsidiaries with canonical mine counts."""
+    return mine_service.get_subsidiaries_list(db=db)
+
+
+@router.get("/mines/sectors", response_model=List[DimensionCountResponse])
+def get_mines_sectors(db: Session = Depends(get_db)):
+    """Returns dynamic list of ownership sectors with canonical mine counts."""
+    return mine_service.get_sectors_list(db=db)
+
+
+@router.get("/mines/types", response_model=List[DimensionCountResponse])
+def get_mines_types(db: Session = Depends(get_db)):
+    """Returns dynamic list of mine types (OC, UG, Mixed) with canonical mine counts."""
+    return mine_service.get_mine_types_list(db=db)
+
+
+@router.get("/mines/companies", response_model=List[DimensionCountResponse])
+def get_mines_companies(db: Session = Depends(get_db)):
+    """Returns dynamic list of operating companies with canonical mine counts."""
+    return mine_service.get_companies_list(db=db)
+
+
+@router.get("/mines-summary-stats")
+def get_mines_summary_stats_alias(db: Session = Depends(get_db)):
+    """Backward-compatible alias for /mines/stats."""
+    return mine_service.get_mines_stats_data(db=db)
 
 
 @router.get("/mines/{mine_id}", response_model=MineDetailResponse)
@@ -116,54 +190,3 @@ def get_data_validations(
     Returns arithmetic verification checks (sum of mines vs company/state/national benchmarks).
     """
     return mine_service.get_data_validations_list(db=db, status_filter=status_filter)
-
-
-@router.get("/mines-summary-stats")
-def get_mines_summary_stats(db: Session = Depends(get_db)):
-    """
-    Provides top-level aggregate statistics across all canonical mines and government data sources.
-    """
-    from app.models.mine import MineMaster, MineYearlyMetric, CoalBlock
-    from app.models.data_provenance import DataSource, DataConflictRecord, DataValidationResult
-    from sqlalchemy import func
-
-    total_mines = db.query(MineMaster).count()
-    total_blocks = db.query(CoalBlock).count()
-    total_sources = db.query(DataSource).count()
-    total_conflicts = db.query(DataConflictRecord).count()
-    total_validations = db.query(DataValidationResult).count()
-
-    # Sum of actual production for FY24-25, FY25-26, FY26-27 YTD across canonical mines
-    fy24_sum = db.query(func.sum(MineYearlyMetric.production_mt)).filter(
-        MineYearlyMetric.financial_year == "2024-25"
-    ).scalar() or 0.0
-
-    fy25_sum = db.query(func.sum(MineYearlyMetric.production_mt)).filter(
-        MineYearlyMetric.financial_year == "2025-26"
-    ).scalar() or 0.0
-
-    fy26_sum = db.query(func.sum(MineYearlyMetric.production_mt)).filter(
-        MineYearlyMetric.financial_year == "2026-27"
-    ).scalar() or 0.0
-
-    return {
-        "total_canonical_mines": total_mines,
-        "total_coal_blocks": total_blocks,
-        "authoritative_sources_count": total_sources,
-        "cross_document_conflicts_count": total_conflicts,
-        "validation_checks_count": total_validations,
-        "major_mines_production": {
-            "fy_2024_25_mt": round(float(fy24_sum), 3),
-            "fy_2025_26_mt": round(float(fy25_sum), 3),
-            "fy_2026_27_ytd_mt": round(float(fy26_sum), 3),
-            "as_of_date": "2026-06-30",
-            "period_type_26_27": "YTD (Q1 April-June 2026)",
-            "data_status_26_27": "provisional"
-        },
-        "national_benchmarks": {
-            "fy_2024_25_all_india_mt": 1047.523,
-            "fy_2024_25_captive_commercial_mt": 190.95,
-            "fy_2025_26_captive_commercial_mt": 210.47,
-            "source_authority": "Ministry of Coal, Government of India (coal.gov.in)"
-        }
-    }
