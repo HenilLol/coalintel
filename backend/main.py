@@ -116,7 +116,10 @@ async def lifespan(app: FastAPI):
                     )
             except Exception as seed_err:
                 db_bootstrap.rollback()
-                logger.warning(f"Note on government data bootstrap: {seed_err}")
+                logger.error(
+                    f"GOVERNMENT DATA BOOTSTRAP FAILED during application startup: {type(seed_err).__name__}: {seed_err}",
+                    exc_info=True
+                )
         except Exception as startup_err:
             db_bootstrap.rollback()
             logger.error(f"Error during startup bootstrap / recovery: {startup_err}")

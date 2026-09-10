@@ -1646,6 +1646,8 @@ def run_government_data_ingestion(db: Optional[Session] = None):
                 error_log=None
             ))
         else:
+            existing_run.status = "COMPLETED"
+            existing_run.error_log = None
             existing_run.completed_at = end_time
             existing_run.records_updated += records_inserted
         db.commit()
@@ -1658,6 +1660,16 @@ def run_government_data_ingestion(db: Optional[Session] = None):
         except Exception as exp_err:
             logger.warning(f"Canonical expansion note: {exp_err}")
 
+        return {
+            "status": "COMPLETED",
+            "run_id": run_id,
+            "records_inserted": records_inserted,
+            "conflicts_found": conflicts_found,
+            "missing_values": missing_values,
+            "started_at": start_time.isoformat(),
+            "completed_at": end_time.isoformat()
+        }
+
     except Exception as e:
         db.rollback()
         logger.error(f"Ingestion run failed: {e}", exc_info=True)
@@ -1668,12 +1680,19 @@ def run_government_data_ingestion(db: Optional[Session] = None):
                 completed_at=datetime.now(timezone.utc),
                 source="Ministry of Coal",
                 document="Coal Directory",
+                records_found=0,
+                records_inserted=0,
+                records_updated=0,
+                records_rejected=0,
+                conflicts_found=0,
+                missing_values=0,
                 status="FAILED",
                 error_log=str(e)
             ))
             db.commit()
-        except Exception:
+        except Exception as record_err:
             db.rollback()
+            logger.error(f"Failed to record FAILED IngestionRun status: {record_err}", exc_info=True)
         raise
     finally:
         if should_close:
@@ -1685,5 +1704,16 @@ run_seed = run_government_data_ingestion
 
 
 if __name__ == "__main__":
-    run_government_data_ingestion()
+    print("=" * 70)
+    print("COALINTEL Official Government Mine Master Ingestion Runner")
+    print("=" * 70)
+    try:
+        res = run_government_data_ingestion()
+        print(f"Ingestion status: {res.get('status')}")
+        print(f"Canonical Run ID: {res.get('run_id')}")
+        print(f"Records Inserted: {res.get('records_inserted')}")
+        sys.exit(0)
+    except Exception as cli_err:
+        print(f"ERROR: Ingestion run failed: {cli_err}", file=sys.stderr)
+        sys.exit(1)
 
