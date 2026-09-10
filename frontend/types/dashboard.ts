@@ -1,6 +1,6 @@
 export interface DashboardKpis {
-  total_production_mt: string;
-  total_obr_mcum: string;
+  total_production_mt: string | number;
+  total_obr_mcum: string | number;
   total_documents: number;
   active_conflicts: number;
   entity_accuracy_rate: string;

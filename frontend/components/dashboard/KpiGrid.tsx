@@ -11,33 +11,46 @@ interface KpiGridProps {
   isApiConnected?: boolean;
 }
 
-export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiConnected = false }) => {
-  const productionValue =
-    kpis?.total_production_mt !== undefined && kpis?.total_production_mt !== null
-      ? Number(kpis.total_production_mt).toFixed(2)
-      : isApiConnected
-      ? '0.00'
-      : '—';
+const formatKpiMetric = (
+  val: string | number | undefined | null,
+  isApiConnected: boolean
+): string => {
+  if (val === undefined || val === null || val === '') {
+    return isApiConnected ? '0.00' : '—';
+  }
 
-  const obrValue =
-    kpis?.total_obr_mcum !== undefined && kpis?.total_obr_mcum !== null
-      ? Number(kpis.total_obr_mcum).toFixed(2)
-      : isApiConnected
-      ? '0.00'
-      : '—';
+  // Handle number type directly
+  if (typeof val === 'number') {
+    if (isNaN(val)) return isApiConnected ? '0.00' : '—';
+    return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // Handle string: strip comma thousand-separators and parse
+  const cleanStr = String(val).replace(/,/g, '').trim();
+  const num = parseFloat(cleanStr);
+  if (isNaN(num)) {
+    return isApiConnected ? '0.00' : '—';
+  }
+
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiConnected = false }) => {
+  const productionValue = formatKpiMetric(kpis?.total_production_mt, isApiConnected);
+  const obrValue = formatKpiMetric(kpis?.total_obr_mcum, isApiConnected);
 
   const conflictsCount =
-    kpis?.active_conflicts !== undefined && kpis?.active_conflicts !== null
+    typeof kpis?.active_conflicts === 'number' && !isNaN(kpis.active_conflicts)
       ? kpis.active_conflicts
-      : isApiConnected
-      ? 0
+      : typeof kpis?.active_conflicts === 'string' && !isNaN(parseInt(kpis.active_conflicts, 10))
+      ? parseInt(kpis.active_conflicts, 10)
       : 0;
 
   const docsCount =
-    kpis?.total_documents !== undefined && kpis?.total_documents !== null
+    typeof kpis?.total_documents === 'number' && !isNaN(kpis.total_documents)
       ? kpis.total_documents
-      : isApiConnected
-      ? 0
+      : typeof kpis?.total_documents === 'string' && !isNaN(parseInt(kpis.total_documents, 10))
+      ? parseInt(kpis.total_documents, 10)
       : 0;
 
   return (
