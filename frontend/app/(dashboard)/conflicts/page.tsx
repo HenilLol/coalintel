@@ -16,11 +16,12 @@ import { GitCompare, RefreshCw } from 'lucide-react';
 
 function ConflictsContent() {
   const searchParams = useSearchParams();
-  const targetId = searchParams.get('id');
+  const targetId = searchParams.get('id') || searchParams.get('resolve');
   const { selectedSubsidiary } = useScope();
   const queryClient = useQueryClient();
   const [selectedStatus] = useState('ALL');
   const [activeConflict, setActiveConflict] = useState<ConflictItem | null>(null);
+  const [directFetchError, setDirectFetchError] = useState<string | null>(null);
 
   const {
     data: conflicts = [],
@@ -35,12 +36,37 @@ function ConflictsContent() {
   });
 
   useEffect(() => {
-    if (targetId && conflicts && conflicts.length > 0) {
+    if (!targetId) return;
+
+    if (conflicts && conflicts.length > 0) {
       const match = conflicts.find((c) => String(c.id) === targetId);
       if (match) {
         setActiveConflict(match);
+        setDirectFetchError(null);
+        return;
       }
     }
+
+    // Direct lookup by ID if not in currently loaded list
+    let isMounted = true;
+    validationApi
+      .getConflictById(targetId)
+      .then((item) => {
+        if (isMounted && item) {
+          setActiveConflict(item);
+          setDirectFetchError(null);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load specific conflict by ID:', err);
+        if (isMounted) {
+          setDirectFetchError(`Discrepancy record #${targetId} could not be loaded or was not found.`);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [targetId, conflicts]);
 
   const resolveMutation = useMutation({
@@ -71,6 +97,7 @@ function ConflictsContent() {
 
       {/* Error Alert */}
       {isError && <ErrorState message={error instanceof Error ? error.message : 'Failed to fetch conflict list.'} />}
+      {directFetchError && <ErrorState message={directFetchError} />}
 
       {/* Main Conflicts Data Table Card */}
       <Card className="border-[#30383D] bg-[#1C2226]">

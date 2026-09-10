@@ -247,13 +247,15 @@ METRIC_DOMAINS = [
 def normalize_subsidiary_scope(scope: Optional[str]) -> Optional[str]:
     """
     Normalizes subsidiary scope strings into either:
-    - None: representing unrestricted/global scope ("ALL", "ALL CIL", "", None, "NULL", "NONE")
+    - None: representing unrestricted/global scope ("ALL", "ALL CIL", "ALL SUBSIDIARIES", "ALL_CIL", "ALL_SUBSIDIARIES", "", None, "NULL", "NONE")
     - Normalized uppercase subsidiary name (e.g. "SECL", "ECL", "WCL")
     """
     if not scope:
         return None
     s = str(scope).strip()
-    if not s or s.upper() in ["ALL", "ALL CIL", "NONE", "NULL"]:
+    if not s or s.upper() in ["ALL", "ALL CIL", "ALL SUBSIDIARIES", "ALL_CIL", "ALL_SUBSIDIARIES", "NONE", "NULL"]:
+        return None
+    if s.upper().startswith("ALL ") or s.upper().startswith("ALL_"):
         return None
     return s.upper()
 

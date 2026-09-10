@@ -13,29 +13,37 @@ export interface DashboardFilterParams {
 
 export const dashboardApi = {
   getKpis: async (params?: DashboardFilterParams): Promise<DashboardKpis> => {
+    const sub = params?.subsidiary_filter;
+    const isAll =
+      !sub ||
+      sub.toUpperCase() === 'ALL' ||
+      sub.toUpperCase() === 'ALL CIL' ||
+      sub.toUpperCase() === 'ALL SUBSIDIARIES' ||
+      sub.toUpperCase() === 'ALL_CIL' ||
+      sub.toUpperCase() === 'ALL_SUBSIDIARIES';
+
     const response = await apiClient.get<DashboardKpis>('/dashboard/kpis', {
       params: {
         fiscal_year: params?.fiscal_year || undefined,
-        subsidiary_filter:
-          params?.subsidiary_filter &&
-          params.subsidiary_filter !== 'ALL' &&
-          params.subsidiary_filter !== 'ALL CIL'
-            ? params.subsidiary_filter
-            : undefined,
+        subsidiary_filter: isAll ? undefined : sub,
       },
     });
     return response.data;
   },
   getCharts: async (params?: DashboardFilterParams): Promise<DashboardChartsResponse> => {
+    const sub = params?.subsidiary_filter;
+    const isAll =
+      !sub ||
+      sub.toUpperCase() === 'ALL' ||
+      sub.toUpperCase() === 'ALL CIL' ||
+      sub.toUpperCase() === 'ALL SUBSIDIARIES' ||
+      sub.toUpperCase() === 'ALL_CIL' ||
+      sub.toUpperCase() === 'ALL_SUBSIDIARIES';
+
     const response = await apiClient.get<DashboardChartsResponse>('/dashboard/charts', {
       params: {
         fiscal_year: params?.fiscal_year || undefined,
-        subsidiary_filter:
-          params?.subsidiary_filter &&
-          params.subsidiary_filter !== 'ALL' &&
-          params.subsidiary_filter !== 'ALL CIL'
-            ? params.subsidiary_filter
-            : undefined,
+        subsidiary_filter: isAll ? undefined : sub,
       },
     });
     return response.data;

@@ -52,12 +52,23 @@ export const validationApi = {
   },
 
   getConflicts: async (status_filter?: string, subsidiary_filter?: string): Promise<ConflictItem[]> => {
+    const isSubAll =
+      !subsidiary_filter ||
+      subsidiary_filter.toUpperCase() === 'ALL' ||
+      subsidiary_filter.toUpperCase() === 'ALL CIL' ||
+      subsidiary_filter.toUpperCase() === 'ALL SUBSIDIARIES';
+
     const response = await apiClient.get<ConflictItem[]>('/conflicts', {
       params: {
         status_filter: status_filter && status_filter !== 'ALL' ? status_filter : undefined,
-        subsidiary_filter: subsidiary_filter && subsidiary_filter !== 'ALL' && subsidiary_filter !== 'ALL CIL' ? subsidiary_filter : undefined,
+        subsidiary_filter: isSubAll ? undefined : subsidiary_filter,
       },
     });
+    return response.data;
+  },
+
+  getConflictById: async (id: number | string): Promise<ConflictItem> => {
+    const response = await apiClient.get<ConflictItem>(`/conflicts/${id}`);
     return response.data;
   },
 

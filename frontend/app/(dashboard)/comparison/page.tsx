@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   GitCompare,
   CheckCircle2,
@@ -383,12 +384,12 @@ export default function ComparisonPage() {
                     <span className="text-[#C58B3A] font-semibold">Possible Reason: </span>
                     {c.possible_reason.replace(/_/g, ' ')}
                   </div>
-                  <a
+                  <Link
                     href={c.conflict_id ? `/conflicts?id=${c.conflict_id}` : '/conflicts'}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#C94B45]/20 hover:bg-[#C94B45]/30 text-[#E8ECEB] border border-[#C94B45]/50 text-[10px] font-mono font-semibold transition-colors shrink-0"
                   >
                     Resolve →
-                  </a>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -505,13 +506,13 @@ export default function ComparisonPage() {
                           <AlertTriangle className="h-4 w-4" />
                           DISCREPANCY DETECTED ({matrix.variance_percentage}% Variance)
                         </Badge>
-                        <a
+                        <Link
                           href={matrix.canonical_conflict_id ? `/conflicts?id=${matrix.canonical_conflict_id}` : '/conflicts'}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#C94B45]/20 hover:bg-[#C94B45]/30 text-[#E8ECEB] border border-[#C94B45]/50 text-xs font-mono font-semibold transition-colors"
                         >
                           <AlertTriangle className="h-3.5 w-3.5 text-[#C94B45]" />
                           Resolve Conflict{matrix.canonical_conflict_id ? ` #${matrix.canonical_conflict_id}` : ''}
-                        </a>
+                        </Link>
                       </div>
                     ) : (
                       <Badge variant="success" size="md" className="gap-1 font-bold">
