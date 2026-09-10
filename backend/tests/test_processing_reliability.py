@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import os
 import sys
 import tempfile
@@ -249,12 +250,13 @@ class TestDocumentProcessingReliability(unittest.TestCase):
         files = {"file": ("async_upload_test.pdf", test_content, "application/pdf")}
         data = {"subsidiary": "ECL", "fiscal_year": "2023-24"}
 
-        response = client.post("/api/v1/documents/upload", headers=headers, files=files, data=data)
-        self.assertEqual(response.status_code, 201)
-        resp_json = response.json()
-        self.assertEqual(resp_json["filename"], "async_upload_test.pdf")
-        self.assertEqual(resp_json["status"], "PENDING")
-        self.assertEqual(resp_json["subsidiary"], "ECL")
+        with patch("app.api.documents.run_background_document_processing"):
+            response = client.post("/api/v1/documents/upload", headers=headers, files=files, data=data)
+            self.assertEqual(response.status_code, 201)
+            resp_json = response.json()
+            self.assertEqual(resp_json["filename"], "async_upload_test.pdf")
+            self.assertEqual(resp_json["status"], "PENDING")
+            self.assertEqual(resp_json["subsidiary"], "ECL")
 
         app.dependency_overrides.clear()
 
