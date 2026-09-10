@@ -43,7 +43,7 @@ class MineMaster(Base):
     retrieved_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_verified_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     verification_status = Column(String(50), default="verified", nullable=False)
-    data_origin = Column(String(30), default="government", nullable=False, index=True)
+    data_origin = Column(String(30), default="OFFICIAL", nullable=False, index=True)
 
 
     # Relationships
@@ -115,7 +115,7 @@ class MineYearlyMetric(Base):
     source_published_date = Column(String(50), nullable=True)
     verification_status = Column(String(50), default="verified", nullable=False)  # 'verified', 'provisional', 'unverified'
     quality_status = Column(String(50), default="verified", nullable=False)  # 'verified', 'provisional', 'ytd', 'calculated', 'conflicting', 'partial', 'missing', 'needs_review'
-    data_origin = Column(String(30), default="government", nullable=False, index=True)  # 'government', 'calculated', 'demo'
+    data_origin = Column(String(30), default="OFFICIAL", nullable=False, index=True)  # 'OFFICIAL', 'calculated', 'demo', 'INTERNAL'
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationships

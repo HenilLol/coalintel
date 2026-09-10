@@ -94,7 +94,7 @@ class MineSummaryResponse(BaseModel):
     production_status: Optional[str] = None
     financial_year: Optional[str] = None
     verification_status: str = "verified"
-    data_origin: str = "government"
+    data_origin: str = "OFFICIAL"
     
     # Latest/Filtered metric view
     latest_production_mt: Optional[float] = None
@@ -150,7 +150,7 @@ class MineDetailResponse(BaseModel):
     retrieved_at: Optional[datetime] = None
     last_verified_at: Optional[datetime] = None
     verification_status: str = "verified"
-    data_origin: str = "government"
+    data_origin: str = "OFFICIAL"
 
     # Relationships
     yearly_metrics: List[MineMetricResponse] = []

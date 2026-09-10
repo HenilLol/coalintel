@@ -40,6 +40,7 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { MineDetailDrawer } from '@/components/mines/MineDetailDrawer';
 import { SourceProvenanceModal } from '@/components/mines/SourceProvenanceModal';
 import { MinesVisualAnalytics } from '@/components/mines/MinesVisualAnalytics';
@@ -135,7 +136,8 @@ export default function MinesPage() {
       setBackendCompanies(compRes);
     } catch (err: any) {
       console.error('Failed to load government mine data:', err);
-      setError('Unable to connect to the Government Mine Intelligence registry. Please check server status.');
+      const msg = err?.response?.data?.detail || err?.message || 'Unable to connect to the Government Mine Intelligence registry. Please check server status.';
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }
@@ -285,7 +287,7 @@ export default function MinesPage() {
             Canonical Mines Intelligence & Government Registry
           </h1>
           <p className="text-xs text-[#9BA5A8] mt-1 max-w-3xl leading-relaxed">
-            Statutory registry covering {mines.length || 60} canonical coal and lignite mining entities across 12 states, directly ingested from Ministry of Coal, Coal Controller&apos;s Organisation, Nominated Authority, and CPSE filings.
+            Statutory registry covering {mines.length > 0 ? `${mines.length} canonical coal and lignite mining entities` : 'canonical coal and lignite mining entities'} across 12 states, directly ingested from Ministry of Coal, Coal Controller&apos;s Organisation, Nominated Authority, and CPSE filings.
           </p>
         </div>
 
@@ -312,21 +314,34 @@ export default function MinesPage() {
         </div>
       </div>
 
-      {/* Top Aggregate KPI Metric Strip */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          <Card variant="bordered" className="p-3.5 bg-[#151A1D]">
-            <span className="text-[10px] font-mono uppercase text-[#9BA5A8] block">Canonical Records</span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-black font-mono text-[#E8ECEB]">
-                {stats.total_canonical_mines}
-              </span>
-              <span className="text-[11px] text-[#4F8A62] font-semibold">Verified</span>
-            </div>
-            <span className="text-[10px] text-[#9BA5A8] block mt-0.5">
-              {stats.coverage?.coal_mines_count || 50} Coal • {stats.coverage?.lignite_mines_count || 10} Lignite
-            </span>
-          </Card>
+      {/* Error State Banner */}
+      {error && (
+        <ErrorState
+          title="Mines Intelligence Service Unavailable"
+          message={error}
+          onRetry={loadData}
+          className="my-6"
+        />
+      )}
+
+      {/* Main Content - Only displayed if no error */}
+      {!error && (
+        <>
+          {/* Top Aggregate KPI Metric Strip */}
+          {stats && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              <Card variant="bordered" className="p-3.5 bg-[#151A1D]">
+                <span className="text-[10px] font-mono uppercase text-[#9BA5A8] block">Canonical Records</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black font-mono text-[#E8ECEB]">
+                    {stats.total_canonical_mines}
+                  </span>
+                  <span className="text-[11px] text-[#4F8A62] font-semibold">Verified</span>
+                </div>
+                <span className="text-[10px] text-[#9BA5A8] block mt-0.5">
+                  {stats.coverage?.coal_mines_count ?? 0} Coal • {stats.coverage?.lignite_mines_count ?? 0} Lignite
+                </span>
+              </Card>
 
           <Card variant="bordered" className="p-3.5 bg-[#151A1D]">
             <span className="text-[10px] font-mono uppercase text-[#9BA5A8] block">FY 24-25 Output</span>
@@ -1130,6 +1145,9 @@ export default function MinesPage() {
 
         </div>
       )}
+
+      </>
+    )}
 
       {/* Slide-out Mine Detail Drawer */}
       <MineDetailDrawer
