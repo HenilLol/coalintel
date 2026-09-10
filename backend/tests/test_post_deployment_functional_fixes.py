@@ -281,3 +281,109 @@ def test_conflicts_api_detail_and_status_filter(isolated_client):
     # 3. Nonexistent conflict ID
     not_found = client.get("/api/v1/conflicts/99999", headers=headers)
     assert not_found.status_code == 404
+
+
+def test_gemini_http_failure_logging_and_secret_sanitization(caplog):
+    """Verifies that Gemini HTTP failure is logged at WARNING and secret API key is redacted."""
+    import logging
+    from unittest.mock import patch, MagicMock
+    from app.services.llm_provider import GeminiLLMProvider
+
+    secret_key = "AIzaSySecretKey9988776655"
+    provider = GeminiLLMProvider(api_key=secret_key, model_name="gemini-1.5-flash")
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 400
+    mock_resp.text = f'{{"error": {{"code": 400, "message": "API key not valid: {secret_key}", "status": "INVALID_ARGUMENT"}}}}'
+
+    with caplog.at_level(logging.WARNING):
+        with patch("requests.post", return_value=mock_resp):
+            res = provider.generate_general_ai("give me the python code")
+
+    # 1. Degraded fallback occurred
+    assert res["provider"] == "degraded"
+    assert res["degraded_mode"] is True
+    assert "def execute_task" in res["answer"]
+
+    # 2. Warning log emitted
+    warning_logs = [r for r in caplog.records if r.levelno >= logging.WARNING and "provider=gemini" in r.message]
+    assert len(warning_logs) >= 1
+    log_text = " ".join(r.message for r in warning_logs)
+
+    # 3. Secret API key MUST NOT appear anywhere in the log text
+    assert secret_key not in log_text
+    assert "[REDACTED]" in log_text
+    assert "status=400" in log_text
+
+
+def test_gemini_network_exception_logging_and_secret_sanitization(caplog):
+    """Verifies that Gemini connection/network exceptions are logged at WARNING with URL query keys redacted."""
+    import logging
+    from unittest.mock import patch
+    import requests
+    from app.services.llm_provider import GeminiLLMProvider
+
+    secret_key = "AIzaSyNetworkSecret112233"
+    provider = GeminiLLMProvider(api_key=secret_key, model_name="gemini-1.5-flash")
+
+    exc_msg = f"Connection refused to https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={secret_key}"
+
+    with caplog.at_level(logging.WARNING):
+        with patch("requests.post", side_effect=requests.exceptions.ConnectionError(exc_msg)):
+            res = provider.generate_general_ai("how does coal form?")
+
+    # 1. Degraded fallback occurred
+    assert res["provider"] == "degraded"
+    assert res["degraded_mode"] is True
+
+    # 2. Warning log emitted
+    warning_logs = [r for r in caplog.records if r.levelno >= logging.WARNING and "provider=gemini" in r.message]
+    assert len(warning_logs) >= 1
+    log_text = " ".join(r.message for r in warning_logs)
+
+    # 3. Secret key must NOT appear in log text
+    assert secret_key not in log_text
+    assert "[REDACTED]" in log_text
+    assert "ConnectionError" in log_text
+
+
+def test_gemini_successful_execution():
+    """Verifies that successful Gemini response returns provider='gemini' and degraded_mode=False."""
+    from unittest.mock import patch, MagicMock
+    from app.services.llm_provider import GeminiLLMProvider
+
+    provider = GeminiLLMProvider(api_key="valid-mock-key", model_name="gemini-1.5-flash")
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [{"text": "```python\ndef calculate_density():\n    return 1.35\n```"}]
+                }
+            }
+        ]
+    }
+
+    with patch("requests.post", return_value=mock_resp):
+        res = provider.generate_general_ai("give me the python code")
+
+    assert res["provider"] == "gemini"
+    assert res["degraded_mode"] is False
+    assert "calculate_density" in res["answer"]
+
+
+def test_degraded_response_supports_llm_api_key_wording():
+    """Verifies that degraded general AI responses mention LLM_API_KEY / GEMINI_API_KEY neutrality."""
+    provider = DegradedLLMProvider()
+
+    code_res = provider.generate_general_ai("give me the python code")
+    assert "LLM_API_KEY" in code_res["answer"]
+    assert "GEMINI_API_KEY" in code_res["answer"]
+    assert "configure a valid LLM API key" in code_res["answer"]
+
+    concept_res = provider.generate_general_ai("unusual prompt xyz123")
+    assert "LLM_API_KEY" in concept_res["answer"]
+    assert "GEMINI_API_KEY" in concept_res["answer"]
+

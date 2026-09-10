@@ -534,7 +534,7 @@ class DegradedLLMProvider(BaseLLMProvider):
                 "    output = execute_task()\n"
                 "    print(f\"Result: {output}\")\n"
                 "```\n\n"
-                "*(For custom real-time GenAI code synthesis on arbitrary prompts, configure `GEMINI_API_KEY` in the environment.)*"
+                "*(For custom real-time GenAI code synthesis on arbitrary prompts, configure a valid LLM API key (`LLM_API_KEY` or `GEMINI_API_KEY`) in the environment.)*"
             )
         elif "what is python" in q_lower:
             answer = (
@@ -577,7 +577,7 @@ class DegradedLLMProvider(BaseLLMProvider):
             answer = (
                 f"COALINTEL AI Assistant: General conceptual response for \"{q_clean}\". "
                 "This topic pertains to general knowledge and technical analysis. "
-                "For real-time unrestricted GenAI generation, configure a `GEMINI_API_KEY` in the application environment."
+                "For real-time unrestricted GenAI generation, configure a valid LLM API key (`LLM_API_KEY` or `GEMINI_API_KEY`) in the application environment."
             )
 
         return {
@@ -602,6 +602,17 @@ class GeminiLLMProvider(BaseLLMProvider):
         self.model_name = model_name or "gemini-1.5-flash"
         self.timeout = timeout
         self.degraded_fallback = DegradedLLMProvider()
+
+    @staticmethod
+    def _sanitize_log_message(msg: str, secret_key: Optional[str] = None) -> str:
+        """Sanitizes error text to ensure API keys, auth headers, and query parameters are never logged."""
+        if not msg:
+            return ""
+        clean = re.sub(r"key=[A-Za-z0-9_\-]+", "key=[REDACTED]", msg)
+        clean = re.sub(r"Bearer\s+[A-Za-z0-9_\-\.]+", "Bearer [REDACTED]", clean)
+        if secret_key and len(secret_key.strip()) >= 4:
+            clean = clean.replace(secret_key.strip(), "[REDACTED]")
+        return clean.strip()[:200]
 
     def _call_gemini_api(self, prompt: str) -> Optional[str]:
         if not self.api_key or self.api_key.strip() in ["", "your-api-key-here"]:
@@ -632,9 +643,15 @@ class GeminiLLMProvider(BaseLLMProvider):
                         if parts and "text" in parts[0]:
                             return parts[0]["text"]
                 else:
-                    logger.debug(f"Gemini API ({model}) returned HTTP {resp.status_code}: {resp.text[:150]}")
+                    clean_resp = self._sanitize_log_message(resp.text[:200], self.api_key)
+                    logger.warning(
+                        f"provider=gemini model={model} HTTP failure status={resp.status_code} response='{clean_resp}'"
+                    )
             except Exception as rest_err:
-                logger.debug(f"Gemini call on {model} failed: {rest_err}")
+                clean_err = self._sanitize_log_message(str(rest_err), self.api_key)
+                logger.warning(
+                    f"provider=gemini model={model} request error ({type(rest_err).__name__}): {clean_err}"
+                )
 
         # Try SDK fallback if available
         try:
@@ -645,7 +662,10 @@ class GeminiLLMProvider(BaseLLMProvider):
             if response and hasattr(response, "text") and response.text:
                 return response.text
         except Exception as sdk_err:
-            logger.debug(f"Gemini SDK invocation note: {sdk_err}")
+            clean_sdk_err = self._sanitize_log_message(str(sdk_err), self.api_key)
+            logger.warning(
+                f"provider=gemini SDK fallback error ({type(sdk_err).__name__}): {clean_sdk_err}"
+            )
 
         return None
 
