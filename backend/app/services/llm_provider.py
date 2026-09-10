@@ -597,9 +597,9 @@ class GeminiLLMProvider(BaseLLMProvider):
     """
     provider_name: str = "gemini"
 
-    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash", timeout: float = 10.0):
+    def __init__(self, api_key: str, model_name: str = "gemini-3.6-flash", timeout: float = 10.0):
         self.api_key = api_key
-        self.model_name = model_name or "gemini-1.5-flash"
+        self.model_name = model_name or "gemini-3.6-flash"
         self.timeout = timeout
         self.degraded_fallback = DegradedLLMProvider()
 
@@ -620,7 +620,7 @@ class GeminiLLMProvider(BaseLLMProvider):
 
         # Try specified model and common active fallbacks
         candidate_models = [self.model_name]
-        for fallback in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]:
+        for fallback in ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro"]:
             if fallback not in candidate_models:
                 candidate_models.append(fallback)
 

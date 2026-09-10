@@ -44,7 +44,7 @@ services:
       - REPORT_DIR=/storage/generated_reports
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-gemini-1.5-flash}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-gemini-3.6-flash}
       - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-10.0}
     ports:
       - "8000:8000"

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""
-    LLM_MODEL_NAME: str = "gemini-1.5-flash"
+    LLM_MODEL_NAME: str = "gemini-3.6-flash"
     LLM_TIMEOUT_SECONDS: float = 10.0
 
     # RAG & Retrieval Hyperparameters

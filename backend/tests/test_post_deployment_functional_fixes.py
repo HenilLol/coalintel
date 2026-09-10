@@ -290,7 +290,7 @@ def test_gemini_http_failure_logging_and_secret_sanitization(caplog):
     from app.services.llm_provider import GeminiLLMProvider
 
     secret_key = "AIzaSySecretKey9988776655"
-    provider = GeminiLLMProvider(api_key=secret_key, model_name="gemini-1.5-flash")
+    provider = GeminiLLMProvider(api_key=secret_key, model_name="gemini-3.6-flash")
 
     mock_resp = MagicMock()
     mock_resp.status_code = 400
@@ -324,9 +324,9 @@ def test_gemini_network_exception_logging_and_secret_sanitization(caplog):
     from app.services.llm_provider import GeminiLLMProvider
 
     secret_key = "AIzaSyNetworkSecret112233"
-    provider = GeminiLLMProvider(api_key=secret_key, model_name="gemini-1.5-flash")
+    provider = GeminiLLMProvider(api_key=secret_key, model_name="gemini-3.6-flash")
 
-    exc_msg = f"Connection refused to https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={secret_key}"
+    exc_msg = f"Connection refused to https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={secret_key}"
 
     with caplog.at_level(logging.WARNING):
         with patch("requests.post", side_effect=requests.exceptions.ConnectionError(exc_msg)):
@@ -352,7 +352,7 @@ def test_gemini_successful_execution():
     from unittest.mock import patch, MagicMock
     from app.services.llm_provider import GeminiLLMProvider
 
-    provider = GeminiLLMProvider(api_key="valid-mock-key", model_name="gemini-1.5-flash")
+    provider = GeminiLLMProvider(api_key="valid-mock-key", model_name="gemini-3.6-flash")
 
     mock_resp = MagicMock()
     mock_resp.status_code = 200
