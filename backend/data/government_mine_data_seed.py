@@ -16,9 +16,12 @@ Authoritative Sources:
 
 import os
 import sys
+import uuid
 import logging
+from typing import Optional
 from datetime import datetime, timezone
 from decimal import Decimal
+from sqlalchemy.orm import Session
 
 # Ensure backend root is in sys.path
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,15 +52,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger("GOVERNMENT-DATA-SEED")
 
 
-def run_government_data_ingestion():
-    db = SessionLocal()
-    run_id = f"GOV-RUN-{int(datetime.now(timezone.utc).timestamp())}"
+def run_government_data_ingestion(db: Optional[Session] = None):
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    run_id = "GOV-RUN-CANONICAL-MASTER-2024-25"
     start_time = datetime.now(timezone.utc)
     
     logger.info(f"Starting authentic Government of India mine data ingestion: {run_id}")
-    
-    # 0. Ensure tables exist
-    Base.metadata.create_all(bind=engine)
 
     records_inserted = 0
     conflicts_found = 0
@@ -65,20 +68,7 @@ def run_government_data_ingestion():
 
     try:
         # ---------------------------------------------------------
-        # 1. TAG DEMO / MOCK DATA
-        # ---------------------------------------------------------
-        demo_metrics = db.query(ExtractedMetric).filter(
-            ExtractedMetric.fiscal_year.in_(["2023-24", "2022-23"]),
-            ExtractedMetric.data_origin != "demo"
-        ).all()
-        for dm in demo_metrics:
-            dm.data_origin = "demo"
-        if demo_metrics:
-            db.commit()
-            logger.info(f"Tagged {len(demo_metrics)} existing records as data_origin='demo'.")
-
-        # ---------------------------------------------------------
-        # 2. SEED AUTHORITATIVE DATA SOURCES (Tier 1 to 6)
+        # 1. SEED AUTHORITATIVE DATA SOURCES (Tier 1 to 6)
         # ---------------------------------------------------------
         data_sources = [
             {
@@ -1087,7 +1077,7 @@ def run_government_data_ingestion():
                     source_url="https://coal.gov.in/en/major-statistics/coal-directory-of-india",
                     source_chapter="Section III: Production Performance",
                     verification_status="verified",
-                    data_origin="government"
+                    data_origin="OFFICIAL"
                 )
                 db.add(new_mine)
                 records_inserted += 1
@@ -1100,7 +1090,7 @@ def run_government_data_ingestion():
                 existing_mine.financial_year = "2024-25"
                 existing_mine.source_chapter = "Section III: Production Performance"
                 existing_mine.verification_status = "verified"
-                existing_mine.data_origin = "government"
+                existing_mine.data_origin = "OFFICIAL"
 
 
             # Seed Aliases
@@ -1159,7 +1149,7 @@ def run_government_data_ingestion():
                         source_url="https://coal.gov.in/",
                         verification_status="verified" if met.get("status") == "final" else "provisional",
                         quality_status="ytd" if met.get("period") == "YTD" else ("provisional" if met.get("status") == "provisional" else "verified"),
-                        data_origin="government"
+                        data_origin="OFFICIAL"
                     )
                     db.add(new_ym)
                     records_inserted += 1
@@ -1636,99 +1626,58 @@ def run_government_data_ingestion():
         db.commit()
         logger.info("Parliamentary Q&A seeded.")
 
-        # ---------------------------------------------------------
-        # 9. SEED CORRESPONDING EXTRACTED METRICS (to power existing endpoints)
-        # ---------------------------------------------------------
-        # Ensure a canonical MoC document exists in Document table
-        moc_doc = db.query(Document).filter(Document.filename == "MoC_Coal_Directory_2024-25.pdf").first()
-        if not moc_doc:
-            moc_doc = Document(
-                filename="MoC_Coal_Directory_2024-25.pdf",
-                file_path=os.path.join(backend_dir, "data", "MoC_Coal_Directory_2024-25.pdf"),
-                file_hash="9f8e7d6c5b4a3210987654321fedcba0987654321fedcba0987654321fedcba0",
-                file_type="PDF",
-                file_size_bytes=24580000,
-                subsidiary="CIL HQ",
-                fiscal_year="2024-25",
-                status="PARSED",
-                total_pages=380
-            )
-            db.add(moc_doc)
-            db.commit()
-            db.refresh(moc_doc)
-
-        for m_data in mines_data:
-            for fy, met in m_data.get("metrics", {}).items():
-                existing_em = db.query(ExtractedMetric).filter(
-                    ExtractedMetric.mine_name == m_data["mine_name"],
-                    ExtractedMetric.fiscal_year == fy,
-                    ExtractedMetric.metric_name == "Coal Production"
-                ).first()
-                if not existing_em:
-                    prod = met["prod"]
-                    db.add(ExtractedMetric(
-                        document_id=moc_doc.id,
-                        page_number=48,
-                        mine_name=m_data["mine_name"],
-                        subsidiary=m_data["subsidiary_name"],
-                        metric_name="Coal Production",
-                        numeric_value=prod,
-                        unit="MT",
-                        raw_unit="MT",
-                        standard_value=Decimal(str(prod)),
-                        standard_unit="MT",
-                        fiscal_year=fy,
-                        confidence_score=Decimal("1.000"),
-                        validation_status="VALIDATED",
-                        raw_snippet=f"Official Ministry of Coal publication reports {m_data['mine_name']} production at {prod} MT in {fy}.",
-                        data_origin="government"
-                    ))
-                    records_inserted += 1
-        db.commit()
-
-        # Record ingestion run audit
+        # Record ingestion run audit (idempotent across runs)
         end_time = datetime.now(timezone.utc)
-        db.add(IngestionRun(
-            run_id=run_id,
-            started_at=start_time,
-            completed_at=end_time,
-            source="Ministry of Coal / CCO / Nominated Authority / CIL",
-            document="Coal Directory 2024-25, MoC Annual Reports 2024-25 & 2025-26, Monthly Stats 2026-27 YTD",
-            records_found=records_inserted + 10,
-            records_inserted=records_inserted,
-            records_updated=0,
-            records_rejected=0,
-            conflicts_found=conflicts_found,
-            missing_values=missing_values,
-            status="COMPLETED",
-            error_log=None
-        ))
+        existing_run = db.query(IngestionRun).filter(IngestionRun.run_id == run_id).first()
+        if not existing_run:
+            db.add(IngestionRun(
+                run_id=run_id,
+                started_at=start_time,
+                completed_at=end_time,
+                source="Ministry of Coal / CCO / Nominated Authority / CIL",
+                document="Coal Directory 2024-25, MoC Annual Reports 2024-25 & 2025-26, Monthly Stats 2026-27 YTD",
+                records_found=records_inserted + 10,
+                records_inserted=records_inserted,
+                records_updated=0,
+                records_rejected=0,
+                conflicts_found=conflicts_found,
+                missing_values=missing_values,
+                status="COMPLETED",
+                error_log=None
+            ))
+        else:
+            existing_run.completed_at = end_time
+            existing_run.records_updated += records_inserted
         db.commit()
         logger.info(f"Ingestion run completed successfully. {records_inserted} records inserted.")
 
         # Execute Canonical Mines Expansion (Phases 3 & 4)
         try:
             from data.canonical_expansion_seed import run_canonical_expansion
-            run_canonical_expansion()
+            run_canonical_expansion(db=db)
         except Exception as exp_err:
             logger.warning(f"Canonical expansion note: {exp_err}")
 
     except Exception as e:
         db.rollback()
         logger.error(f"Ingestion run failed: {e}", exc_info=True)
-        db.add(IngestionRun(
-            run_id=run_id,
-            started_at=start_time,
-            completed_at=datetime.now(timezone.utc),
-            source="Ministry of Coal",
-            document="Coal Directory",
-            status="FAILED",
-            error_log=str(e)
-        ))
-        db.commit()
+        try:
+            db.add(IngestionRun(
+                run_id=run_id,
+                started_at=start_time,
+                completed_at=datetime.now(timezone.utc),
+                source="Ministry of Coal",
+                document="Coal Directory",
+                status="FAILED",
+                error_log=str(e)
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
         raise
     finally:
-        db.close()
+        if should_close:
+            db.close()
 
 
 # Standard alias for backend bootstrap

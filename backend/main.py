@@ -33,12 +33,13 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("PostgreSQL database tables verified and created successfully.")
 
-        # Read-Only Database Schema Compatibility Check (Phase 9C Production Hardening)
+        # Read-Only Database Schema Compatibility Check (Phase 9C & Phase 11 Production Hardening)
         # Note: Startup MUST NOT execute DDL or mutate existing database schemas.
         try:
             from sqlalchemy import inspect
             inspector = inspect(engine)
-            if "extracted_metrics" in inspector.get_table_names():
+            existing_tables = set(inspector.get_table_names())
+            if "extracted_metrics" in existing_tables:
                 existing_cols = {c["name"] for c in inspector.get_columns("extracted_metrics")}
                 if "data_origin" not in existing_cols:
                     logger.warning(
@@ -48,6 +49,28 @@ async def lifespan(app: FastAPI):
                     )
                 else:
                     logger.info("Schema compatibility verified: 'extracted_metrics.data_origin' column is present.")
+
+            # Phase 11: Check mine_master and data_sources columns
+            if "mine_master" in existing_tables:
+                mine_cols = {c["name"] for c in inspector.get_columns("mine_master")}
+                missing_mine_cols = {"parent_company", "block", "coalfield", "sector", "captive_or_commercial", "financial_year", "source_chapter", "retrieved_at", "verification_status", "data_origin"} - mine_cols
+                if missing_mine_cols:
+                    logger.warning(
+                        f"DATABASE COMPATIBILITY NOTICE: Columns {missing_mine_cols} missing from 'mine_master' table. "
+                        "Execute backend/migrations/002_add_missing_mine_master_and_provenance_columns.sql via authorized DBA workflow."
+                    )
+                else:
+                    logger.info("Schema compatibility verified: 'mine_master' columns are complete.")
+
+            if "data_sources" in existing_tables:
+                ds_cols = {c["name"] for c in inspector.get_columns("data_sources")}
+                if "chapter" not in ds_cols:
+                    logger.warning(
+                        "DATABASE COMPATIBILITY NOTICE: 'chapter' column is missing from 'data_sources' table. "
+                        "Execute backend/migrations/002_add_missing_mine_master_and_provenance_columns.sql via authorized DBA workflow."
+                    )
+                else:
+                    logger.info("Schema compatibility verified: 'data_sources' columns are complete.")
         except Exception as schema_check_err:
             logger.warning(f"Schema compatibility check note: {schema_check_err}")
 
@@ -74,14 +97,25 @@ async def lifespan(app: FastAPI):
             try:
                 from app.models.mine import MineMaster
                 from data.government_mine_data_seed import run_seed as seed_government_data
-                mine_count = db_bootstrap.query(MineMaster).count()
-                if mine_count == 0:
-                    logger.info("No canonical mines detected; bootstrapping authentic Government data.")
-                    seed_government_data(db_bootstrap)
-                    logger.info("Government of India mine data bootstrapped successfully.")
+
+                # Check column presence before querying MineMaster to prevent UndefinedColumn crash
+                inspector = inspect(engine)
+                mine_cols = {c["name"] for c in inspector.get_columns("mine_master")} if "mine_master" in inspector.get_table_names() else set()
+                if "parent_company" in mine_cols or not mine_cols:
+                    mine_count = db_bootstrap.query(MineMaster).count()
+                    if mine_count == 0:
+                        logger.info("No canonical mines detected; bootstrapping authentic Government data.")
+                        seed_government_data(db_bootstrap)
+                        logger.info("Government of India mine data bootstrapped successfully.")
+                    else:
+                        logger.info(f"Existing canonical mines detected ({mine_count} mines); skipping government data seed.")
                 else:
-                    logger.info(f"Existing canonical mines detected ({mine_count} mines); skipping government data seed.")
+                    logger.warning(
+                        "DATABASE COMPATIBILITY NOTICE: 'mine_master' table is missing required columns. "
+                        "Skipping startup seed until migration 002 is applied."
+                    )
             except Exception as seed_err:
+                db_bootstrap.rollback()
                 logger.warning(f"Note on government data bootstrap: {seed_err}")
         except Exception as startup_err:
             db_bootstrap.rollback()
