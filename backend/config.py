@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # LLM Configuration (Provider Abstraction)
     LLM_PROVIDER: str = "gemini"  # "gemini", "openai", or "degraded"
     LLM_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
     LLM_MODEL_NAME: str = "gemini-1.5-flash"
     LLM_TIMEOUT_SECONDS: float = 10.0
 

@@ -44,10 +44,18 @@ def detect_query_entities(query_text: str) -> Dict[str, Any]:
     
     # Generic mine name regex check (e.g. "Rajmahal", "Gevra", "Samaleswari")
     if not target_mines:
+        stopwords = {
+            "what", "where", "how", "why", "when", "who", "which", "is", "are", "can", "will", "does", "do",
+            "give", "show", "tell", "explain", "describe", "define", "list", "compare", "provide", "difference",
+            "total", "coal", "production", "overburden", "fiscal", "year", "annual", "open", "cast", "mining",
+            "underground", "report", "ministry", "provisional", "please", "hello"
+        }
         mine_match = re.findall(r"\b([A-Z][a-z]+(?:\s+(?:OC|OpenCast|Mine|Colliery))?)\b", text_for_mines)
         for mm in mine_match:
-            if mm.lower() not in ["what", "where", "total", "coal", "production", "overburden", "fiscal", "year", "annual"]:
+            base_word = mm.split()[0].lower()
+            if mm.lower() not in stopwords and base_word not in stopwords:
                 target_mines.append(mm)
+
 
     target_subsidiary = None
     for sub in OPERATING_SUBSIDIARIES:

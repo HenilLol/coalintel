@@ -30,9 +30,14 @@ export default function DashboardPage() {
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
+      const filterParams = {
+        subsidiary_filter: selectedSubsidiary,
+        fiscal_year: selectedFiscalYear,
+      };
+
       const [kpiRes, chartRes, feedRes, docRes] = await Promise.allSettled([
-        dashboardApi.getKpis(),
-        dashboardApi.getCharts(),
+        dashboardApi.getKpis(filterParams),
+        dashboardApi.getCharts(filterParams),
         dashboardApi.getValidationFeed(),
         documentApi.getDocuments({
           subsidiary_filter: selectedSubsidiary,
@@ -61,11 +66,11 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSubsidiary]);
+  }, [selectedSubsidiary, selectedFiscalYear]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData, selectedFiscalYear]);
+  }, [fetchDashboardData]);
 
   return (
     <div className="space-y-6">

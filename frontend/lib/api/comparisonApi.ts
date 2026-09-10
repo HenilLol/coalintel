@@ -72,6 +72,7 @@ export interface ComparisonMatrixItem {
   has_discrepancy: boolean;
   is_seeded_demo: boolean;
   has_conflict?: boolean;
+  canonical_conflict_id?: number | null;
   conflict_details?: ConflictDetails | null;
   provenance_notice: string;
 }

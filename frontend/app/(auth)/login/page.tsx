@@ -111,6 +111,39 @@ export default function LoginPage() {
 
           {error && <ErrorState message={error} />}
 
+          {/* Role Selection Helpers */}
+          <div className="space-y-2">
+            <span className="text-[11px] uppercase tracking-wider text-[#9BA5A8] font-mono block">
+              Quick Role Selection
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setUsername('admin');
+                  setError(null);
+                }}
+                className={`text-xs ${username === 'admin' ? 'border-[#C58B3A] text-[#C58B3A]' : 'text-[#9BA5A8]'}`}
+              >
+                Admin Role
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setUsername('analyst');
+                  setError(null);
+                }}
+                className={`text-xs ${username === 'analyst' ? 'border-[#4F8A62] text-[#4F8A62]' : 'text-[#9BA5A8]'}`}
+              >
+                Analyst Role
+              </Button>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               label="Username"
@@ -141,7 +174,7 @@ export default function LoginPage() {
                 <span>Remember session</span>
               </label>
 
-              <span className="text-[#9BA5A8] cursor-not-allowed" title="Contact System Administrator for credentials">
+              <span className="text-[#9BA5A8] cursor-not-allowed" title="Contact System Administrator for credential resets">
                 Forgot password?
               </span>
             </div>
@@ -158,15 +191,20 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Future-Ready Architecture Notice */}
+          {/* Institutional Access & Signup Link */}
           <div className="pt-4 border-t border-[#30383D] text-center text-xs text-[#9BA5A8]">
-            <span>New subsidiary user? </span>
-            <span className="text-[#C58B3A] hover:text-[#D6A052] font-semibold cursor-not-allowed" title="Account provisioning is managed by CIL HQ System Administrators">
-              Request Access from Admin
-            </span>
+            <span>Need an analyst account? </span>
+            <button
+              type="button"
+              onClick={() => router.push('/signup')}
+              className="text-[#C58B3A] hover:text-[#D6A052] font-semibold underline underline-offset-2 ml-1"
+            >
+              Register Account
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 }
+

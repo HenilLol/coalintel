@@ -103,7 +103,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
       {/* Secondary Supporting Metric: Entity Accuracy */}
       <StatCard
         title="Entity Accuracy"
-        value={kpis?.entity_accuracy_rate ?? '98.5%'}
+        value={kpis?.entity_accuracy_rate || (isApiConnected ? 'N/A' : '—')}
         icon={<CheckCircle2 className="h-4 w-4 text-[#4F8A62]" />}
         subtitle="Regex & NLP Normalization"
         variant="default"
@@ -113,7 +113,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpis, loading = false, isApiCo
       {/* Secondary Supporting Metric: Citation Coverage */}
       <StatCard
         title="Citation Coverage"
-        value={kpis?.citation_coverage_rate ?? '100%'}
+        value={kpis?.citation_coverage_rate || (isApiConnected ? 'N/A' : '—')}
         icon={<ShieldCheck className="h-4 w-4 text-[#4F8A62]" />}
         subtitle="RAG Grounding Verified"
         variant="default"

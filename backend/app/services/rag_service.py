@@ -179,6 +179,104 @@ def extract_and_validate_citations(
     return validated_citations, citation_gate_passed
 
 
+def classify_query_intent(query_text: str) -> str:
+    """
+    Classifies a natural language query into:
+    - 'GENERAL_AI': General conceptual questions, coding/programming, greetings, general tech/science/math,
+                    or conceptual mining/geological definitions without specific entity, fiscal year, or quantitative fact requests.
+    - 'EVIDENCE_GROUNDED': Specific organizational/mining performance metrics, mine/subsidiary facts,
+                           historical fiscal year queries, targets, OBR, production, official reports, or document-derived comparisons.
+    """
+    if not query_text or not query_text.strip():
+        return "GENERAL_AI"
+
+    q_clean = query_text.strip()
+    q_lower = q_clean.lower()
+
+    # 1. Conversational greetings and meta queries
+    greeting_patterns = [
+        r"^(hi|hello|hey|greetings|good\s+(?:morning|afternoon|evening))\b",
+        r"\bhow\s+are\s+you\b",
+        r"\bwhat\s+are\s+you\s+doing\b",
+        r"\bwho\s+are\s+you\b",
+        r"\bwhat\s+can\s+you\s+do\b",
+        r"\bhelp\s+me\b"
+    ]
+    if any(re.search(pat, q_lower) for pat in greeting_patterns):
+        return "GENERAL_AI"
+
+    # 2. Programming, Coding & Computer Science Inquiries
+    coding_patterns = [
+        r"\b(?:python|javascript|typescript|java|c\+\+|golang|rust|sql|html|css)\b",
+        r"\b(?:code|function|program|script|regex|recursion|algorithm|reverse\s+a\s+string)\b",
+        r"\b(?:tcp\/?ip|dns|http|rest\s+api|json|xml|data\s+structure|machine\s+learning|deep\s+learning|neural\s+network)\b",
+        r"\b(?:write\s+(?:me\s+)?(?:python|code|a\s+function|a\s+script))\b",
+        r"\bexplain\s+(?:recursion|tcp\/?ip|machine\s+learning|pointers|sorting|quicksort|binary\s+search)\b"
+    ]
+    if any(re.search(pat, q_lower) for pat in coding_patterns):
+        return "GENERAL_AI"
+
+    # 3. Detect entities, temporal scope, metrics, and document references
+    q_entities = detect_query_entities(q_clean)
+    target_mines = q_entities.get("mines", [])
+    target_metric = q_entities.get("metric")
+    metric_domain = q_entities.get("metric_domain")
+    detected_fy = q_entities.get("fiscal_year")
+    detected_sub = q_entities.get("subsidiary")
+    is_corporate = q_entities.get("is_corporate_query", False)
+
+    # Check for explicit document / report requests
+    has_doc_request = bool(re.search(
+        r"\b(?:annual\s+report|provisional\s+report|ministry\s+report|official\s+(?:report|source|document)|ingested\s+document|cite\s+(?:the\s+)?document|according\s+to\s+(?:the\s+)?(?:report|document|ministry))\b",
+        q_lower
+    ))
+
+    # Check for quantitative / numerical inquiry terms
+    has_quantitative_intent = bool(re.search(
+        r"\b(?:how\s+much|what\s+was|what\s+is\s+the\s+(?:total|annual|target|actual)|compare|difference\s+between|target\s+vs\s+actual|production\s+of|obr\s+of|in\s+fy|for\s+fy)\b",
+        q_lower
+    ))
+
+    # Check for specific fiscal year pattern
+    has_explicit_fy = bool(detect_query_fiscal_year(q_clean) or re.search(r"\b(20\d{2}[-\/]\d{2,4}|FY\s*20\d{2}(?:[-\/]\d{2,4})?|FY\d{2,4})\b", q_clean, re.IGNORECASE))
+
+    # 4. Pure conceptual mining questions (WITHOUT specific mine, subsidiary, fiscal year, or quantitative data request)
+    conceptual_patterns = [
+        r"\b(?:what\s+is|what\s+are|define|explain|describe)\s+(?:coal|mining|overburden|overburden\s+removal|obr|opencast(?:\s+mining)?|open\s+cast(?:\s+mining)?|underground(?:\s+mining)?|longwall|stripping\s+ratio|coal\s+seam|lignite|anthracite|bituminous|geology)\b",
+        r"\b(?:difference\s+between|compare)\s+(?:open\s*cast|opencast)\s+(?:and|vs\.?|versus)\s+underground\b",
+        r"\b(?:how\s+is\s+coal\s+formed|how\s+does\s+(?:open\s*cast|underground|mining)\s+work|types\s+of\s+coal|methods\s+of\s+mining)\b",
+        r"^(?:what\s+is|define|explain)\s+mining\??$"
+    ]
+    is_pure_conceptual = any(re.search(pat, q_lower.strip()) for pat in conceptual_patterns)
+    if is_pure_conceptual and not target_mines and not detected_sub and not has_explicit_fy and not has_doc_request:
+        return "GENERAL_AI"
+
+
+    # 5. Evidence-Grounded criteria:
+    # A. Explicit specific mine mentioned (e.g. Gevra, Kusmunda, Rajmahal)
+    if target_mines:
+        return "EVIDENCE_GROUNDED"
+
+    # B. Specific subsidiary or corporate CIL combined with metric, fiscal year, quantitative intent, or document request
+    if (detected_sub or is_corporate) and (target_metric or metric_domain or has_explicit_fy or has_quantitative_intent or has_doc_request):
+        return "EVIDENCE_GROUNDED"
+
+    # C. Specific fiscal year combined with metric inquiry (e.g. "production in FY2023-24")
+    if has_explicit_fy and (target_metric or metric_domain or "production" in q_lower or "overburden" in q_lower or "dispatch" in q_lower or "offtake" in q_lower or "target" in q_lower):
+        return "EVIDENCE_GROUNDED"
+
+    # D. Explicit document or ministry source reference
+    if has_doc_request:
+        return "EVIDENCE_GROUNDED"
+
+    # E. Quantitative comparison across mines or subsidiaries
+    if "compare" in q_lower and ("production" in q_lower or "obr" in q_lower or "target" in q_lower or has_explicit_fy):
+        return "EVIDENCE_GROUNDED"
+
+    # Default fallback: When uncertain for generic conceptual queries, prefer GENERAL_AI
+    return "GENERAL_AI"
+
+
 def execute_rag_query(
     db: Session,
     query_text: str,
@@ -186,14 +284,32 @@ def execute_rag_query(
     subsidiary_filter: str = None
 ) -> Dict[str, Any]:
     """
-    Executes Evidence-Grounded Q&A RAG Pipeline:
-    1. Hybrid Search (ChromaDB Vector + PostgreSQL BM25 Keyword via RRF k=60).
-    2. Authority Relevance Checking: prefers INSUFFICIENT_AUTHORITATIVE_EVIDENCE when
-       only synthetic test documents exist for factual queries.
-    3. Builds isolated prompt wrapping evidence in <untrusted_document_context>.
-    4. Queries LLM Provider (Gemini, OpenAI, or Degraded fallback).
-    5. Semantic Citation Gate: verifies document existence, entity, metric, and FY alignment.
+    Executes Dual-Mode Q&A Routing:
+    - MODE A (GENERAL_AI): Routes general conceptual, coding, and chat inquiries directly to Gemini LLM Provider.
+    - MODE B (EVIDENCE_GROUNDED): Executes strict Hybrid Search + Source Authority Gates + Citation Grounding.
+      Unsupported mining questions return 'Insufficient evidence found for this query.' without guessing.
     """
+    query_mode = classify_query_intent(query_text)
+
+    # -------------------------------------------------------------
+    # MODE A: General AI / Knowledge Inquiries (Zero Fake Citations)
+    # -------------------------------------------------------------
+    if query_mode == "GENERAL_AI":
+        llm = get_llm_provider()
+        gen_res = llm.generate_general_ai(query_text)
+        return {
+            "query": query_text,
+            "answer": gen_res.get("answer", "").strip(),
+            "citations": [],
+            "evidence_chunks": [],
+            "provider": gen_res.get("provider", getattr(llm, "provider_name", "gemini")),
+            "degraded_mode": gen_res.get("degraded_mode", False),
+            "mode": "GENERAL_AI"
+        }
+
+    # -------------------------------------------------------------
+    # MODE B: Evidence-Grounded Mining Intelligence
+    # -------------------------------------------------------------
     norm_sub = normalize_subsidiary_scope(subsidiary_filter)
 
     # 1. Execute Hybrid Retrieval
@@ -207,7 +323,8 @@ def execute_rag_query(
             "citations": [],
             "evidence_chunks": [],
             "provider": "none",
-            "degraded_mode": False
+            "degraded_mode": False,
+            "mode": "INSUFFICIENT_EVIDENCE"
         }
 
     # 2. Source Authority Gate (Component 2 & 5)
@@ -247,7 +364,8 @@ def execute_rag_query(
             "citations": [],
             "evidence_chunks": evidence_chunks,
             "provider": "none",
-            "degraded_mode": False
+            "degraded_mode": False,
+            "mode": "INSUFFICIENT_EVIDENCE"
         }
 
     if not has_official_for_metric and not has_synthetic_for_metric and (target_mines or metric_domain or target_metric):
@@ -258,7 +376,8 @@ def execute_rag_query(
             "citations": [],
             "evidence_chunks": evidence_chunks,
             "provider": "none",
-            "degraded_mode": False
+            "degraded_mode": False,
+            "mode": "INSUFFICIENT_EVIDENCE"
         }
 
     # 3. Get LLM Provider instance & determine degraded status
@@ -314,7 +433,8 @@ def execute_rag_query(
         "citations": citations,
         "evidence_chunks": evidence_chunks,
         "provider": "degraded" if is_degraded else getattr(llm, "provider_name", "llm"),
-        "degraded_mode": is_degraded
+        "degraded_mode": is_degraded,
+        "mode": "EVIDENCE_GROUNDED" if citations else "INSUFFICIENT_EVIDENCE"
     }
 
 

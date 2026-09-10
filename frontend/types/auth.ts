@@ -15,3 +15,12 @@ export interface LoginResponse {
   token_type: string;
   user: UserProfile;
 }
+
+export interface SignupPayload {
+  username: string;
+  password: string;
+  full_name?: string;
+  email?: string;
+  subsidiary?: string;
+}
+
