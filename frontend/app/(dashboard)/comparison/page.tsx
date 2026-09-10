@@ -378,9 +378,17 @@ export default function ComparisonPage() {
                     <span className="text-[#E8ECEB] font-bold text-sm">{c.value_b} MT</span>
                   </div>
                 </div>
-                <div className="text-[11px] text-[#9BA5A8] pt-1">
-                  <span className="text-[#C58B3A] font-semibold">Possible Reason: </span>
-                  {c.possible_reason.replace(/_/g, ' ')}
+                <div className="flex items-center justify-between pt-1 border-t border-[#30383D]">
+                  <div className="text-[11px] text-[#9BA5A8]">
+                    <span className="text-[#C58B3A] font-semibold">Possible Reason: </span>
+                    {c.possible_reason.replace(/_/g, ' ')}
+                  </div>
+                  <a
+                    href={c.conflict_id ? `/conflicts?id=${c.conflict_id}` : '/conflicts'}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#C94B45]/20 hover:bg-[#C94B45]/30 text-[#E8ECEB] border border-[#C94B45]/50 text-[10px] font-mono font-semibold transition-colors shrink-0"
+                  >
+                    Resolve →
+                  </a>
                 </div>
               </div>
             ))}
@@ -483,7 +491,7 @@ export default function ComparisonPage() {
                     </div>
                   </div>
 
-                  {/* Status Badges */}
+                  {/* Status Badges & Action */}
                   <div className="flex items-center gap-2 flex-wrap">
                     {matrix.is_seeded_demo && (
                       <Badge variant="warning" size="sm" className="font-mono">
@@ -492,10 +500,19 @@ export default function ComparisonPage() {
                     )}
 
                     {matrix.has_discrepancy || matrix.has_conflict ? (
-                      <Badge variant="danger" size="md" className="gap-1 font-bold">
-                        <AlertTriangle className="h-4 w-4" />
-                        DISCREPANCY DETECTED ({matrix.variance_percentage}% Variance)
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="danger" size="md" className="gap-1 font-bold">
+                          <AlertTriangle className="h-4 w-4" />
+                          DISCREPANCY DETECTED ({matrix.variance_percentage}% Variance)
+                        </Badge>
+                        <a
+                          href={matrix.canonical_conflict_id ? `/conflicts?id=${matrix.canonical_conflict_id}` : '/conflicts'}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#C94B45]/20 hover:bg-[#C94B45]/30 text-[#E8ECEB] border border-[#C94B45]/50 text-xs font-mono font-semibold transition-colors"
+                        >
+                          <AlertTriangle className="h-3.5 w-3.5 text-[#C94B45]" />
+                          Resolve Conflict{matrix.canonical_conflict_id ? ` #${matrix.canonical_conflict_id}` : ''}
+                        </a>
+                      </div>
                     ) : (
                       <Badge variant="success" size="md" className="gap-1 font-bold">
                         <CheckCircle2 className="h-4 w-4" />

@@ -1,18 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { ConflictResolveModal } from '@/components/validation/ConflictResolveModal';
 import { validationApi, ConflictItem, ResolveConflictPayload } from '@/lib/api/validationApi';
 import { useScope } from '@/context/ScopeContext';
 import { GitCompare, RefreshCw } from 'lucide-react';
 
-export default function ConflictsPage() {
+function ConflictsContent() {
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get('id');
   const { selectedSubsidiary } = useScope();
   const queryClient = useQueryClient();
   const [selectedStatus] = useState('ALL');
@@ -30,12 +34,23 @@ export default function ConflictsPage() {
     staleTime: 30000,
   });
 
+  useEffect(() => {
+    if (targetId && conflicts && conflicts.length > 0) {
+      const match = conflicts.find((c) => String(c.id) === targetId);
+      if (match) {
+        setActiveConflict(match);
+      }
+    }
+  }, [targetId, conflicts]);
+
   const resolveMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: ResolveConflictPayload }) =>
       validationApi.resolveConflict(id, payload),
     onSuccess: () => {
       setActiveConflict(null);
       queryClient.invalidateQueries({ queryKey: ['conflicts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['comparison'] });
     },
   });
 
@@ -169,3 +184,12 @@ export default function ConflictsPage() {
     </div>
   );
 }
+
+export default function ConflictsPage() {
+  return (
+    <Suspense fallback={<LoadingState label="Loading Cross-Document Conflicts..." />}>
+      <ConflictsContent />
+    </Suspense>
+  );
+}
+

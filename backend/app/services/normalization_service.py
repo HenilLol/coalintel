@@ -86,7 +86,13 @@ def detect_query_fiscal_year(query_text: str) -> Optional[str]:
         start_yr_short = int(m2.group(1))
         full_start = 2000 + start_yr_short if start_yr_short < 70 else 1900 + start_yr_short
         return f"{full_start}-{m2.group(2)}"
+    # Match single FY YYYY e.g. FY2035 or FY 2035
+    m3 = re.search(r"\bFY\s*((?:19|20)\d{2})\b", query_text, re.IGNORECASE)
+    if m3:
+        yr = int(m3.group(1))
+        return f"{yr-1}-{str(yr)[-2:]}"
     return None
+
 
 
 def classify_document_authority(filename: str) -> str:

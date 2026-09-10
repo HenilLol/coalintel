@@ -25,6 +25,7 @@ export interface QueryResponse {
   evidence_chunks: EvidenceChunkItem[];
   provider: string;
   degraded_mode: boolean;
+  mode?: string;
 }
 
 export interface QueryRequestParams {

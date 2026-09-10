@@ -1,6 +1,9 @@
+import os
 import re
 import abc
+import json
 import logging
+import requests
 from typing import Dict, Any, List, Optional
 from config import settings
 from app.services.normalization_service import (
@@ -38,6 +41,13 @@ class BaseLLMProvider(abc.ABC):
     ) -> Dict[str, Any]:
         """
         Generate completion given user query prompt and isolated context chunks.
+        """
+        pass
+
+    @abc.abstractmethod
+    def generate_general_ai(self, query: str) -> Dict[str, Any]:
+        """
+        Generates direct response for general conceptual, coding, or conversational inquiries.
         """
         pass
 
@@ -381,31 +391,168 @@ class DegradedLLMProvider(BaseLLMProvider):
             "provider": "degraded"
         }
 
+    def generate_general_ai(self, query: str) -> Dict[str, Any]:
+        """
+        Generates deterministic local responses for general conceptual, coding, and chat queries.
+        """
+        q_clean = query.strip()
+        q_lower = q_clean.lower()
+
+        # 1. Conversational greetings
+        if any(q_lower == g or q_lower.startswith(g + " ") for g in ["hi", "hello", "hey", "greetings"]):
+            answer = "Hello! I am COALINTEL AI Assistant, ready to assist you with geological analytics, coal production metrics, and general technical inquiries."
+        elif "how are you" in q_lower:
+            answer = "I am COALINTEL AI Assistant, operating normally and ready to help with mining intelligence, document extractions, or general technical questions."
+        elif "what are you doing" in q_lower or "what can you do" in q_lower:
+            answer = "I am COALINTEL AI, processing geological data, validating multi-source mining metrics, and answering general technical and mining questions."
+        
+        # 2. Programming / Coding queries
+        elif "reverse a string" in q_lower and "python" in q_lower:
+            answer = (
+                "Here is how to reverse a string in Python using slicing:\n\n"
+                "```python\n"
+                "def reverse_string(s: str) -> str:\n"
+                "    return s[::-1]\n\n"
+                "# Example usage:\n"
+                "original = \"COALINTEL\"\n"
+                "reversed_text = reverse_string(original)\n"
+                "print(reversed_text)  # Output: LETNILAOC\n"
+                "```"
+            )
+        elif "what is python" in q_lower:
+            answer = (
+                "Python is a versatile, high-level programming language known for its clear syntax and readability. "
+                "It is widely used in data science, artificial intelligence, backend development, and automation."
+            )
+        elif "recursion" in q_lower:
+            answer = (
+                "Recursion is a programming technique where a function calls itself to solve smaller subproblems "
+                "of the original problem until reaching a base termination case."
+            )
+        elif "tcp/ip" in q_lower or "tcp ip" in q_lower:
+            answer = (
+                "TCP/IP (Transmission Control Protocol/Internet Protocol) is the foundational communications protocol suite "
+                "that standardizes how data is packetized, addressed, transmitted, routed, and received across network connections."
+            )
+        elif "machine learning" in q_lower:
+            answer = (
+                "Machine Learning (ML) is a subset of artificial intelligence where algorithms learn patterns and relationships "
+                "from historical data to make predictions or decisions without being explicitly rule-programmed."
+            )
+
+        # 3. Conceptual mining questions
+        elif "what is coal" in q_lower or q_lower == "coal":
+            answer = (
+                "Coal is a combustible black or dark brownish sedimentary rock formed from ancient plant material subjected to "
+                "heat and pressure over geological eras. It serves as a primary energy source for thermal power generation and steelmaking."
+            )
+        elif "overburden removal" in q_lower or "what is obr" in q_lower or "what is overburden" in q_lower:
+            answer = (
+                "Overburden removal (OBR) is the operational process in surface/open-cast mining where overlying rock, soil, and earth "
+                "are excavated and removed to uncover the economically extractable coal seam below."
+            )
+        elif "open cast" in q_lower or "opencast" in q_lower:
+            answer = (
+                "Opencast (surface) mining is an extraction method used when mineral or coal deposits are located relatively close to the surface, "
+                "excavating from the ground level downward."
+            )
+        else:
+            answer = (
+                f"COALINTEL AI Assistant: For unrestricted real-time general knowledge generation on \"{q_clean}\", "
+                "connect a configured Gemini API key in the backend environment."
+            )
+
+        return {
+            "answer": answer,
+            "citations": [],
+            "evidence_chunks": [],
+            "provider": "degraded",
+            "degraded_mode": True,
+            "mode": "GENERAL_AI"
+        }
+
 
 class GeminiLLMProvider(BaseLLMProvider):
     """
-    Hosted Gemini API LLM Provider implementation.
+    Hosted Gemini API LLM Provider implementation with direct REST API invocation and SDK fallback.
     """
     provider_name: str = "gemini"
 
     def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash", timeout: float = 10.0):
         self.api_key = api_key
-        self.model_name = model_name
+        self.model_name = model_name or "gemini-1.5-flash"
         self.timeout = timeout
         self.degraded_fallback = DegradedLLMProvider()
 
-    def generate(self, prompt: str) -> str:
-        if not self.api_key or self.api_key == "your-api-key-here":
-            return self.degraded_fallback.generate(prompt)
+    def _call_gemini_api(self, prompt: str) -> Optional[str]:
+        if not self.api_key or self.api_key.strip() in ["", "your-api-key-here"]:
+            return None
+
+        # 1. Try Google Generative Language REST API (direct, zero-dependency, ultra-reliable)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [
+                {"parts": [{"text": prompt}]}
+            ]
+        }
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts and "text" in parts[0]:
+                        return parts[0]["text"]
+            else:
+                logger.warning(f"Gemini REST API returned HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as rest_err:
+            logger.warning(f"Gemini REST call failed ({rest_err}). Trying SDK fallback if installed.")
+
+        # 2. Try SDK fallback if available
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
             model = genai.GenerativeModel(self.model_name)
             response = model.generate_content(prompt)
-            return response.text if response and hasattr(response, "text") else self.degraded_fallback.generate(prompt)
-        except Exception as err:
-            logger.warning(f"Gemini API invocation failed ({err}). Falling back to degraded grounded synthesis.")
-            return self.degraded_fallback.generate(prompt)
+            if response and hasattr(response, "text") and response.text:
+                return response.text
+        except Exception as sdk_err:
+            logger.warning(f"Gemini SDK invocation failed ({sdk_err}).")
+
+        return None
+
+    def generate(self, prompt: str) -> str:
+        api_res = self._call_gemini_api(prompt)
+        if api_res:
+            return api_res
+        return self.degraded_fallback.generate(prompt)
+
+    def generate_general_ai(self, query: str) -> Dict[str, Any]:
+        if not self.api_key or self.api_key.strip() in ["", "your-api-key-here"]:
+            return self.degraded_fallback.generate_general_ai(query)
+
+        sys_prompt = (
+            "You are COALINTEL AI, an intelligent technical assistant for Coal India Limited (CIL) and CMPDI. "
+            "Provide a direct, helpful, and technically accurate answer to the user's question.\n\n"
+            f"User Question: {query}\n\n"
+            "Answer:"
+        )
+        api_res = self._call_gemini_api(sys_prompt)
+        if api_res:
+            return {
+                "answer": api_res.strip(),
+                "citations": [],
+                "evidence_chunks": [],
+                "provider": "gemini",
+                "degraded_mode": False,
+                "mode": "GENERAL_AI"
+            }
+
+        fallback_res = self.degraded_fallback.generate_general_ai(query)
+        fallback_res["provider"] = "degraded"
+        return fallback_res
 
     def generate_completion(
         self,
@@ -416,7 +563,7 @@ class GeminiLLMProvider(BaseLLMProvider):
         return {
             "answer": ans,
             "citations": [],
-            "degraded_mode": not bool(self.api_key),
+            "degraded_mode": not bool(self.api_key and self.api_key != "your-api-key-here"),
             "provider": "gemini"
         }
 
@@ -449,6 +596,32 @@ class OpenAILLMProvider(BaseLLMProvider):
             logger.warning(f"OpenAI API invocation failed ({err}). Falling back to degraded grounded synthesis.")
             return self.degraded_fallback.generate(prompt)
 
+    def generate_general_ai(self, query: str) -> Dict[str, Any]:
+        if not self.api_key or self.api_key.strip() in ["", "your-api-key-here"]:
+            return self.degraded_fallback.generate_general_ai(query)
+        try:
+            import openai
+            client = openai.OpenAI(api_key=self.api_key)
+            response = client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": "You are COALINTEL AI Assistant for Coal India Limited."},
+                    {"role": "user", "content": query}
+                ],
+                timeout=self.timeout
+            )
+            return {
+                "answer": response.choices[0].message.content.strip(),
+                "citations": [],
+                "evidence_chunks": [],
+                "provider": "openai",
+                "degraded_mode": False,
+                "mode": "GENERAL_AI"
+            }
+        except Exception as err:
+            logger.warning(f"OpenAI General AI call failed ({err}).")
+            return self.degraded_fallback.generate_general_ai(query)
+
     def generate_completion(
         self,
         prompt: str,
@@ -458,10 +631,9 @@ class OpenAILLMProvider(BaseLLMProvider):
         return {
             "answer": ans,
             "citations": [],
-            "degraded_mode": not bool(self.api_key),
+            "degraded_mode": not bool(self.api_key and self.api_key != "your-api-key-here"),
             "provider": "openai"
         }
-
 
 
 def get_llm_provider(
@@ -474,7 +646,15 @@ def get_llm_provider(
     Factory function returning the configured LLM provider according to environment settings.
     """
     p_name = (provider_name or settings.LLM_PROVIDER).lower()
-    key = api_key or settings.LLM_API_KEY
+    key = (
+        api_key
+        or settings.LLM_API_KEY
+        or getattr(settings, "GEMINI_API_KEY", "")
+        or getattr(settings, "GOOGLE_API_KEY", "")
+        or os.getenv("GEMINI_API_KEY", "")
+        or os.getenv("GOOGLE_API_KEY", "")
+        or os.getenv("LLM_API_KEY", "")
+    )
     m_name = model_name or settings.LLM_MODEL_NAME
     t_out = timeout or settings.LLM_TIMEOUT_SECONDS
 

@@ -8,6 +8,15 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    subsidiary: Optional[str] = "CIL HQ"
+
+
+
 class UserResponse(BaseModel):
     id: int
     username: str

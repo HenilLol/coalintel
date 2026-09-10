@@ -35,3 +35,4 @@ class QueryResponse(BaseModel):
     evidence_chunks: List[EvidenceChunkItem]
     provider: str
     degraded_mode: bool = False
+    mode: Optional[str] = "EVIDENCE_GROUNDED"

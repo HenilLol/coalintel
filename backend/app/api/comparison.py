@@ -8,7 +8,9 @@ from app.models.user import User
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.extracted_metric import ExtractedMetric
+from app.models.data_conflict import DataConflict
 from app.models.data_provenance import DataSource, DataObservation, DataConflictRecord
+
 from app.models.mine import MineMaster, MineYearlyMetric
 from app.core.rbac import get_current_user
 from app.services.conflict_service import (
@@ -546,6 +548,47 @@ def get_comparison_matrix(
                 "status": conflict_rec.resolution_status
             }
 
+        # Resolve or link canonical DataConflict record deterministically
+        canonical_conflict_id = None
+        if has_discrepancy:
+            existing_dc = db.query(DataConflict).filter(
+                DataConflict.mine_name.ilike(entity),
+                DataConflict.fiscal_year == fy,
+                DataConflict.status == "OPEN"
+            ).first()
+            if existing_dc:
+                canonical_conflict_id = existing_dc.id
+            elif len(rows) >= 2:
+                doc_a_id = rows[0].get("document_id") if isinstance(rows[0].get("document_id"), int) else None
+                doc_b_id = rows[1].get("document_id") if isinstance(rows[1].get("document_id"), int) else None
+                if doc_a_id and doc_b_id and doc_a_id != doc_b_id:
+                    matched_dc = db.query(DataConflict).filter(
+                        DataConflict.mine_name == entity,
+                        DataConflict.fiscal_year == fy,
+                        or_(
+                            (DataConflict.doc_a_id == doc_a_id) & (DataConflict.doc_b_id == doc_b_id),
+                            (DataConflict.doc_a_id == doc_b_id) & (DataConflict.doc_b_id == doc_a_id)
+                        )
+                    ).first()
+                    if matched_dc:
+                        canonical_conflict_id = matched_dc.id
+                    else:
+                        new_dc = DataConflict(
+                            doc_a_id=doc_a_id,
+                            doc_b_id=doc_b_id,
+                            mine_name=entity,
+                            metric_name=metric_name,
+                            fiscal_year=fy,
+                            doc_a_value=rows[0].get("standard_value"),
+                            doc_b_value=rows[1].get("standard_value"),
+                            discrepancy_pct=variance_pct,
+                            status="OPEN"
+                        )
+                        db.add(new_dc)
+                        db.commit()
+                        db.refresh(new_dc)
+                        canonical_conflict_id = new_dc.id
+
         period_type = "YTD" if "2026-27" in fy else "annual"
         as_of_date = "June 2026" if "2026-27" in fy else None
 
@@ -564,7 +607,8 @@ def get_comparison_matrix(
             "status": status_label,
             "has_discrepancy": has_discrepancy,
             "is_seeded_demo": has_seeded,
-            "has_conflict": conflict_rec is not None,
+            "has_conflict": conflict_rec is not None or canonical_conflict_id is not None,
+            "canonical_conflict_id": canonical_conflict_id,
             "conflict_details": conflict_details,
             "provenance_notice": "Contains Seeded Mine-Level Discrepancy Fixture (database_seed.py)" if has_seeded else ("Official Government Source Conflict Detected" if conflict_rec else "100% Authentic Official Government Sources")
         })
