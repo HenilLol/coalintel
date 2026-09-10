@@ -57,7 +57,7 @@ def run_government_data_ingestion(db: Optional[Session] = None):
     if db is None:
         db = SessionLocal()
         should_close = True
-    run_id = f"GOV-RUN-{int(datetime.now(timezone.utc).timestamp())}-{uuid.uuid4().hex[:8]}"
+    run_id = "GOV-RUN-CANONICAL-MASTER-2024-25"
     start_time = datetime.now(timezone.utc)
     
     logger.info(f"Starting authentic Government of India mine data ingestion: {run_id}")
@@ -1626,23 +1626,28 @@ def run_government_data_ingestion(db: Optional[Session] = None):
         db.commit()
         logger.info("Parliamentary Q&A seeded.")
 
-        # Record ingestion run audit
+        # Record ingestion run audit (idempotent across runs)
         end_time = datetime.now(timezone.utc)
-        db.add(IngestionRun(
-            run_id=run_id,
-            started_at=start_time,
-            completed_at=end_time,
-            source="Ministry of Coal / CCO / Nominated Authority / CIL",
-            document="Coal Directory 2024-25, MoC Annual Reports 2024-25 & 2025-26, Monthly Stats 2026-27 YTD",
-            records_found=records_inserted + 10,
-            records_inserted=records_inserted,
-            records_updated=0,
-            records_rejected=0,
-            conflicts_found=conflicts_found,
-            missing_values=missing_values,
-            status="COMPLETED",
-            error_log=None
-        ))
+        existing_run = db.query(IngestionRun).filter(IngestionRun.run_id == run_id).first()
+        if not existing_run:
+            db.add(IngestionRun(
+                run_id=run_id,
+                started_at=start_time,
+                completed_at=end_time,
+                source="Ministry of Coal / CCO / Nominated Authority / CIL",
+                document="Coal Directory 2024-25, MoC Annual Reports 2024-25 & 2025-26, Monthly Stats 2026-27 YTD",
+                records_found=records_inserted + 10,
+                records_inserted=records_inserted,
+                records_updated=0,
+                records_rejected=0,
+                conflicts_found=conflicts_found,
+                missing_values=missing_values,
+                status="COMPLETED",
+                error_log=None
+            ))
+        else:
+            existing_run.completed_at = end_time
+            existing_run.records_updated += records_inserted
         db.commit()
         logger.info(f"Ingestion run completed successfully. {records_inserted} records inserted.")
 

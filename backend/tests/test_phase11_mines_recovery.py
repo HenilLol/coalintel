@@ -16,7 +16,8 @@ if backend_dir not in sys.path:
 from main import app
 from database import SessionLocal
 from app.models.mine import MineMaster, MineYearlyMetric, CoalBlock, MineAlias
-from app.models.data_provenance import DataSource
+from app.models.data_provenance import DataSource, IngestionRun
+from app.models.document import Document
 from app.models.extracted_metric import ExtractedMetric
 from data.government_mine_data_seed import run_government_data_ingestion
 
@@ -37,6 +38,13 @@ def test_migration_002_file_integrity():
     assert any("CREATE INDEX IF NOT EXISTS" in line for line in non_comment_lines), "Must use IF NOT EXISTS for index creation"
     assert not any(line.startswith("DROP") for line in non_comment_lines), "Must NOT contain any DROP statement"
     assert not any("TRUNCATE" in line for line in non_comment_lines), "Must NOT contain any TRUNCATE statement"
+
+    # Provenance safety assertions: prevent retroactive false attribution to existing rows
+    assert "DEFAULT 'OFFICIAL'" not in sql, "DDL must NOT default data_origin to 'OFFICIAL'"
+    assert "DEFAULT '2024-25'" not in sql, "DDL must NOT default financial_year to '2024-25'"
+    assert "DEFAULT 'VERIFIED'" not in sql.upper(), "DDL must NOT default verification_status to 'verified'"
+    assert "DEFAULT NOW()" not in sql, "DDL must NOT default retrieved_at to NOW()"
+    assert "DEFAULT 'UNKNOWN'" in sql, "DDL must default unproven provenance columns to 'UNKNOWN'"
 
     # Required columns checked
     required_cols = [
@@ -66,7 +74,15 @@ def test_mines_list_success_and_headers():
     assert "company_name" in first
     assert "state" in first
     assert "data_origin" in first
-    assert first["data_origin"] in ["OFFICIAL", "government"]
+    assert first["data_origin"] in ["OFFICIAL", "government", "UNKNOWN"]
+
+    # Verify natural key patterns and integrity across all returned mines
+    for m in data:
+        assert m["mine_id"].startswith("MINE-"), f"Invalid natural key prefix: {m['mine_id']}"
+        assert len(m["mine_name"].strip()) > 0, f"Empty mine name for {m['mine_id']}"
+        assert len(m["company_name"].strip()) > 0, f"Empty company name for {m['mine_id']}"
+        assert len(m["state"].strip()) > 0, f"Empty state for {m['mine_id']}"
+        assert m["coal_or_lignite"] in ["Coal", "Lignite"], f"Invalid fuel type: {m['coal_or_lignite']}"
 
 
 def test_mines_list_filtering():
@@ -218,6 +234,8 @@ def test_seeder_idempotency_and_zero_metric_mutation():
         metrics_before = db.query(MineYearlyMetric).count()
         blocks_before = db.query(CoalBlock).count()
         sources_before = db.query(DataSource).count()
+        runs_before = db.query(IngestionRun).count()
+        docs_before = db.query(Document).count()
 
         # Run seeder again
         run_government_data_ingestion(db=db)
@@ -226,11 +244,15 @@ def test_seeder_idempotency_and_zero_metric_mutation():
         metrics_after = db.query(MineYearlyMetric).count()
         blocks_after = db.query(CoalBlock).count()
         sources_after = db.query(DataSource).count()
+        runs_after = db.query(IngestionRun).count()
+        docs_after = db.query(Document).count()
 
         assert mines_before == mines_after, f"Duplicate mines created: {mines_before} != {mines_after}"
         assert metrics_before == metrics_after, f"Duplicate metrics created: {metrics_before} != {metrics_after}"
         assert blocks_before == blocks_after, f"Duplicate blocks created: {blocks_before} != {blocks_after}"
         assert sources_before == sources_after, f"Duplicate sources created: {sources_before} != {sources_after}"
+        assert runs_before == runs_after, f"Duplicate IngestionRun created: {runs_before} != {runs_after}"
+        assert docs_before == docs_after, f"Unexpected Document created by seeder: {docs_before} != {docs_after}"
 
         # Verify extracted_metrics were NOT mutated
         extracted_after = [
@@ -241,6 +263,36 @@ def test_seeder_idempotency_and_zero_metric_mutation():
 
     finally:
         db.close()
+
+
+def test_mines_route_precedence_order():
+    """Verify route registration order ensures static routes precede parameterized /{mine_id}."""
+    from app.api.mines import router as mines_router
+
+    route_map = [(r.path, r.endpoint.__name__) for r in mines_router.routes if hasattr(r, "path")]
+    paths = [p for p, _ in route_map]
+
+    assert "/mines/coal-blocks" in paths
+    assert "/mines/data-sources" in paths
+    assert "/mines/{mine_id}" in paths
+
+    cb_idx = paths.index("/mines/coal-blocks")
+    ds_idx = paths.index("/mines/data-sources")
+    param_idx = paths.index("/mines/{mine_id}")
+
+    assert cb_idx < param_idx, f"Route /mines/coal-blocks ({cb_idx}) must precede /mines/{{mine_id}} ({param_idx})"
+    assert ds_idx < param_idx, f"Route /mines/data-sources ({ds_idx}) must precede /mines/{{mine_id}} ({param_idx})"
+
+    # Verify that HTTP requests to static subpaths resolve to their specific handlers, NOT get_mine_details
+    r_cb = client.get("/api/v1/mines/coal-blocks")
+    assert r_cb.status_code == 200
+    assert isinstance(r_cb.json(), list)
+    assert all("coal_block_id" in b for b in r_cb.json())
+
+    r_ds = client.get("/api/v1/mines/data-sources")
+    assert r_ds.status_code == 200
+    assert isinstance(r_ds.json(), list)
+    assert all("source_id" in s for s in r_ds.json())
 
 
 def test_mines_endpoint_error_handling_graceful_503(monkeypatch):

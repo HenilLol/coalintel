@@ -30,7 +30,7 @@ class MineMaster(Base):
     production_status = Column(String(50), nullable=True)
     mine_opening_permission = Column(String(50), nullable=True)
     captive_or_commercial = Column(String(50), nullable=True)
-    financial_year = Column(String(20), nullable=True, default="2024-25")
+    financial_year = Column(String(20), nullable=True)
     
     # Source provenance & authenticity
     source_id = Column(String(100), nullable=True, index=True)
@@ -40,10 +40,10 @@ class MineMaster(Base):
     source_table = Column(String(100), nullable=True)
     source_chapter = Column(String(100), nullable=True)
     source_publication_date = Column(String(50), nullable=True)
-    retrieved_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    retrieved_at = Column(DateTime(timezone=True), nullable=True)
     last_verified_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    verification_status = Column(String(50), default="verified", nullable=False)
-    data_origin = Column(String(30), default="OFFICIAL", nullable=False, index=True)
+    verification_status = Column(String(50), default="UNKNOWN", nullable=True)
+    data_origin = Column(String(30), default="UNKNOWN", nullable=True, index=True)
 
 
     # Relationships

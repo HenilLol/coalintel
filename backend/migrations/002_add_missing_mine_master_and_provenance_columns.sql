@@ -5,9 +5,12 @@
 -- Safety Guarantees:
 -- 1. Uses IF NOT EXISTS on all ADD COLUMN statements to guarantee idempotency across multiple executions.
 -- 2. Uses CREATE INDEX IF NOT EXISTS to guarantee idempotent index creation.
--- 3. Sets safe default values ('OFFICIAL', '2024-25', 'verified', NOW()) so existing rows remain valid.
--- 4. Does NOT drop tables, truncate data, or alter existing column definitions.
--- 5. Application startup does NOT execute this DDL; executed via authorized DBA workflow or standalone migration script.
+-- 3. Sets safe provenance default values ('UNKNOWN' for data_origin and verification_status, NULL for financial_year and retrieved_at)
+--    to prevent unproven retroactive upgrades to historical rows.
+-- 4. Specific official provenance ('OFFICIAL', '2024-25', 'verified', retrieval timestamp) is explicitly attributed
+--    by the authoritative government seeder upon genuine ingestion, not by retroactive schema defaults.
+-- 5. Does NOT drop tables, truncate data, or alter existing column definitions.
+-- 6. Application startup does NOT execute this DDL; executed via authorized DBA workflow or standalone migration script.
 
 -- 1. mine_master table missing columns (added in PR #34 model definition)
 ALTER TABLE mine_master
@@ -26,19 +29,19 @@ ALTER TABLE mine_master
 ADD COLUMN IF NOT EXISTS captive_or_commercial VARCHAR(50);
 
 ALTER TABLE mine_master
-ADD COLUMN IF NOT EXISTS financial_year VARCHAR(20) DEFAULT '2024-25';
+ADD COLUMN IF NOT EXISTS financial_year VARCHAR(20);
 
 ALTER TABLE mine_master
 ADD COLUMN IF NOT EXISTS source_chapter VARCHAR(100);
 
 ALTER TABLE mine_master
-ADD COLUMN IF NOT EXISTS retrieved_at TIMESTAMPTZ DEFAULT NOW();
+ADD COLUMN IF NOT EXISTS retrieved_at TIMESTAMPTZ;
 
 ALTER TABLE mine_master
-ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'verified';
+ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'UNKNOWN';
 
 ALTER TABLE mine_master
-ADD COLUMN IF NOT EXISTS data_origin VARCHAR(30) DEFAULT 'OFFICIAL';
+ADD COLUMN IF NOT EXISTS data_origin VARCHAR(30) DEFAULT 'UNKNOWN';
 
 -- Performance & Dimensional Indexes on mine_master
 CREATE INDEX IF NOT EXISTS ix_mine_master_sector
