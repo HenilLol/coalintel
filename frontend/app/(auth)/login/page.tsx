@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Logo } from '@/components/ui/Logo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -37,6 +38,34 @@ export default function LoginPage() {
       console.error('Login error:', err);
       const detail =
         err.response?.data?.detail || 'Authentication failed. Invalid username or password.';
+      setError(detail);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickLogin = async (role: 'admin' | 'analyst') => {
+    setIsLoading(true);
+    setError(null);
+    const creds =
+      role === 'admin'
+        ? { username: 'admin', password: 'Admin@123' }
+        : { username: 'analyst', password: 'Analyst@123' };
+
+    setUsername(creds.username);
+    setPassword(creds.password);
+
+    try {
+      const data = await authApi.login(creds.username, creds.password);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('coalintel_token', data.access_token);
+        localStorage.setItem('coalintel_user', JSON.stringify(data.user));
+      }
+      router.push('/dashboard');
+    } catch (err: any) {
+      console.error('Quick login error:', err);
+      const detail =
+        err.response?.data?.detail || 'Authentication failed. Please verify credentials.';
       setError(detail);
     } finally {
       setIsLoading(false);
@@ -111,35 +140,31 @@ export default function LoginPage() {
 
           {error && <ErrorState message={error} />}
 
-          {/* Role Selection Helpers */}
+          {/* Role Selection Helpers / Demo Quick Login Shortcuts */}
           <div className="space-y-2">
             <span className="text-[11px] uppercase tracking-wider text-[#9BA5A8] font-mono block">
-              Quick Role Selection
+              Predefined Demo Shortcuts
             </span>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setUsername('admin');
-                  setError(null);
-                }}
-                className={`text-xs ${username === 'admin' ? 'border-[#C58B3A] text-[#C58B3A]' : 'text-[#9BA5A8]'}`}
+                disabled={isLoading}
+                onClick={() => handleQuickLogin('admin')}
+                className="text-xs border-[#C58B3A]/60 text-[#C58B3A] hover:bg-[#C58B3A]/10"
               >
-                Admin Role
+                Admin Login
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setUsername('analyst');
-                  setError(null);
-                }}
-                className={`text-xs ${username === 'analyst' ? 'border-[#4F8A62] text-[#4F8A62]' : 'text-[#9BA5A8]'}`}
+                disabled={isLoading}
+                onClick={() => handleQuickLogin('analyst')}
+                className="text-xs border-[#4F8A62]/60 text-[#4F8A62] hover:bg-[#4F8A62]/10"
               >
-                Analyst Role
+                Analyst Login
               </Button>
             </div>
           </div>
@@ -193,14 +218,13 @@ export default function LoginPage() {
 
           {/* Institutional Access & Signup Link */}
           <div className="pt-4 border-t border-[#30383D] text-center text-xs text-[#9BA5A8]">
-            <span>Need an analyst account? </span>
-            <button
-              type="button"
-              onClick={() => router.push('/signup')}
+            <span>Don&apos;t have an account? </span>
+            <Link
+              href="/signup"
               className="text-[#C58B3A] hover:text-[#D6A052] font-semibold underline underline-offset-2 ml-1"
             >
-              Register Account
-            </button>
+              Sign up
+            </Link>
           </div>
         </div>
       </div>

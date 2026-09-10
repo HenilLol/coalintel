@@ -10,6 +10,7 @@ from app.core.rbac import get_current_user, require_roles
 from app.schemas.validation import ValidationItemResponse, ConflictResponse, ConflictResolveRequest
 from app.services.validation_service import run_deterministic_validation_feed
 from app.services.conflict_service import detect_and_register_cross_document_conflicts, resolve_data_conflict
+from app.services.normalization_service import normalize_subsidiary_scope
 
 router = APIRouter(tags=["Validation & Conflict Resolver"])
 
@@ -23,9 +24,10 @@ def get_validation_feed(
     """
     Returns deterministic arithmetic validation warnings (> 5% discrepancy) and data quality feed items.
     """
+    norm_sub = normalize_subsidiary_scope(subsidiary_filter)
     items = run_deterministic_validation_feed(
         db=db,
-        subsidiary_filter=subsidiary_filter or current_user.subsidiary
+        subsidiary_filter=norm_sub or current_user.subsidiary
     )
     return [ValidationItemResponse.model_validate(i) for i in items]
 
@@ -44,34 +46,36 @@ def list_conflicts(
     detect_and_register_cross_document_conflicts(db)
 
     query = db.query(DataConflict)
-    if status_filter:
+    if status_filter and status_filter.upper() not in ["ALL", "ANY", ""]:
         query = query.filter(DataConflict.status == status_filter.upper())
-    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
-        query = query.filter(DataConflict.subsidiary == subsidiary_filter)
+    
+    norm_sub = normalize_subsidiary_scope(subsidiary_filter)
+    if norm_sub:
+        query = query.join(Document, DataConflict.doc_a_id == Document.id).filter(Document.subsidiary == norm_sub)
     
     conflicts = query.order_by(DataConflict.created_at.desc()).all()
 
     # Map filename relationships for Document A and Document B
     response_list = []
     for c in conflicts:
-        doc_a = db.query(Document).filter(Document.id == c.document_a_id).first()
-        doc_b = db.query(Document).filter(Document.id == c.document_b_id).first()
+        doc_a = db.query(Document).filter(Document.id == c.doc_a_id).first()
+        doc_b = db.query(Document).filter(Document.id == c.doc_b_id).first()
         
         response_list.append(ConflictResponse(
             id=c.id,
             mine_name=c.mine_name,
-            subsidiary=c.subsidiary,
+            subsidiary=doc_a.subsidiary if doc_a and doc_a.subsidiary else "CIL HQ",
             metric_name=c.metric_name,
             fiscal_year=c.fiscal_year,
-            document_a_id=c.document_a_id,
-            document_a_filename=doc_a.filename if doc_a else f"Doc #{c.document_a_id}",
-            document_a_value=c.document_a_value,
-            document_a_unit=c.document_a_unit or "MT",
-            document_b_id=c.document_b_id,
-            document_b_filename=doc_b.filename if doc_b else f"Doc #{c.document_b_id}",
-            document_b_value=c.document_b_value,
-            document_b_unit=c.document_b_unit or "MT",
-            discrepancy_percentage=c.discrepancy_percentage,
+            document_a_id=c.doc_a_id or 0,
+            document_a_filename=doc_a.filename if doc_a else f"Doc #{c.doc_a_id}",
+            document_a_value=float(c.doc_a_value) if c.doc_a_value is not None else 0.0,
+            document_a_unit="MT",
+            document_b_id=c.doc_b_id or 0,
+            document_b_filename=doc_b.filename if doc_b else f"Doc #{c.doc_b_id}",
+            document_b_value=float(c.doc_b_value) if c.doc_b_value is not None else 0.0,
+            document_b_unit="MT",
+            discrepancy_percentage=float(c.discrepancy_pct) if c.discrepancy_pct is not None else 0.0,
             status=c.status,
             resolved_by=c.resolved_by,
             resolution_notes=c.resolution_notes,
@@ -79,6 +83,47 @@ def list_conflicts(
         ))
 
     return response_list
+
+
+@router.get("/conflicts/{id}", response_model=ConflictResponse)
+def get_conflict_by_id(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Returns a single cross-document conflict record by ID.
+    """
+    c = db.query(DataConflict).filter(DataConflict.id == id).first()
+    if not c:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conflict with ID {id} not found."
+        )
+
+    doc_a = db.query(Document).filter(Document.id == c.doc_a_id).first()
+    doc_b = db.query(Document).filter(Document.id == c.doc_b_id).first()
+
+    return ConflictResponse(
+        id=c.id,
+        mine_name=c.mine_name,
+        subsidiary=doc_a.subsidiary if doc_a and doc_a.subsidiary else "CIL HQ",
+        metric_name=c.metric_name,
+        fiscal_year=c.fiscal_year,
+        document_a_id=c.doc_a_id or 0,
+        document_a_filename=doc_a.filename if doc_a else f"Doc #{c.doc_a_id}",
+        document_a_value=float(c.doc_a_value) if c.doc_a_value is not None else 0.0,
+        document_a_unit="MT",
+        document_b_id=c.doc_b_id or 0,
+        document_b_filename=doc_b.filename if doc_b else f"Doc #{c.doc_b_id}",
+        document_b_value=float(c.doc_b_value) if c.doc_b_value is not None else 0.0,
+        document_b_unit="MT",
+        discrepancy_percentage=float(c.discrepancy_pct) if c.discrepancy_pct is not None else 0.0,
+        status=c.status,
+        resolved_by=c.resolved_by,
+        resolution_notes=c.resolution_notes,
+        created_at=c.created_at
+    )
 
 
 @router.post("/conflicts/{id}/resolve", response_model=ConflictResponse)
@@ -107,24 +152,24 @@ def resolve_conflict_endpoint(
             detail=str(ve)
         )
 
-    doc_a = db.query(Document).filter(Document.id == updated.document_a_id).first()
-    doc_b = db.query(Document).filter(Document.id == updated.document_b_id).first()
+    doc_a = db.query(Document).filter(Document.id == updated.doc_a_id).first()
+    doc_b = db.query(Document).filter(Document.id == updated.doc_b_id).first()
 
     return ConflictResponse(
         id=updated.id,
         mine_name=updated.mine_name,
-        subsidiary=updated.subsidiary,
+        subsidiary=doc_a.subsidiary if doc_a and doc_a.subsidiary else "CIL HQ",
         metric_name=updated.metric_name,
         fiscal_year=updated.fiscal_year,
-        document_a_id=updated.document_a_id,
-        document_a_filename=doc_a.filename if doc_a else f"Doc #{updated.document_a_id}",
-        document_a_value=updated.document_a_value,
-        document_a_unit=updated.document_a_unit or "MT",
-        document_b_id=updated.document_b_id,
-        document_b_filename=doc_b.filename if doc_b else f"Doc #{updated.document_b_id}",
-        document_b_value=updated.document_b_value,
-        document_b_unit=updated.document_b_unit or "MT",
-        discrepancy_percentage=updated.discrepancy_percentage,
+        document_a_id=updated.doc_a_id or 0,
+        document_a_filename=doc_a.filename if doc_a else f"Doc #{updated.doc_a_id}",
+        document_a_value=float(updated.doc_a_value) if updated.doc_a_value is not None else 0.0,
+        document_a_unit="MT",
+        document_b_id=updated.doc_b_id or 0,
+        document_b_filename=doc_b.filename if doc_b else f"Doc #{updated.doc_b_id}",
+        document_b_value=float(updated.doc_b_value) if updated.doc_b_value is not None else 0.0,
+        document_b_unit="MT",
+        discrepancy_percentage=float(updated.discrepancy_pct) if updated.discrepancy_pct is not None else 0.0,
         status=updated.status,
         resolved_by=updated.resolved_by,
         resolution_notes=updated.resolution_notes,

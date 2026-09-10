@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Logo } from '@/components/ui/Logo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -214,14 +215,13 @@ export default function SignupPage() {
           </form>
 
           <div className="pt-4 border-t border-[#30383D] text-center text-xs text-[#9BA5A8]">
-            <span>Already have an authorized account? </span>
-            <button
-              type="button"
-              onClick={() => router.push('/login')}
+            <span>Already signed up? </span>
+            <Link
+              href="/login"
               className="text-[#C58B3A] hover:text-[#D6A052] font-semibold underline underline-offset-2 ml-1"
             >
-              Sign In
-            </button>
+              Sign in
+            </Link>
           </div>
         </div>
       </div>

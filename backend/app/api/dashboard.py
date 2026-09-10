@@ -10,6 +10,7 @@ from app.models.extracted_metric import ExtractedMetric
 from app.models.data_conflict import DataConflict
 from app.core.rbac import get_current_user
 from app.schemas.dashboard import KpiResponse, DashboardChartsResponse, ProductionChartItem
+from app.services.normalization_service import normalize_subsidiary_scope
 
 router = APIRouter(tags=["Dashboard Analytics"])
 
@@ -28,17 +29,19 @@ def get_dashboard_kpis(
     - Active Cross-Document Conflicts
     - Calculated Entity Accuracy & Citation Coverage Rates
     """
-    # 1. Total Documents
+    norm_sub = normalize_subsidiary_scope(subsidiary_filter)
+
+    # 1. Total Documents (filtered by subsidiary when specific, otherwise global)
     doc_query = db.query(Document)
-    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
-        doc_query = doc_query.filter(Document.subsidiary == subsidiary_filter)
+    if norm_sub:
+        doc_query = doc_query.filter(Document.subsidiary == norm_sub)
     total_docs = doc_query.count()
 
     # 2. Active Conflicts (filtered by subsidiary through related documents and status='OPEN')
     conflict_query = db.query(DataConflict).filter(DataConflict.status == "OPEN")
-    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
+    if norm_sub:
         conflict_query = conflict_query.join(Document, DataConflict.doc_a_id == Document.id).filter(
-            Document.subsidiary == subsidiary_filter
+            Document.subsidiary == norm_sub
         )
     if fiscal_year:
         conflict_query = conflict_query.filter(DataConflict.fiscal_year == fiscal_year)
@@ -46,7 +49,8 @@ def get_dashboard_kpis(
 
     # 3. Production & OBR Aggregations from extracted_metrics
     prod_query = db.query(func.sum(ExtractedMetric.standard_value)).filter(
-        ExtractedMetric.metric_name.ilike("%production%")
+        ExtractedMetric.metric_name.ilike("%production%"),
+        ~ExtractedMetric.metric_name.ilike("%target%")
     )
     obr_query = db.query(func.sum(ExtractedMetric.standard_value)).filter(
         ExtractedMetric.metric_name.ilike("%overburden%")
@@ -56,9 +60,9 @@ def get_dashboard_kpis(
         prod_query = prod_query.filter(ExtractedMetric.fiscal_year == fiscal_year)
         obr_query = obr_query.filter(ExtractedMetric.fiscal_year == fiscal_year)
 
-    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
-        prod_query = prod_query.filter(ExtractedMetric.subsidiary == subsidiary_filter)
-        obr_query = obr_query.filter(ExtractedMetric.subsidiary == subsidiary_filter)
+    if norm_sub:
+        prod_query = prod_query.filter(ExtractedMetric.subsidiary == norm_sub)
+        obr_query = obr_query.filter(ExtractedMetric.subsidiary == norm_sub)
 
     db_prod_sum = prod_query.scalar()
     db_obr_sum = obr_query.scalar()
@@ -70,8 +74,8 @@ def get_dashboard_kpis(
     metrics_query = db.query(ExtractedMetric)
     if fiscal_year:
         metrics_query = metrics_query.filter(ExtractedMetric.fiscal_year == fiscal_year)
-    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
-        metrics_query = metrics_query.filter(ExtractedMetric.subsidiary == subsidiary_filter)
+    if norm_sub:
+        metrics_query = metrics_query.filter(ExtractedMetric.subsidiary == norm_sub)
 
     total_metrics = metrics_query.count()
     if total_metrics > 0:
@@ -111,9 +115,10 @@ def get_dashboard_charts(
     """
     chart_items = []
     
+    norm_sub = normalize_subsidiary_scope(subsidiary_filter)
     subsidiaries = ["ECL", "BCCL", "CCL", "WCL", "SECL", "NCL", "MCL"]
-    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
-        subsidiaries = [subsidiary_filter]
+    if norm_sub:
+        subsidiaries = [norm_sub]
 
     for sub in subsidiaries:
         prod_query = db.query(func.sum(ExtractedMetric.standard_value)).filter(
