@@ -498,7 +498,8 @@ def parse_storage_reference(storage_ref: Optional[str]) -> Tuple[str, str, str]:
         or "storage/uploads" in normalized
         or "storage/reports" in normalized
     ):
-        return ("local", "uploads", clean_ref)
+        bucket_hint = "reports" if "storage/reports" in normalized or "reports" in normalized else "uploads"
+        return ("local", bucket_hint, clean_ref)
 
     # 3. Supabase object keys: e.g. "documents/{doc_id}/{filename}" or "reports/{report_id}/{filename}"
     doc_bucket = getattr(settings, "SUPABASE_DOCUMENTS_BUCKET", "documents")
@@ -627,6 +628,142 @@ def get_document_binary_size(storage_ref: Optional[str]) -> int:
             return 0
 
     return get_file_size(storage_ref)
+
+
+# ==============================================================================
+# Report Storage Routing & Lifecycle Helpers
+# ==============================================================================
+
+def save_report_binary(
+    file_bytes: bytes,
+    report_id: int,
+    filename: str,
+    content_type: Optional[str] = "application/pdf"
+) -> str:
+    """
+    Persists report PDF binary bytes using the currently configured StorageProvider.
+    In Local mode:
+        Saves to local report directory (e.g. ./storage/reports/{filename}).
+        Returns local relative path (e.g. ./storage/reports/{filename}).
+    In Supabase mode:
+        Saves to Supabase Storage reports bucket under 'reports/{report_id}/{filename}'.
+        Returns canonical object reference 'reports/{report_id}/{filename}'.
+    """
+    provider = get_storage_provider()
+    clean_name = sanitize_storage_path(filename)
+
+    if isinstance(provider, SupabaseStorageProvider):
+        bucket = getattr(settings, "SUPABASE_REPORTS_BUCKET", "reports")
+        object_path = f"{report_id}/{clean_name}"
+        canonical_key = provider.save_file(
+            bucket=bucket,
+            path=object_path,
+            file_bytes=file_bytes,
+            content_type=content_type or "application/pdf"
+        )
+        logger.info(f"Persisted report #{report_id} binary to Supabase Storage: '{canonical_key}'")
+        return canonical_key
+    else:
+        # LocalStorageProvider
+        report_dir = os.path.abspath(settings.REPORT_DIR)
+        os.makedirs(report_dir, exist_ok=True)
+        target_path = os.path.join(report_dir, clean_name)
+        with open(target_path, "wb") as f:
+            f.write(file_bytes)
+        rel_path = os.path.join(settings.REPORT_DIR, clean_name).replace("\\", "/")
+        logger.info(f"Persisted report #{report_id} binary to Local Storage: '{rel_path}'")
+        return rel_path
+
+
+def read_report_binary(storage_ref: str) -> bytes:
+    """
+    Reference-aware report binary reader.
+    Retrieves report binary from Supabase Storage or Local filesystem based on storage_ref.
+    """
+    if not storage_ref or not storage_ref.strip():
+        raise StorageNotFoundError("Report storage reference is empty.")
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        provider = get_storage_provider("supabase")
+        return provider.read_file(bucket=bucket, path=path)
+
+    abs_path = os.path.abspath(storage_ref)
+    if not os.path.exists(abs_path):
+        raise StorageNotFoundError(f"Stored report file not found at '{storage_ref}'.")
+    with open(abs_path, "rb") as f:
+        return f.read()
+
+
+def report_binary_exists(storage_ref: Optional[str]) -> bool:
+    """
+    Reference-aware report existence checker.
+    Returns True if report binary exists in Supabase Storage or Local filesystem, False otherwise.
+    """
+    if not storage_ref or not storage_ref.strip():
+        return False
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.file_exists(bucket=bucket, path=path)
+        except Exception as e:
+            logger.warning(f"Error checking Supabase storage existence for report '{storage_ref}': {e}")
+            return False
+
+    return os.path.exists(os.path.abspath(storage_ref))
+
+
+def delete_report_binary(storage_ref: Optional[str]) -> bool:
+    """
+    Reference-aware report binary deletion.
+    Removes report binary from Supabase Storage or Local filesystem.
+    Idempotent: returns True if deleted or already absent.
+    """
+    if not storage_ref or not storage_ref.strip():
+        return False
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.delete_file(bucket=bucket, path=path)
+        except Exception as e:
+            logger.warning(f"Error deleting Supabase report object '{storage_ref}': {e}")
+            raise
+
+    abs_path = os.path.abspath(storage_ref)
+    if os.path.exists(abs_path):
+        try:
+            os.remove(abs_path)
+            logger.info(f"Deleted local report file: {abs_path}")
+            return True
+        except Exception as e:
+            logger.warning(f"Could not delete local report file at '{abs_path}': {e}")
+            return False
+    return False
+
+
+def get_report_binary_size(storage_ref: Optional[str]) -> int:
+    """
+    Reference-aware report size lookup in bytes.
+    """
+    if not storage_ref or not storage_ref.strip():
+        return 0
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.get_file_size(bucket=bucket, path=path)
+        except Exception:
+            return 0
+
+    abs_path = os.path.abspath(storage_ref)
+    if os.path.exists(abs_path):
+        return os.path.getsize(abs_path)
+    return 0
 
 
 # ==============================================================================
