@@ -2,7 +2,7 @@ import os
 import re
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import httpx
 
 from config import settings
@@ -457,7 +457,180 @@ def get_storage_provider(provider_type: Optional[str] = None, force_new: bool = 
 
 
 # ==============================================================================
-# Backward-Compatible Helper Functions (Delegating to Provider/Filesystem)
+# ==============================================================================
+# Reference-Aware Storage Routing & Lifecycle Helpers
+# ==============================================================================
+
+def parse_storage_reference(storage_ref: Optional[str]) -> Tuple[str, str, str]:
+    """
+    Parses a stored file_path string into (provider_type, bucket, object_path_or_file_path).
+    Distinguishes legacy local filesystem paths from Supabase object references.
+
+    Returns:
+        ('supabase', bucket_name, object_path)
+        or
+        ('local', bucket_or_dir, file_path)
+        or
+        ('unknown', '', '')
+    """
+    if not storage_ref or not storage_ref.strip():
+        return ("unknown", "", "")
+
+    clean_ref = storage_ref.strip()
+
+    # 1. Explicit supabase:// scheme
+    if clean_ref.startswith("supabase://"):
+        without_scheme = clean_ref[len("supabase://"):].lstrip("/")
+        parts = without_scheme.split("/", 1)
+        bucket = parts[0] if parts else getattr(settings, "SUPABASE_DOCUMENTS_BUCKET", "documents")
+        obj_path = parts[1] if len(parts) > 1 else ""
+        return ("supabase", validate_bucket_name(bucket), sanitize_storage_path(obj_path))
+
+    # Normalize slashes for inspection
+    normalized = clean_ref.replace("\\", "/")
+
+    # 2. Legacy local filesystem paths: starts with ./, ../, /, drive letter, or contains storage/
+    if (
+        normalized.startswith("./")
+        or normalized.startswith("../")
+        or normalized.startswith("/")
+        or bool(re.match(r"^[a-zA-Z]:", normalized))
+        or "storage/uploads" in normalized
+        or "storage/reports" in normalized
+    ):
+        return ("local", "uploads", clean_ref)
+
+    # 3. Supabase object keys: e.g. "documents/{doc_id}/{filename}" or "reports/{report_id}/{filename}"
+    doc_bucket = getattr(settings, "SUPABASE_DOCUMENTS_BUCKET", "documents")
+    rep_bucket = getattr(settings, "SUPABASE_REPORTS_BUCKET", "reports")
+
+    parts = normalized.split("/", 1)
+    first_segment = parts[0]
+    if first_segment in [doc_bucket, "documents", rep_bucket, "reports"]:
+        bucket = first_segment
+        obj_path = parts[1] if len(parts) > 1 else ""
+        return ("supabase", validate_bucket_name(bucket), sanitize_storage_path(obj_path))
+
+    # 4. Fallback for unclassified paths: treat as local filesystem path
+    return ("local", "uploads", clean_ref)
+
+
+def save_document_binary(
+    file_bytes: bytes,
+    document_id: int,
+    filename: str,
+    file_hash: str,
+    content_type: Optional[str] = None
+) -> str:
+    """
+    Persists document binary bytes using the currently configured StorageProvider.
+    In Local mode:
+        Saves to local upload directory (e.g. ./storage/uploads/{file_hash}_{filename}).
+        Returns local relative path.
+    In Supabase mode:
+        Saves to Supabase Storage documents bucket under 'documents/{document_id}/{filename}'.
+        Returns canonical object reference 'documents/{document_id}/{filename}'.
+    """
+    provider = get_storage_provider()
+
+    if isinstance(provider, SupabaseStorageProvider):
+        bucket = getattr(settings, "SUPABASE_DOCUMENTS_BUCKET", "documents")
+        clean_name = sanitize_storage_path(filename)
+        # Store under {document_id}/{sanitized_filename} in the documents bucket
+        object_path = f"{document_id}/{clean_name}"
+        canonical_key = provider.save_file(
+            bucket=bucket,
+            path=object_path,
+            file_bytes=file_bytes,
+            content_type=content_type or "application/pdf"
+        )
+        logger.info(f"Persisted document #{document_id} binary to Supabase Storage: '{canonical_key}'")
+        return canonical_key
+    else:
+        # LocalStorageProvider
+        saved_path = save_uploaded_file(file_bytes=file_bytes, file_hash=file_hash, sanitized_filename=filename)
+        logger.info(f"Persisted document #{document_id} binary to Local Storage: '{saved_path}'")
+        return saved_path
+
+
+def read_document_binary(storage_ref: str) -> bytes:
+    """
+    Reference-aware binary reader.
+    Retrieves document binary from Supabase Storage or Local filesystem based on storage_ref.
+    """
+    if not storage_ref or not storage_ref.strip():
+        raise StorageNotFoundError("Document storage reference is empty.")
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        provider = get_storage_provider("supabase")
+        return provider.read_file(bucket=bucket, path=path)
+
+    # Local fallback
+    return read_uploaded_file(storage_ref)
+
+
+def document_binary_exists(storage_ref: Optional[str]) -> bool:
+    """
+    Reference-aware existence checker.
+    Returns True if binary exists in Supabase Storage or Local filesystem, False otherwise.
+    """
+    if not storage_ref or not storage_ref.strip():
+        return False
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.file_exists(bucket=bucket, path=path)
+        except Exception as e:
+            logger.warning(f"Error checking Supabase storage existence for '{storage_ref}': {e}")
+            return False
+
+    return file_exists(storage_ref)
+
+
+def delete_document_binary(storage_ref: Optional[str]) -> bool:
+    """
+    Reference-aware binary deletion.
+    Removes document binary from Supabase Storage or Local filesystem.
+    Idempotent: returns True if deleted or already absent.
+    """
+    if not storage_ref or not storage_ref.strip():
+        return False
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.delete_file(bucket=bucket, path=path)
+        except Exception as e:
+            logger.warning(f"Error deleting Supabase object '{storage_ref}': {e}")
+            raise
+
+    return delete_uploaded_file(storage_ref)
+
+
+def get_document_binary_size(storage_ref: Optional[str]) -> int:
+    """
+    Reference-aware size lookup in bytes.
+    """
+    if not storage_ref or not storage_ref.strip():
+        return 0
+
+    ref_type, bucket, path = parse_storage_reference(storage_ref)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.get_file_size(bucket=bucket, path=path)
+        except Exception:
+            return 0
+
+    return get_file_size(storage_ref)
+
+
+# ==============================================================================
+# Backward-Compatible Helper Functions (Delegating to Reference-Aware Helpers)
 # ==============================================================================
 
 def get_storage_upload_dir() -> str:
@@ -469,7 +642,7 @@ def get_storage_upload_dir() -> str:
 
 def save_uploaded_file(file_bytes: bytes, file_hash: str, sanitized_filename: str) -> str:
     """
-    Persists uploaded file bytes to storage.
+    Persists uploaded file bytes to local storage.
     Returns relative or canonical storage path string stored in database.
     """
     upload_dir = get_storage_upload_dir()
@@ -479,15 +652,24 @@ def save_uploaded_file(file_bytes: bytes, file_hash: str, sanitized_filename: st
     with open(target_path, "wb") as f:
         f.write(file_bytes)
 
-    logger.info(f"Saved uploaded file to storage: {target_path} ({len(file_bytes)} bytes)")
+    logger.info(f"Saved uploaded file to local storage: {target_path} ({len(file_bytes)} bytes)")
     return os.path.join(settings.UPLOAD_DIR, storage_filename).replace("\\", "/")
 
 
 def read_uploaded_file(file_path: str) -> bytes:
     """
     Reads and returns raw bytes of stored document file.
+    Supports both legacy local paths and remote storage references.
     Raises StorageNotFoundError / FileNotFoundError if file is missing.
     """
+    if not file_path:
+        raise StorageNotFoundError("Stored document file path cannot be empty.")
+
+    ref_type, bucket, path = parse_storage_reference(file_path)
+    if ref_type == "supabase":
+        provider = get_storage_provider("supabase")
+        return provider.read_file(bucket=bucket, path=path)
+
     abs_path = os.path.abspath(file_path)
     if not os.path.exists(abs_path):
         raise StorageNotFoundError(f"Stored document file not found at '{file_path}'.")
@@ -497,32 +679,60 @@ def read_uploaded_file(file_path: str) -> bytes:
 
 
 def file_exists(file_path: Optional[str]) -> bool:
-    """Checks whether the physical document file exists in storage."""
+    """Checks whether the physical document file or remote object exists in storage."""
     if not file_path:
         return False
+
+    ref_type, bucket, path = parse_storage_reference(file_path)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.file_exists(bucket=bucket, path=path)
+        except Exception:
+            return False
+
     return os.path.exists(os.path.abspath(file_path))
 
 
 def delete_uploaded_file(file_path: Optional[str]) -> bool:
-    """Safely removes physical document file from storage if present."""
+    """Safely removes physical document file or remote object from storage if present."""
     if not file_path:
         return False
+
+    ref_type, bucket, path = parse_storage_reference(file_path)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.delete_file(bucket=bucket, path=path)
+        except Exception as e:
+            logger.warning(f"Could not delete Supabase object at '{file_path}': {e}")
+            return False
+
     abs_path = os.path.abspath(file_path)
     if os.path.exists(abs_path):
         try:
             os.remove(abs_path)
-            logger.info(f"Deleted file from storage: {abs_path}")
+            logger.info(f"Deleted file from local storage: {abs_path}")
             return True
         except Exception as e:
-            logger.warning(f"Could not delete file at '{abs_path}': {e}")
+            logger.warning(f"Could not delete local file at '{abs_path}': {e}")
             return False
     return False
 
 
 def get_file_size(file_path: Optional[str]) -> int:
-    """Returns file size in bytes, or 0 if missing."""
+    """Returns file or object size in bytes, or 0 if missing."""
     if not file_path:
         return 0
+
+    ref_type, bucket, path = parse_storage_reference(file_path)
+    if ref_type == "supabase":
+        try:
+            provider = get_storage_provider("supabase")
+            return provider.get_file_size(bucket=bucket, path=path)
+        except Exception:
+            return 0
+
     abs_path = os.path.abspath(file_path)
     if os.path.exists(abs_path):
         return os.path.getsize(abs_path)

@@ -17,7 +17,7 @@ from app.schemas.document import (
     DocumentDeleteResponse,
 )
 from app.models.audit_log import AuditLog
-from app.services.storage_service import delete_uploaded_file
+from app.services.storage_service import delete_uploaded_file, delete_document_binary
 from app.services.vector_store_service import delete_document_vectors
 from app.services.ingestion_service import process_file_ingestion
 from app.services.processing_pipeline import execute_document_processing_pipeline
@@ -248,7 +248,7 @@ def delete_document(
 
     # 3. Delete physical source file from storage abstraction (idempotent)
     try:
-        delete_uploaded_file(doc_file_path)
+        delete_document_binary(doc_file_path)
     except Exception as file_err:
         logger.warning(f"Storage file cleanup note for Document #{doc_id} ('{doc_file_path}'): {file_err}")
 

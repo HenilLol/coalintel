@@ -79,10 +79,11 @@ def process_file_ingestion(
     Executes secure document ingestion:
     1. Sanitizes filename and validates file size / extension.
     2. Computes SHA-256 digest and checks for duplicate ingestion.
-    3. Writes file safely to storage directory.
-    4. Inserts DB record in documents table.
-    5. Writes audit log entry.
-    6. Ensures transactional consistency (cleans up physical file on DB error).
+    3. Flushes Document DB record to allocate unique document_id.
+    4. Persists binary via StorageProvider (Local or Supabase).
+    5. Updates Document.file_path with canonical storage reference.
+    6. Writes audit log entry and commits transaction.
+    7. Ensures transactional consistency (compensating deletion if DB commit fails).
     """
     sanitized_name = sanitize_filename(original_filename)
     file_size = len(file_bytes)
@@ -98,22 +99,23 @@ def process_file_ingestion(
             detail=f"Duplicate document detected. Document '{existing_doc.filename}' with identical content (SHA-256: {file_hash[:16]}...) already exists in database (ID #{existing_doc.id})."
         )
 
-    # 2. Persist file bytes via storage abstraction
-    from app.services.storage_service import save_uploaded_file, delete_uploaded_file
-    try:
-        target_file_path = save_uploaded_file(file_bytes, file_hash, sanitized_name)
-    except Exception as e:
-        logger.error(f"Failed to persist file to storage: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to persist file to server storage."
-        )
+    content_type_map = {
+        "PDF": "application/pdf",
+        "DOCX": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "XLSX": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "CSV": "text/csv",
+    }
+    content_type = content_type_map.get(file_type, "application/octet-stream")
 
-    # 4. Create database record inside transaction
+    from app.services.storage_service import save_document_binary, delete_document_binary
+
+    target_storage_ref = None
+
     try:
+        # 2. Create initial Document record in transaction to allocate document_id
         new_doc = Document(
             filename=sanitized_name,
-            file_path=target_file_path,
+            file_path="",
             file_hash=file_hash,
             file_type=file_type,
             file_size_bytes=file_size,
@@ -123,9 +125,19 @@ def process_file_ingestion(
             uploaded_by=user_id
         )
         db.add(new_doc)
-        db.flush()  # Assigns new_doc.id
+        db.flush()  # Allocates new_doc.id
 
-        # 5. Insert Audit Log
+        # 3. Persist file bytes via storage provider abstraction
+        target_storage_ref = save_document_binary(
+            file_bytes=file_bytes,
+            document_id=new_doc.id,
+            filename=sanitized_name,
+            file_hash=file_hash,
+            content_type=content_type
+        )
+        new_doc.file_path = target_storage_ref
+
+        # 4. Insert Audit Log
         audit_entry = AuditLog(
             user_id=user_id,
             action="DOCUMENT_UPLOAD",
@@ -136,6 +148,7 @@ def process_file_ingestion(
                 "filename": sanitized_name,
                 "file_hash": file_hash,
                 "file_size": file_size,
+                "storage_ref": target_storage_ref,
                 "subsidiary": subsidiary,
                 "fiscal_year": fiscal_year
             }
@@ -144,15 +157,27 @@ def process_file_ingestion(
         db.commit()
         db.refresh(new_doc)
 
-        logger.info(f"Document ID #{new_doc.id} successfully created and committed.")
+        logger.info(f"Document ID #{new_doc.id} successfully created and committed with storage ref '{target_storage_ref}'.")
         return new_doc
+
+    except HTTPException:
+        db.rollback()
+        if target_storage_ref:
+            try:
+                delete_document_binary(target_storage_ref)
+            except Exception as clean_err:
+                logger.warning(f"Compensating storage cleanup note for '{target_storage_ref}': {clean_err}")
+        raise
 
     except Exception as e:
         db.rollback()
-        # Transactional Cleanup: Remove physical file if DB commit failed
-        delete_uploaded_file(target_file_path)
-        logger.error(f"Database error during document ingestion: {e}")
+        if target_storage_ref:
+            try:
+                delete_document_binary(target_storage_ref)
+            except Exception as clean_err:
+                logger.warning(f"Compensating storage cleanup note for '{target_storage_ref}': {clean_err}")
+        logger.error(f"Error during document ingestion: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database transaction error during document creation."
+            detail="Failed to persist document to storage or database."
         )
