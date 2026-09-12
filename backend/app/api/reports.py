@@ -62,20 +62,39 @@ def download_report_pdf(
 ):
     """
     Streams generated PDF report file for download.
+    Supports legacy local files, new local StorageProvider files, and remote Supabase Storage objects.
     """
+    from fastapi.responses import Response
+    from app.services.storage_service import (
+        report_binary_exists,
+        read_report_binary,
+        parse_storage_reference,
+    )
+
     report = db.query(Report).filter(Report.id == id).first()
-    if not report or not report.file_path or not os.path.exists(report.file_path):
-        # Return fallback ReportLab demo PDF if exact file was created transiently
+    if not report or not report.file_path or not report_binary_exists(report.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Report file for ID #{id} not found on server storage."
         )
 
     filename = os.path.basename(report.file_path)
-    return FileResponse(
-        path=report.file_path,
+    ref_type, bucket, path = parse_storage_reference(report.file_path)
+
+    # If local filesystem file exists at path, return FileResponse
+    if ref_type == "local" and os.path.exists(os.path.abspath(report.file_path)):
+        return FileResponse(
+            path=os.path.abspath(report.file_path),
+            media_type="application/pdf",
+            filename=filename
+        )
+
+    # Supabase or non-local storage: retrieve binary bytes securely through StorageProvider
+    pdf_bytes = read_report_binary(report.file_path)
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
-        filename=filename
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 
