@@ -25,10 +25,19 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     DATABASE_URL: str = "postgresql://coalintel:coalintel_secure_pass@localhost:5432/coalintel_db"
 
-    # Storage Paths
+    # Storage Provider & Paths
+    STORAGE_PROVIDER: str = "local"  # "local" or "supabase"
     UPLOAD_DIR: str = "./storage/uploads"
     CHROMA_DB_DIR: str = "./storage/chroma_db"
     REPORT_DIR: str = "./storage/reports"
+
+    # Supabase Storage Configuration (Backend-only credentials)
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_DOCUMENTS_BUCKET: str = "documents"
+    SUPABASE_REPORTS_BUCKET: str = "reports"
+    STORAGE_HTTP_CONNECT_TIMEOUT: float = 15.0
+    STORAGE_HTTP_READ_TIMEOUT: float = 60.0
 
     # LLM Configuration (Provider Abstraction)
     LLM_PROVIDER: str = "gemini"  # "gemini", "openai", or "degraded"
