@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.extracted_metric import ExtractedMetric
-from app.services.storage_service import file_exists
+from app.services.storage_service import document_binary_exists, read_document_binary, file_exists
 from app.services.parsing_service import parse_document_file
 from app.services.chunking_service import chunk_text_by_tokens
 from app.services.normalization_service import (
@@ -20,24 +20,25 @@ logger = logging.getLogger(__name__)
 def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
     """
     Orchestrates the Document Ingestion & Extraction Pipeline with low-memory safety:
-    1. Validates document existence and physical storage file presence.
+    1. Validates document existence and storage binary presence.
     2. Updates status -> 'PROCESSING' and commits initial state.
-    3. Executes PyMuPDF / Tesseract OCR page parsing and persists total_pages immediately.
-    4. Idempotently clears previous derived chunks, metrics, and Chroma vectors for this document.
-    5. Splits page text into 500-token chunks and persists to document_chunks.
-    6. Extracts entity metrics tuples, applies deterministic unit normalization (-> MT),
+    3. Retrieves document binary and executes PyMuPDF / OCR page parsing.
+    4. Persists total_pages immediately.
+    5. Idempotently clears previous derived chunks, metrics, and Chroma vectors for this document.
+    6. Splits page text into 500-token chunks and persists to document_chunks.
+    7. Extracts entity metrics tuples, applies deterministic unit normalization (-> MT),
        and persists to extracted_metrics.
-    7. Indexes chunk vectors into persistent ChromaDB using low-memory ONNX embeddings.
-    8. Marks document status -> 'PARSED' and commits final state.
+    8. Indexes chunk vectors into persistent ChromaDB using low-memory ONNX embeddings.
+    9. Marks document status -> 'PARSED' and commits final state.
     """
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         logger.error(f"Processing pipeline failed: Document ID #{document_id} not found.")
         return False
 
-    # Check physical file existence before starting processing
-    if not file_exists(doc.file_path):
-        logger.error(f"Cannot process Document #{doc.id}: physical file missing at '{doc.file_path}'.")
+    # Check storage binary existence before starting processing
+    if not document_binary_exists(doc.file_path):
+        logger.error(f"Cannot process Document #{doc.id}: source binary missing at '{doc.file_path}'.")
         doc.status = "FAILED"
         doc.error_message = "Source document file is missing from storage. Please re-upload the document."
         db.commit()
@@ -49,9 +50,18 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
         doc.error_message = None
         db.commit()
 
-        # Step 1: Parse Document Pages (PyMuPDF / OCR)
-        logger.info(f"Document #{doc.id} parsing started.")
-        pages_data = parse_document_file(doc.file_path, doc.file_type)
+        # Step 1: Retrieve Document Binary & Parse Document Pages (PyMuPDF / OCR)
+        logger.info(f"Document #{doc.id} parsing started from storage reference '{doc.file_path}'.")
+        try:
+            file_bytes = read_document_binary(doc.file_path)
+        except Exception as read_err:
+            logger.error(f"Failed to read storage binary for Document #{doc.id}: {read_err}")
+            doc.status = "FAILED"
+            doc.error_message = f"Failed to retrieve document binary from storage: {str(read_err)[:300]}"
+            db.commit()
+            return False
+
+        pages_data = parse_document_file(doc.file_path, doc.file_type, file_bytes=file_bytes)
         total_pages = len(pages_data)
 
         if total_pages == 0:
@@ -168,7 +178,7 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
 def recover_stale_processing_documents(db: Session, stale_minutes: int = 15) -> int:
     """
     Startup and on-demand recovery mechanism for orphaned PROCESSING records.
-    Transitions documents that are stale (> stale_minutes) AND have lost physical storage files.
+    Transitions documents that are stale (> stale_minutes) AND have lost storage binaries.
     """
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(minutes=stale_minutes)
@@ -184,16 +194,16 @@ def recover_stale_processing_documents(db: Session, stale_minutes: int = 15) -> 
         is_stale = (doc_time is None) or (doc_time < cutoff)
 
         if is_stale:
-            if not file_exists(doc.file_path):
+            if not document_binary_exists(doc.file_path):
                 logger.warning(
                     f"Recovering stale Document #{doc.id} ('{doc.filename}'): "
-                    f"Created at {doc.created_at}, physical file missing. Marking FAILED."
+                    f"Created at {doc.created_at}, storage binary missing. Marking FAILED."
                 )
                 doc.status = "FAILED"
                 doc.error_message = "Processing was interrupted during server restart and source file is unavailable in storage. Please re-upload the document."
                 recovered_count += 1
             else:
-                logger.info(f"Stale Document #{doc.id} detected but physical file exists at '{doc.file_path}'. Eligible for reprocessing.")
+                logger.info(f"Stale Document #{doc.id} detected but storage binary exists at '{doc.file_path}'. Eligible for reprocessing.")
 
     if recovered_count > 0:
         db.commit()
