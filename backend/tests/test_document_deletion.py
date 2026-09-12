@@ -264,6 +264,94 @@ class TestDocumentDeletionFeature(unittest.TestCase):
             new_doc_data = upload_resp_2.json()
             self.assertEqual(new_doc_data["file_hash"], file_hash)
 
+    def test_08_conflict_references_safely_disassociated_on_deletion(self):
+        """Verify data conflicts referencing the deleted document have doc_a_id/doc_b_id set to None while conflict record is preserved."""
+        from app.models.data_conflict import DataConflict
+
+        doc_1 = self._create_sample_doc(doc_id=301, file_hash="hash_conflict_del_1")
+        doc_2 = self._create_sample_doc(doc_id=302, file_hash="hash_conflict_del_2")
+
+        conflict_1 = DataConflict(
+            id=401,
+            metric_name="Coal Production",
+            mine_name="Rajmahal",
+            fiscal_year="2023-24",
+            doc_a_id=doc_1.id,
+            doc_b_id=doc_2.id,
+            doc_a_value=15.5,
+            doc_b_value=16.2,
+            discrepancy_pct=4.5,
+            status="OPEN"
+        )
+        self.db.add(conflict_1)
+
+        conflict_2 = DataConflict(
+            id=402,
+            metric_name="Overburden Removal",
+            mine_name="Rajmahal",
+            fiscal_year="2023-24",
+            doc_a_id=doc_2.id,
+            doc_b_id=doc_1.id,
+            doc_a_value=120.0,
+            doc_b_value=125.0,
+            discrepancy_pct=4.1,
+            status="OPEN"
+        )
+        self.db.add(conflict_2)
+        self.db.commit()
+
+        app.dependency_overrides[get_db] = lambda: self.db
+        app.dependency_overrides[get_current_user] = lambda: self.admin_user
+
+        with patch("app.api.documents.delete_document_vectors", return_value=True):
+            resp = self.client.delete(f"/api/v1/documents/{doc_1.id}")
+            self.assertEqual(resp.status_code, 200)
+
+        # 1. Document 1 is deleted
+        self.assertIsNone(self.db.query(Document).filter(Document.id == 301).first())
+
+        # 2. Conflict 1 still exists, but doc_a_id is disassociated (None), doc_b_id remains doc_2.id
+        c1 = self.db.query(DataConflict).filter(DataConflict.id == 401).first()
+        self.assertIsNotNone(c1)
+        self.assertIsNone(c1.doc_a_id)
+        self.assertEqual(c1.doc_b_id, 302)
+
+        # 3. Conflict 2 still exists, but doc_b_id is disassociated (None), doc_a_id remains doc_2.id
+        c2 = self.db.query(DataConflict).filter(DataConflict.id == 402).first()
+        self.assertIsNotNone(c2)
+        self.assertEqual(c2.doc_a_id, 302)
+        self.assertIsNone(c2.doc_b_id)
+
+    def test_09_database_rollback_on_deletion_failure(self):
+        """Verify transactional rollback if database flush fails during document deletion."""
+        doc = self._create_sample_doc(doc_id=309, file_hash="hash_rollback_del_1")
+
+        app.dependency_overrides[get_db] = lambda: self.db
+        app.dependency_overrides[get_current_user] = lambda: self.admin_user
+
+        with patch("app.api.documents.delete_document_vectors", return_value=True):
+            with patch.object(self.db, "flush", side_effect=Exception("Simulated DB Flush Error")):
+                resp = self.client.delete(f"/api/v1/documents/{doc.id}")
+                self.assertEqual(resp.status_code, 500)
+                self.assertIn("Failed to delete document from database", resp.json()["detail"])
+
+        # Document must remain in DB after rollback
+        self.assertIsNotNone(self.db.query(Document).filter(Document.id == 309).first())
+
+    def test_10_chroma_exception_gracefully_handled_without_blocking_db_deletion(self):
+        """Verify vector deletion exception does not block relational database document cleanup."""
+        doc = self._create_sample_doc(doc_id=310, file_hash="hash_chroma_err_del_1")
+
+        app.dependency_overrides[get_db] = lambda: self.db
+        app.dependency_overrides[get_current_user] = lambda: self.admin_user
+
+        with patch("app.api.documents.delete_document_vectors", side_effect=Exception("Chroma Connection Error")):
+            resp = self.client.delete(f"/api/v1/documents/{doc.id}")
+            self.assertEqual(resp.status_code, 200)
+
+        # Document must be removed from DB despite Chroma exception
+        self.assertIsNone(self.db.query(Document).filter(Document.id == 310).first())
+
 
 if __name__ == "__main__":
     unittest.main()

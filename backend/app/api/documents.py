@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.extracted_metric import ExtractedMetric
+from app.models.data_conflict import DataConflict
 from app.core.rbac import get_current_user, require_roles
 from app.schemas.document import (
     DocumentResponse,
@@ -217,8 +218,9 @@ def delete_document(
     2. Validates document existence (returns HTTP 404 Not Found if missing).
     3. Cleans ChromaDB vector embeddings via delete_document_vectors(id).
     4. Removes stored source file from storage via delete_uploaded_file(file_path).
-    5. Transactionally deletes all document-owned DB records (DocumentChunk, ExtractedMetric, Document).
-    6. Records an immutable audit event (DOCUMENT_DELETED).
+    5. Disassociates conflict records referencing this document (preserves conflict history).
+    6. Transactionally deletes all document-owned DB records (DocumentChunk, ExtractedMetric, Document).
+    7. Records an immutable audit event (DOCUMENT_DELETED).
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -252,9 +254,17 @@ def delete_document(
 
     # 4. Transactional PostgreSQL Cleanup
     try:
+        # Disassociate conflict records referencing this document to preserve conflict history and avoid FK violation
+        db.query(DataConflict).filter(DataConflict.doc_a_id == doc_id).update(
+            {DataConflict.doc_a_id: None}, synchronize_session=False
+        )
+        db.query(DataConflict).filter(DataConflict.doc_b_id == doc_id).update(
+            {DataConflict.doc_b_id: None}, synchronize_session=False
+        )
+
         # Delete document chunks and extracted metrics owned by this document
-        db.query(DocumentChunk).filter(DocumentChunk.document_id == doc_id).delete()
-        db.query(ExtractedMetric).filter(ExtractedMetric.document_id == doc_id).delete()
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == doc_id).delete(synchronize_session=False)
+        db.query(ExtractedMetric).filter(ExtractedMetric.document_id == doc_id).delete(synchronize_session=False)
         db.delete(doc)
         db.flush()
 
