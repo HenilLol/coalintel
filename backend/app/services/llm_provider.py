@@ -129,24 +129,14 @@ class DegradedLLMProvider(BaseLLMProvider):
         user_query = q_match.group(1).strip() if q_match else prompt
         q_lower = user_query.lower()
 
-        # Target mine and fiscal year detection
-        target_mine = None
-        for km in KNOWN_MINES:
-            if km.lower() in q_lower:
-                target_mine = km
-                break
-        if not target_mine:
-            requested_mines = re.findall(r"\b([A-Z][a-z]+(?:\s+(?:OC|OpenCast|Mine))?)\b", user_query)
-            for rm in requested_mines:
-                if rm.lower() not in ["what", "where", "total", "coal", "production", "overburden", "fiscal", "year", "compare", "versus", "ecl", "bccl", "secl", "mcl", "cil"]:
-                    target_mine = rm
-                    break
-
+        # Target mine, temporal scope, and fiscal year detection using canonical entity parsing
+        q_entities = detect_query_entities(user_query)
+        target_mines = q_entities.get("mines", [])
+        target_mine = target_mines[0] if target_mines else None
         base_mine = get_base_mine_name(target_mine) if target_mine else None
-        target_fy = detect_query_fiscal_year(user_query)
+        target_fy = q_entities.get("fiscal_year") or detect_query_fiscal_year(user_query)
 
         # Detect target metric and metric domain
-        q_entities = detect_query_entities(user_query)
         metric_domain = q_entities.get("metric_domain")
         target_metric = q_entities.get("metric")
         is_corporate = q_entities.get("is_corporate_query", False)
@@ -167,7 +157,7 @@ class DegradedLLMProvider(BaseLLMProvider):
             ):
                 matching_chunks.append(c)
 
-        if not matching_chunks and (target_mine or metric_domain or target_metric):
+        if not matching_chunks and target_mine:
             return "Insufficient evidence found for this query."
 
         candidate_chunks = matching_chunks if matching_chunks else parsed_chunks
@@ -576,8 +566,8 @@ class DegradedLLMProvider(BaseLLMProvider):
         else:
             answer = (
                 f"COALINTEL AI Assistant: General conceptual response for \"{q_clean}\". "
-                "This topic pertains to general knowledge and technical analysis. "
-                "For real-time unrestricted GenAI generation, configure a valid LLM API key (`LLM_API_KEY` or `GEMINI_API_KEY`) in the application environment."
+                "This topic pertains to general knowledge and technical mining concepts. "
+                "To enable real-time generative responses for general questions, configure a valid LLM API key (`LLM_API_KEY` or `GEMINI_API_KEY`) in the environment."
             )
 
         return {

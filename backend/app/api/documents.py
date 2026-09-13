@@ -181,6 +181,7 @@ def get_document_lineage(
         "metrics": [
             {
                 "id": m.id,
+                "page_number": m.page_number,
                 "mine_name": m.mine_name,
                 "metric_name": m.metric_name,
                 "numeric_value": float(m.numeric_value) if m.numeric_value is not None else 0.0,
