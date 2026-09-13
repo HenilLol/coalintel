@@ -219,7 +219,7 @@ export default function ComparisonPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6 gap-2.5 max-h-56 overflow-y-auto pr-1">
             {documentsCatalog.map((doc) => {
               const isChecked = selectedDocIds.includes(doc.id);
               return (

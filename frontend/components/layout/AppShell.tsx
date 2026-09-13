@@ -97,7 +97,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           showLogoOnDesktop={collapsed}
         />
 
-        <main className="flex-1 p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 animate-page-enter">
+        <main className="flex-1 p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl 2xl:max-w-[1720px] w-full mx-auto space-y-6 animate-page-enter">
           {children}
         </main>
 

@@ -41,7 +41,7 @@ class TestDay3IngestionAndSecurity(unittest.TestCase):
             self.assertIn(expected_substring.split('.')[0], sanitized)
 
     def test_file_type_and_size_validation(self):
-        """Verify size limits (100MB) and extension whitelist enforcement."""
+        """Verify size limits (50MB) and extension whitelist enforcement."""
         # Supported extensions
         self.assertEqual(validate_file_upload("report.pdf", 1024), "PDF")
         self.assertEqual(validate_file_upload("data.docx", 2048), "DOCX")
@@ -55,7 +55,7 @@ class TestDay3IngestionAndSecurity(unittest.TestCase):
         self.assertEqual(ctx_ext.exception.status_code, 400)
         self.assertIn("not supported", ctx_ext.exception.detail)
 
-        # Oversized file failure (> 100MB)
+        # Oversized file failure (> 50MB)
         with self.assertRaises(HTTPException) as ctx_size:
             validate_file_upload("huge.pdf", MAX_FILE_SIZE_BYTES + 1)
         self.assertEqual(ctx_size.exception.status_code, 400)

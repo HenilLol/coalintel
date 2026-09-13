@@ -7,7 +7,7 @@ import hashlib
 # Ensure backend root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".csv"}
 ARITHMETIC_TOLERANCE_PERCENT = 5.0
 CONFLICT_THRESHOLD_PERCENT = 1.0
@@ -25,7 +25,7 @@ def sanitize_filename(filename: str) -> str:
 
 def validate_file_upload(filename: str, file_size: int):
     if file_size > MAX_FILE_SIZE_BYTES:
-        raise ValueError(f"File size ({file_size} bytes) exceeds maximum 100MB limit.")
+        raise ValueError(f"File size ({file_size} bytes) exceeds maximum 50MB limit.")
     _, ext = os.path.splitext(filename)
     ext_lower = ext.lower()
     if ext_lower not in ALLOWED_EXTENSIONS:
@@ -114,7 +114,7 @@ class TestDay7FullSystemIntegrationAndSecurity(unittest.TestCase):
             self.assertIn(expected_sub.split('.')[0], clean)
 
     def test_02_file_size_and_extension_whitelist_security(self):
-        """Security Audit 2: 100MB Size Ceiling and Extension Whitelist."""
+        """Security Audit 2: 50MB Size Ceiling and Extension Whitelist."""
         self.assertEqual(validate_file_upload("report.pdf", 1024), "PDF")
         self.assertEqual(validate_file_upload("data.docx", 2048), "DOCX")
         self.assertEqual(validate_file_upload("sheet.xlsx", 512), "XLSX")

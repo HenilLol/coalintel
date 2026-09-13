@@ -213,10 +213,11 @@ def get_comparison_matrix(
     """
     target_domain = get_metric_domain(metric_name)
 
-    # Normalize fiscal year filter ("ALL" means no fiscal year filtering)
-    active_fy = None
-    if fiscal_year and fiscal_year.upper() not in ["ALL", "ALL FISCAL YEARS", ""]:
-        active_fy = fiscal_year
+    # Normalize filters defensively (supporting both FastAPI Query defaults and direct Python calls)
+    active_fy = fiscal_year if isinstance(fiscal_year, str) and fiscal_year.upper() not in ["ALL", "ALL FISCAL YEARS", ""] else None
+    active_sub = subsidiary_filter if isinstance(subsidiary_filter, str) and subsidiary_filter.upper() not in ["ALL", "ALL CIL", ""] else None
+    active_entity = entity_filter if isinstance(entity_filter, str) and entity_filter.strip() else None
+    active_doc_ids = document_ids if isinstance(document_ids, list) else None
 
     # Map of all DataSources for rapid provenance lookup
     sources_catalog = {s.source_id: s for s in db.query(DataSource).all()}
@@ -235,28 +236,28 @@ def get_comparison_matrix(
     if active_fy:
         query_extracted = query_extracted.filter(ExtractedMetric.fiscal_year == active_fy)
 
-    if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
+    if active_sub:
         query_extracted = query_extracted.filter(
             or_(
-                Document.subsidiary.ilike(f"%{subsidiary_filter}%"),
-                ExtractedMetric.subsidiary.ilike(f"%{subsidiary_filter}%")
+                Document.subsidiary.ilike(f"%{active_sub}%"),
+                ExtractedMetric.subsidiary.ilike(f"%{active_sub}%")
             )
         )
 
-    if entity_filter:
+    if active_entity:
         query_extracted = query_extracted.filter(
             or_(
-                ExtractedMetric.mine_name.ilike(f"%{entity_filter}%"),
-                Document.subsidiary.ilike(f"%{entity_filter}%")
+                ExtractedMetric.mine_name.ilike(f"%{active_entity}%"),
+                Document.subsidiary.ilike(f"%{active_entity}%")
             )
         )
 
-    if document_ids:
+    if active_doc_ids:
         # Filter if document ID or filename matches selection
-        id_ints = [int(d) for d in document_ids if d.isdigit()]
+        id_ints = [int(d) for d in active_doc_ids if str(d).isdigit()]
         query_extracted = query_extracted.filter(
             or_(
-                Document.filename.in_(document_ids),
+                Document.filename.in_(active_doc_ids),
                 Document.id.in_(id_ints)
             )
         )
@@ -345,25 +346,25 @@ def get_comparison_matrix(
         if active_fy:
             query_gov = query_gov.filter(MineYearlyMetric.financial_year == active_fy)
 
-        if subsidiary_filter and subsidiary_filter.upper() not in ["ALL", "ALL CIL"]:
+        if active_sub:
             query_gov = query_gov.filter(
                 or_(
-                    MineMaster.subsidiary_name.ilike(f"%{subsidiary_filter}%"),
-                    MineMaster.company_name.ilike(f"%{subsidiary_filter}%")
+                    MineMaster.subsidiary_name.ilike(f"%{active_sub}%"),
+                    MineMaster.company_name.ilike(f"%{active_sub}%")
                 )
             )
 
-        if entity_filter:
+        if active_entity:
             query_gov = query_gov.filter(
                 or_(
-                    MineMaster.mine_name.ilike(f"%{entity_filter}%"),
-                    MineMaster.normalized_mine_name.ilike(f"%{entity_filter}%"),
-                    MineMaster.subsidiary_name.ilike(f"%{entity_filter}%")
+                    MineMaster.mine_name.ilike(f"%{active_entity}%"),
+                    MineMaster.normalized_mine_name.ilike(f"%{active_entity}%"),
+                    MineMaster.subsidiary_name.ilike(f"%{active_entity}%")
                 )
             )
 
-        if document_ids:
-            query_gov = query_gov.filter(MineYearlyMetric.source_id.in_(document_ids))
+        if active_doc_ids:
+            query_gov = query_gov.filter(MineYearlyMetric.source_id.in_(active_doc_ids))
 
         gov_results = query_gov.all()
 
@@ -428,8 +429,14 @@ def get_comparison_matrix(
     conflicts_query = db.query(DataConflictRecord)
     if active_fy:
         conflicts_query = conflicts_query.filter(DataConflictRecord.financial_year == active_fy)
-    if entity_filter:
-        conflicts_query = conflicts_query.filter(DataConflictRecord.entity_id.ilike(f"%{entity_filter}%"))
+    if active_entity:
+        conflicts_query = conflicts_query.filter(
+            or_(
+                DataConflictRecord.entity_id.ilike(f"%{active_entity}%"),
+                DataConflictRecord.source_a.ilike(f"%{active_entity}%"),
+                DataConflictRecord.source_b.ilike(f"%{active_entity}%")
+            )
+        )
 
     active_conflicts = conflicts_query.all()
     conflicts_map: Dict[tuple, DataConflictRecord] = {}
@@ -457,9 +464,40 @@ def get_comparison_matrix(
             "resolution_method": cr.resolution_method
         })
 
-        # Augment the comparison group with Source B so that cross-document variance renders directly
+        # Augment the comparison group with Source A and Source B so that cross-document variance renders directly
         g_key = get_group_key(e_name, cr.financial_year)
-        if g_key in grouped_rows and not any(r["document_title"] == cr.source_b for r in grouped_rows[g_key]):
+        if g_key not in grouped_rows:
+            grouped_rows[g_key] = [{
+                "metric_id": cr.conflict_id + 20000,
+                "document_id": cr.source_a,
+                "document_title": cr.source_a,
+                "filename": f"{cr.source_a}.pdf",
+                "organization": e_mine.subsidiary_name if e_mine else "Ministry of Coal / CIL",
+                "document_type": "Official Primary Source Disclosures",
+                "subsidiary": e_mine.subsidiary_name if e_mine else "CIL",
+                "mine_name": e_name,
+                "metric_name": metric_name,
+                "original_metric_name": f"{metric_name} (Primary Return)",
+                "fiscal_year": cr.financial_year,
+                "period_type": "annual",
+                "data_status": "final",
+                "as_of_date": None,
+                "raw_value": float(cr.value_a),
+                "raw_unit": "MT",
+                "standard_value": float(cr.value_a),
+                "standard_unit": "MT",
+                "page_number": None,
+                "table_number": "Not Available",
+                "source_url": "https://coal.gov.in/",
+                "publication_date": "Official Return",
+                "snippet": f"Primary return {cr.source_a} reported {cr.value_a} MT.",
+                "chunk_id": None,
+                "is_seeded_demo": False,
+                "provenance_label": "Official Primary Source",
+                "verification_status": "verified"
+            }]
+
+        if not any(r["document_title"] == cr.source_b for r in grouped_rows[g_key]):
             grouped_rows[g_key].append({
                 "metric_id": cr.conflict_id + 10000,
                 "document_id": cr.source_b,
@@ -550,7 +588,9 @@ def get_comparison_matrix(
 
         # Resolve or link canonical DataConflict record deterministically
         canonical_conflict_id = None
-        if has_discrepancy:
+        if conflict_rec:
+            canonical_conflict_id = 10000 + conflict_rec.conflict_id
+        elif has_discrepancy:
             existing_dc = db.query(DataConflict).filter(
                 DataConflict.mine_name.ilike(entity),
                 DataConflict.fiscal_year == fy,
@@ -588,6 +628,22 @@ def get_comparison_matrix(
                         db.commit()
                         db.refresh(new_dc)
                         canonical_conflict_id = new_dc.id
+                else:
+                    new_dc = DataConflict(
+                        doc_a_id=doc_a_id,
+                        doc_b_id=doc_b_id,
+                        mine_name=entity,
+                        metric_name=metric_name,
+                        fiscal_year=fy,
+                        doc_a_value=rows[0].get("standard_value") or 0.0,
+                        doc_b_value=rows[1].get("standard_value") or 0.0,
+                        discrepancy_pct=variance_pct,
+                        status="OPEN"
+                    )
+                    db.add(new_dc)
+                    db.commit()
+                    db.refresh(new_dc)
+                    canonical_conflict_id = new_dc.id
 
         period_type = "YTD" if "2026-27" in fy else "annual"
         as_of_date = "June 2026" if "2026-27" in fy else None
