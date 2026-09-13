@@ -13,7 +13,7 @@ from app.models.audit_log import AuditLog
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB Limit
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB Limit
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".csv"}
 
 
@@ -40,14 +40,14 @@ def sanitize_filename(filename: str) -> str:
 
 def validate_file_upload(filename: str, file_size: int) -> str:
     """
-    Enforces maximum file size limit (100MB) and file extension whitelist.
+    Enforces maximum file size limit (50MB) and file extension whitelist.
     Returns normalized uppercase file type ('PDF', 'DOCX', 'XLSX', 'CSV').
     Raises HTTP 400 Bad Request on validation failure.
     """
     if file_size > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File size ({file_size / (1024*1024):.2f} MB) exceeds maximum allowed limit of 100 MB."
+            detail=f"File size ({file_size / (1024*1024):.2f} MB) exceeds maximum allowed limit of 50 MB."
         )
 
     _, ext = os.path.splitext(filename)

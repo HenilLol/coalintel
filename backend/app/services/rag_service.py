@@ -277,6 +277,45 @@ def classify_query_intent(query_text: str) -> str:
     return "GENERAL_AI"
 
 
+def build_insufficient_evidence_response(query_text: str) -> str:
+    """
+    Constructs an informative, evidence-grounded refusal response detailing the missing
+    entity, metric, or temporal scope without hallucinating unverified figures.
+    Preserves strict Evidence -> Validation -> Answer policy.
+    """
+    q_entities = detect_query_entities(query_text)
+    target_mines = q_entities.get("mines", [])
+    target_metric = q_entities.get("metric")
+    metric_domain = q_entities.get("metric_domain")
+    target_sub = q_entities.get("subsidiary")
+    target_fy = q_entities.get("fiscal_year") or detect_query_fiscal_year(query_text)
+
+    entity_parts = []
+    if target_mines:
+        entity_parts.append(f"mine '{', '.join(target_mines)}'")
+    elif target_sub:
+        entity_parts.append(f"subsidiary '{target_sub}'")
+    elif q_entities.get("is_corporate_query"):
+        entity_parts.append("Coal India Limited (Corporate CIL)")
+
+    metric_name = target_metric or (metric_domain.get("canonical_name") if metric_domain else None)
+    metric_part = f" ({metric_name})" if metric_name else ""
+    fy_part = f" for FY {target_fy}" if target_fy else ""
+
+    if entity_parts:
+        target_str = f" for {', '.join(entity_parts)}{metric_part}{fy_part}"
+    elif metric_part:
+        target_str = f"{metric_part}{fy_part}"
+    else:
+        target_str = ""
+
+    return (
+        f"Insufficient evidence found for this query in the active document repository{target_str}. "
+        "Based on COALINTEL indexed documents, no verified production or operational statistics have been ingested for this entity. "
+        "To view verified figures, please upload the relevant official production report or annual return into the Document Library."
+    )
+
+
 def execute_rag_query(
     db: Session,
     query_text: str,
@@ -319,7 +358,7 @@ def execute_rag_query(
     if not evidence_chunks:
         return {
             "query": query_text,
-            "answer": "Insufficient evidence found for this query.",
+            "answer": build_insufficient_evidence_response(query_text),
             "citations": [],
             "evidence_chunks": [],
             "provider": "none",
@@ -372,7 +411,7 @@ def execute_rag_query(
         logger.info(f"Authority Gate: no supporting evidence found for queried entity {target_mines} in metric domain {metric_domain}. Refusing answer.")
         return {
             "query": query_text,
-            "answer": "Insufficient evidence found for this query.",
+            "answer": build_insufficient_evidence_response(query_text),
             "citations": [],
             "evidence_chunks": evidence_chunks,
             "provider": "none",

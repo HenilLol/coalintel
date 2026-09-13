@@ -48,8 +48,8 @@ async def upload_document(
     current_user: User = Depends(require_roles(["Admin", "Analyst"]))
 ):
     """
-    Ingests a raw document file (.pdf, .docx, .xlsx, .csv up to 100MB).
-    - Enforces max size limit (100MB) and extension whitelist.
+    Ingests a raw document file (.pdf, .docx, .xlsx, .csv up to 50MB).
+    - Enforces max size limit (50MB) and extension whitelist.
     - Computes SHA-256 digest and blocks duplicate uploads with HTTP 409 Conflict.
     - Saves file safely via storage abstraction.
     - Inserts document record with status 'PENDING' and logs audit event.
