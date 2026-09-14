@@ -26,6 +26,14 @@ def test_parse_numeric_cell_clean():
     assert parse_numeric_cell("0.00") == 0.0
 
 
+def test_parse_numeric_cell_leading_decimals():
+    """TEST C: Verify leading-decimal numbers (.03, .00) and standard decimals."""
+    assert parse_numeric_cell(".03") == 0.03
+    assert parse_numeric_cell(".00") == 0.0
+    assert parse_numeric_cell("0.03") == 0.03
+    assert parse_numeric_cell("7.07") == 7.07
+
+
 def test_parse_numeric_cell_boundary_bleed():
     """Verifies that adjacent percentage/achievement numbers bleeding into the cell are safely isolated."""
     assert parse_numeric_cell("7.07 1") == 7.07
@@ -123,13 +131,14 @@ def test_extract_march_2025_table():
     assert monthly_metrics["NEC"]["numeric_value"] == 0.00
 
     assert monthly_metrics["CIL Total"]["numeric_value"] == 85.81
-    assert monthly_metrics["CIL Total"]["subsidiary"] == "CIL"
+    assert monthly_metrics["CIL Total"]["subsidiary"] is None
 
     assert monthly_metrics["SCCL"]["numeric_value"] == 8.91
     assert monthly_metrics["Captive/Others"]["numeric_value"] == 23.82
+    assert monthly_metrics["Captive/Others"]["subsidiary"] is None
 
     assert monthly_metrics["Grand Total"]["numeric_value"] == 118.54
-    assert monthly_metrics["Grand Total"]["subsidiary"] == "Grand Total"
+    assert monthly_metrics["Grand Total"]["subsidiary"] is None
 
     # Verify cumulative values are distinguished from monthly values
     assert cumulative_metrics["ECL"]["numeric_value"] == 52.04
@@ -255,10 +264,26 @@ def test_real_pdf_november_2024_page_5():
 
     monthly_metrics = {m["mine_name"]: m for m in metrics if m["metric_name"] == "Coal Production"}
 
-    assert monthly_metrics["CIL Total"]["numeric_value"] == 67.18
-    assert monthly_metrics["Grand Total"]["numeric_value"] == 90.80
-    assert monthly_metrics["ECL"]["numeric_value"] == 4.59
-    assert monthly_metrics["SECL"]["numeric_value"] == 13.31
+    expected_nov_values = {
+        "ECL": 4.59,
+        "BCCL": 3.42,
+        "CCL": 7.29,
+        "NCL": 12.78,
+        "WCL": 6.26,
+        "SECL": 13.31,
+        "MCL": 19.50,
+        "NEC": 0.03,
+        "CIL Total": 67.18,
+        "SCCL": 6.31,
+        "Captive/Others": 17.32,
+        "Grand Total": 90.80,
+    }
+
+    for entity, exp_val in expected_nov_values.items():
+        assert entity in monthly_metrics, f"Missing entity '{entity}' in November 2024 monthly metrics"
+        assert monthly_metrics[entity]["numeric_value"] == exp_val, (
+            f"Entity '{entity}' expected {exp_val} MT, got {monthly_metrics[entity]['numeric_value']} MT"
+        )
     assert monthly_metrics["CIL Total"]["unit"] == "MT"
 
 
@@ -283,3 +308,69 @@ def test_existing_text_extraction_regression():
     assert prod_m["unit"] == "Lakh Tonnes"
     assert prod_m["standard_value"] == 4.25
     assert prod_m["standard_unit"] == "MT"
+
+
+# ==============================================================================
+# 7. REGRESSION TESTS: PR #51 HARDENED TABLE EXTRACTION (TEST A & TEST B)
+# ==============================================================================
+
+def test_non_production_table_fallback_safety():
+    """TEST A: Verify a non-production table (e.g. Overburden Removal) with >=4 columns
+    does NOT manufacture 'Coal Production' metrics via column-3 fallback."""
+    obr_table_rows = [
+        ["Sl No", "Subsidiary", "OBR Target", "OBR Achievement", "Growth %"],
+        ["1", "ECL", "10.50", "12.30", "17.14"],
+        ["2", "BCCL", "8.20", "7.90", "-3.65"],
+        ["3", "CIL Total", "85.00", "88.20", "3.76"],
+    ]
+    page_text = "Table 1.2: Overburden Removal\nFig. in M.Cu.M\nPerformance of OBR during March 2025."
+
+    metrics = extract_entity_tuples_from_tables(
+        tables=[{"raw_rows": obr_table_rows}],
+        page_number=6,
+        page_text=page_text,
+        default_subsidiary="CIL HQ",
+        default_year="2024-25"
+    )
+    # Must NOT produce any Coal Production metric
+    coal_prod_metrics = [m for m in metrics if m["metric_name"] == "Coal Production"]
+    assert len(coal_prod_metrics) == 0, f"Expected 0 Coal Production metrics from OBR table, got: {coal_prod_metrics}"
+
+
+def test_aggregate_rows_not_treated_as_operating_subsidiaries():
+    """TEST B: Mock production table containing operating subsidiaries and aggregates.
+    Verify operating subsidiaries keep their subsidiary values, while aggregates
+    (Grand Total, Captive/Others, CIL Total) have subsidiary=None."""
+    mock_rows = [
+        ["Sl No", "Company", "Target", "Production during Mar FY 25", "Growth %"],
+        ["1", "ECL", "6.50", "7.07", "8.8"],
+        ["2", "BCCL", "4.00", "4.33", "8.2"],
+        ["3", "CIL Total", "80.00", "85.81", "7.3"],
+        ["4", "Captive/Others", "20.00", "23.82", "19.1"],
+        ["5", "Grand Total", "105.00", "118.54", "12.9"],
+    ]
+    page_text = "Table 1.1: Coal Production\nFig. in MT\nMarch 2025."
+
+    metrics = extract_entity_tuples_from_tables(
+        tables=[{"raw_rows": mock_rows}],
+        page_number=5,
+        page_text=page_text,
+        default_subsidiary="CIL HQ",
+        default_year="2024-25"
+    )
+    monthly_metrics = {m["mine_name"]: m for m in metrics if m["metric_name"] == "Coal Production"}
+
+    # Operating subsidiaries
+    assert monthly_metrics["ECL"]["subsidiary"] == "ECL"
+    assert monthly_metrics["BCCL"]["subsidiary"] == "BCCL"
+
+    # Aggregates must NOT be treated as operating CIL subsidiaries
+    assert monthly_metrics["CIL Total"]["subsidiary"] is None
+    assert monthly_metrics["Captive/Others"]["subsidiary"] is None
+    assert monthly_metrics["Grand Total"]["subsidiary"] is None
+
+    # Entity/mine labels must be preserved
+    assert monthly_metrics["CIL Total"]["mine_name"] == "CIL Total"
+    assert monthly_metrics["Captive/Others"]["mine_name"] == "Captive/Others"
+    assert monthly_metrics["Grand Total"]["mine_name"] == "Grand Total"
+

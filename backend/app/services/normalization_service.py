@@ -736,7 +736,7 @@ def parse_numeric_cell(cell_val: Any) -> Optional[float]:
     tokens = clean_str.split()
     for tok in tokens:
         norm_tok = tok.replace(",", "").rstrip("%").strip()
-        if re.match(r"^[-+]?\d+(?:\.\d+)?$", norm_tok):
+        if re.match(r"^[-+]?(?:\d+(?:\.\d+)?|\.\d+)$", norm_tok):
             try:
                 return float(norm_tok)
             except ValueError:
@@ -797,10 +797,10 @@ def extract_entity_tuples_from_tables(
         table_unit = detect_table_unit(raw_rows, page_text)
 
         # Detect table title from nearby text or row 0
-        table_title = "Coal Production Table"
-        title_m = re.search(r"\bTable\s*[\d\.]+\s*[:\-]?[^\n]{0,80}(?:Production|Despatch|OBR|Coal)[^\n]{0,80}", page_text, re.IGNORECASE)
-        if title_m:
-            table_title = title_m.group(0).strip()
+        title_m = re.search(r"\bTable\s*[\d\.]+\s*[:\-]?[^\n]{0,80}(?:Production|Despatch|OBR|Overburden|Offtake|Coal)[^\n]{0,80}", page_text, re.IGNORECASE)
+        if not title_m:
+            title_m = re.search(r"\bTable\s*[\d\.]+\s*[:\-]?[^\n]{1,80}", page_text, re.IGNORECASE)
+        table_title = title_m.group(0).strip() if title_m else ""
 
         # Step 1: Detect header rows (Row 0 and optionally Row 1)
         row0 = [str(c).replace("\n", " ").strip() if c is not None else "" for c in raw_rows[0]]
@@ -864,9 +864,18 @@ def extract_entity_tuples_from_tables(
             else:
                 entity_col_idx = 0
 
-        # Fallback for monthly production: Col 3
+        # Check if table semantically pertains to coal production vs other metric families (OBR, Despatch, etc.)
+        combined_title_headers = f"{table_title} " + " ".join(col_headers)
+        is_other_family = bool(re.search(r"\b(?:overburden|obr|despatch|offtake|exploration|safety)\b", combined_title_headers, re.IGNORECASE))
+        has_production_keyword = bool(re.search(r"\b(?:production|prod)\b", combined_title_headers, re.IGNORECASE))
+        is_production_table = has_production_keyword and not is_other_family
+
+        # Fallback for monthly production: Col 3 (ONLY if table is clearly a production table)
         if monthly_prod_col_idx is None and col_count >= 4:
-            monthly_prod_col_idx = 3
+            if is_production_table:
+                monthly_prod_col_idx = 3
+            else:
+                monthly_prod_col_idx = None
 
         # Step 3: Detect Temporal Context (Month & FY)
         table_month = None
@@ -905,15 +914,15 @@ def extract_entity_tuples_from_tables(
             # Map organization / entity semantics
             if "GRAND TOTAL" in ent_upper or ent_upper == "TOTAL":
                 entity_label = "Grand Total"
-                subsidiary = "Grand Total"
+                subsidiary = None
                 mine_name = "Grand Total"
             elif "CIL" in ent_upper or ent_upper == "CIL TOTAL":
                 entity_label = "CIL Total"
-                subsidiary = "CIL"
+                subsidiary = None
                 mine_name = "CIL Total"
             elif "CAPTIVE" in ent_upper:
                 entity_label = "Captive/Others"
-                subsidiary = "Captive/Others"
+                subsidiary = None
                 mine_name = "Captive/Others"
             elif ent_upper in ["ECL", "BCCL", "CCL", "NCL", "WCL", "SECL", "MCL", "NEC", "SCCL"]:
                 entity_label = ent_upper
@@ -935,13 +944,14 @@ def extract_entity_tuples_from_tables(
                     mine_name = clean_entity
 
             month_str = f" ({table_month} {table_fy})" if table_month else f" ({table_fy})"
+            snip_title = table_title or "Coal Production Table"
 
             # Extract Monthly Production
-            if monthly_prod_col_idx is not None and monthly_prod_col_idx < len(row):
+            if is_production_table and monthly_prod_col_idx is not None and monthly_prod_col_idx < len(row):
                 m_val = parse_numeric_cell(row[monthly_prod_col_idx])
                 if m_val is not None:
                     std_val, std_unit = normalize_unit_to_mt(m_val, table_unit)
-                    raw_snip = f"{table_title} | {entity_label} | Monthly Production{month_str}: {m_val} {table_unit} | Page {page_number}"
+                    raw_snip = f"{snip_title} | {entity_label} | Monthly Production{month_str}: {m_val} {table_unit} | Page {page_number}"
                     extracted_metrics.append({
                         "mine_name": mine_name,
                         "subsidiary": subsidiary,
@@ -958,11 +968,11 @@ def extract_entity_tuples_from_tables(
                     })
 
             # Extract Cumulative Production
-            if cumulative_prod_col_idx is not None and cumulative_prod_col_idx < len(row):
+            if is_production_table and cumulative_prod_col_idx is not None and cumulative_prod_col_idx < len(row):
                 c_val = parse_numeric_cell(row[cumulative_prod_col_idx])
                 if c_val is not None:
                     std_val, std_unit = normalize_unit_to_mt(c_val, table_unit)
-                    raw_snip = f"{table_title} | {entity_label} | Cumulative Production upto {table_month or 'Month'}{month_str}: {c_val} {table_unit} | Page {page_number}"
+                    raw_snip = f"{snip_title} | {entity_label} | Cumulative Production upto {table_month or 'Month'}{month_str}: {c_val} {table_unit} | Page {page_number}"
                     extracted_metrics.append({
                         "mine_name": mine_name,
                         "subsidiary": subsidiary,
@@ -979,11 +989,11 @@ def extract_entity_tuples_from_tables(
                     })
 
             # Extract Monthly Target if present
-            if target_col_idx is not None and target_col_idx < len(row):
+            if is_production_table and target_col_idx is not None and target_col_idx < len(row):
                 t_val = parse_numeric_cell(row[target_col_idx])
                 if t_val is not None:
                     std_val, std_unit = normalize_unit_to_mt(t_val, table_unit)
-                    raw_snip = f"{table_title} | {entity_label} | Monthly Target{month_str}: {t_val} {table_unit} | Page {page_number}"
+                    raw_snip = f"{snip_title} | {entity_label} | Monthly Target{month_str}: {t_val} {table_unit} | Page {page_number}"
                     extracted_metrics.append({
                         "mine_name": mine_name,
                         "subsidiary": subsidiary,
