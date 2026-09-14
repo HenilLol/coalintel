@@ -73,10 +73,31 @@ def parse_pdf_document(file_path: str, file_bytes: Optional[bytes] = None) -> Li
                 except Exception as ocr_err:
                     logger.warning(f"Tesseract OCR failed on page {page_num}: {ocr_err}. Reverting to native text.")
 
+            # If native PyMuPDF table finder is available, attempt table extraction (additive, fail-safe)
+            page_tables = []
+            try:
+                if hasattr(page, "find_tables"):
+                    tab_finder = page.find_tables()
+                    if tab_finder and hasattr(tab_finder, "tables") and tab_finder.tables:
+                        for tab_idx, tab in enumerate(tab_finder.tables):
+                            raw_rows = tab.extract()
+                            if raw_rows and len(raw_rows) >= 2:
+                                page_tables.append({
+                                    "table_index": tab_idx,
+                                    "bbox": list(tab.bbox) if hasattr(tab, "bbox") else [],
+                                    "row_count": getattr(tab, "row_count", len(raw_rows)),
+                                    "col_count": getattr(tab, "col_count", len(raw_rows[0]) if raw_rows else 0),
+                                    "raw_rows": raw_rows,
+                                    "header_names": list(tab.header.names) if hasattr(tab, "header") and tab.header and hasattr(tab.header, "names") else []
+                                })
+            except Exception as tab_err:
+                logger.warning(f"PyMuPDF table extraction note on page {page_num}: {tab_err}")
+
             pages_data.append({
                 "page_number": page_num,
                 "text": final_text or f"Page {page_num} content.",
-                "is_ocr": is_ocr
+                "is_ocr": is_ocr,
+                "tables": page_tables
             })
 
         doc.close()

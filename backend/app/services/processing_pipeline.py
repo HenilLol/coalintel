@@ -10,6 +10,7 @@ from app.services.parsing_service import parse_document_file
 from app.services.chunking_service import chunk_text_by_tokens
 from app.services.normalization_service import (
     extract_entity_tuples_from_text,
+    extract_entity_tuples_from_tables,
     classify_document_authority,
 )
 from app.services.vector_store_service import add_chunks_to_vector_store, delete_document_vectors
@@ -106,14 +107,59 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
                     embedding_id=f"chunk_{doc.id}_{c['page_number']}_{c['chunk_index']}"
                 ))
 
-            # Entity Metric Extraction & Unit Normalization (-> MT)
-            metric_tuples = extract_entity_tuples_from_text(
+            # Entity Metric Extraction from text
+            text_metrics = extract_entity_tuples_from_text(
                 text=page_text,
                 page_number=page_num,
                 default_subsidiary=doc.subsidiary or "CIL HQ",
                 default_year=doc.fiscal_year or "2023-24"
             )
-            for m in metric_tuples:
+
+            # Table-aware Metric Extraction from structured tables (additive)
+            page_tables = page_info.get("tables", [])
+            table_metrics = []
+            if page_tables:
+                try:
+                    table_metrics = extract_entity_tuples_from_tables(
+                        tables=page_tables,
+                        page_number=page_num,
+                        page_text=page_text,
+                        default_subsidiary=doc.subsidiary or "CIL HQ",
+                        default_year=doc.fiscal_year or "2023-24"
+                    )
+                except Exception as tab_ext_err:
+                    logger.warning(f"Table metric extraction note on page {page_num}: {tab_ext_err}")
+
+            # Merge and deduplicate: table metrics take precedence for matching (page, entity, metric, year, value)
+            seen_page_keys = set()
+            combined_page_metrics = []
+
+            for tm in table_metrics:
+                key = (
+                    tm["page_number"],
+                    (tm.get("subsidiary") or "").upper(),
+                    (tm.get("mine_name") or "").upper(),
+                    (tm.get("metric_name") or "").upper(),
+                    str(tm.get("fiscal_year", "")).strip(),
+                    round(float(tm["numeric_value"]), 4)
+                )
+                seen_page_keys.add(key)
+                combined_page_metrics.append(tm)
+
+            for m in text_metrics:
+                key = (
+                    m["page_number"],
+                    (m.get("subsidiary") or "").upper(),
+                    (m.get("mine_name") or "").upper(),
+                    (m.get("metric_name") or "").upper(),
+                    str(m.get("fiscal_year", "")).strip(),
+                    round(float(m["numeric_value"]), 4)
+                )
+                if key not in seen_page_keys:
+                    seen_page_keys.add(key)
+                    combined_page_metrics.append(m)
+
+            for m in combined_page_metrics:
                 all_metrics.append(ExtractedMetric(
                     document_id=doc.id,
                     page_number=m["page_number"],
