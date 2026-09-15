@@ -360,6 +360,21 @@ def build_insufficient_evidence_response(query_text: str) -> str:
     )
 
 
+def determine_production_metric_intent(query_lower: str) -> str:
+    """
+    Determines canonical production metric name based on user query intent:
+    - "Monthly Production Target": queries specifying target, targeted, planned, etc.
+    - "Cumulative Coal Production": queries specifying cumulative, upto, up to, YTD, etc.
+    - "Coal Production": default for actual monthly coal production inquiries.
+    """
+    if any(k in query_lower for k in ["target", "targeted", "targetted", "planned"]):
+        return "Monthly Production Target"
+    elif any(k in query_lower for k in ["cumulative", "upto", "up to", "to date", "year to date", "ytd"]):
+        return "Cumulative Coal Production"
+    else:
+        return "Coal Production"
+
+
 def handle_structured_analytical_query(
     db: Session,
     query_text: str
@@ -467,11 +482,11 @@ def handle_structured_analytical_query(
     if is_sub_query and ("production" in q_lower or "coal" in q_lower):
         target_month = temporal_scope.get("primary_month")
         target_year = temporal_scope.get("primary_year")
+        sub_metric = determine_production_metric_intent(q_lower)
 
         query_base = (
             db.query(ExtractedMetric, Document)
             .join(Document, ExtractedMetric.document_id == Document.id)
-            .filter(ExtractedMetric.metric_name.ilike("%production%"))
             .filter(ExtractedMetric.subsidiary.isnot(None))
             .filter(ExtractedMetric.subsidiary != "")
         )
@@ -482,7 +497,9 @@ def handle_structured_analytical_query(
                 (Document.filename.ilike(f"%{target_month[:3]}%{target_year}%"))
             )
 
-        rows = query_base.order_by(ExtractedMetric.numeric_value.desc()).all()
+        exact_rows = query_base.filter(ExtractedMetric.metric_name == sub_metric).order_by(ExtractedMetric.numeric_value.desc()).all()
+        rows = exact_rows if exact_rows else query_base.filter(ExtractedMetric.metric_name.ilike("%production%")).order_by(ExtractedMetric.numeric_value.desc()).all()
+
         if rows:
             sub_best = {}
             for m, d in rows:
@@ -535,6 +552,7 @@ def handle_structured_analytical_query(
 
     # C. Multi-Period Comparison (e.g. "Compare coal production between November 2024 and March 2025.")
     if len(periods) >= 2 and ("compare" in q_lower or "difference" in q_lower or "versus" in q_lower or "between" in q_lower):
+        comp_metric = determine_production_metric_intent(q_lower)
         p1 = periods[0]
         p2 = periods[1]
 
@@ -558,7 +576,15 @@ def handle_structured_analytical_query(
         p1_metrics = []
         p2_metrics = []
         if p1_doc:
-            p1_metrics = (
+            p1_exact = (
+                db.query(ExtractedMetric)
+                .filter(ExtractedMetric.document_id == p1_doc.id)
+                .filter(ExtractedMetric.metric_name == comp_metric)
+                .order_by(ExtractedMetric.numeric_value.desc())
+                .limit(5)
+                .all()
+            )
+            p1_metrics = p1_exact if p1_exact else (
                 db.query(ExtractedMetric)
                 .filter(ExtractedMetric.document_id == p1_doc.id)
                 .filter(ExtractedMetric.metric_name.ilike("%production%"))
@@ -567,7 +593,15 @@ def handle_structured_analytical_query(
                 .all()
             )
         if p2_doc:
-            p2_metrics = (
+            p2_exact = (
+                db.query(ExtractedMetric)
+                .filter(ExtractedMetric.document_id == p2_doc.id)
+                .filter(ExtractedMetric.metric_name == comp_metric)
+                .order_by(ExtractedMetric.numeric_value.desc())
+                .limit(5)
+                .all()
+            )
+            p2_metrics = p2_exact if p2_exact else (
                 db.query(ExtractedMetric)
                 .filter(ExtractedMetric.document_id == p2_doc.id)
                 .filter(ExtractedMetric.metric_name.ilike("%production%"))
@@ -615,8 +649,14 @@ def handle_structured_analytical_query(
             }
 
     # D. Single Month Production Query (e.g. "What was the coal production in March 2025?")
-    if len(periods) == 1 and not target_mines and ("production" in q_lower or "coal" in q_lower):
+    is_prod_intent = bool(
+        re.search(r"\b(?:production|produce|produced|output|target|targeted|targetted|planned|how\s+much\s+coal)\b", q_lower)
+        and not ("overburden" in q_lower or "obr" in q_lower)
+    )
+    if len(periods) == 1 and not target_mines and is_prod_intent:
         p = periods[0]
+        target_metric_name = determine_production_metric_intent(q_lower)
+
         matching_doc = (
             db.query(Document)
             .filter(
@@ -626,21 +666,51 @@ def handle_structured_analytical_query(
             .first()
         )
         if matching_doc:
-            m_rows = (
+            target_sub = q_entities.get("subsidiary")
+            target_entity = None
+            if target_sub:
+                target_entity = target_sub
+            elif re.search(r"\b(?:cil\s+total|total\s+cil)\b", q_lower):
+                target_entity = "CIL Total"
+            elif re.search(r"\b(?:grand\s+total)\b", q_lower):
+                target_entity = "Grand Total"
+            elif re.search(r"\b(?:captive(?:/others)?)\b", q_lower):
+                target_entity = "Captive/Others"
+            elif re.search(r"\b(?:sccl)\b", q_lower):
+                target_entity = "SCCL"
+
+            metric_query = (
                 db.query(ExtractedMetric)
                 .filter(ExtractedMetric.document_id == matching_doc.id)
-                .filter(ExtractedMetric.metric_name.ilike("%production%"))
-                .order_by(ExtractedMetric.numeric_value.desc())
-                .limit(8)
-                .all()
+                .filter(ExtractedMetric.metric_name == target_metric_name)
             )
+
+            all_metric_rows = metric_query.all()
+            if target_entity:
+                if target_sub:
+                    sub_pat = rf"\b{re.escape(target_sub)}\b"
+                    entity_rows = [
+                        m for m in all_metric_rows
+                        if (m.subsidiary and m.subsidiary.upper() == target_sub.upper())
+                        or (m.mine_name and bool(re.search(sub_pat, m.mine_name, re.IGNORECASE)))
+                    ]
+                else:
+                    ent_pat = rf"\b{re.escape(target_entity.split('/')[0])}\b"
+                    entity_rows = [
+                        m for m in all_metric_rows
+                        if m.mine_name and bool(re.search(ent_pat, m.mine_name, re.IGNORECASE))
+                    ]
+                m_rows = entity_rows if entity_rows else all_metric_rows
+            else:
+                m_rows = all_metric_rows
+
             if m_rows:
                 citations = []
                 seen_cites = set()
                 sub_lines = []
                 for m in m_rows:
                     tag = f"[{matching_doc.filename}, Page {m.page_number}]"
-                    label = m.subsidiary or m.mine_name or "Total"
+                    label = m.mine_name or m.subsidiary or "Total"
                     sub_lines.append(f"- {label}: {m.numeric_value} {m.unit} ({tag})")
                     if tag not in seen_cites:
                         seen_cites.add(tag)
@@ -649,11 +719,19 @@ def handle_structured_analytical_query(
                             "page_number": m.page_number,
                             "citation_tag": tag
                         })
-                answer = (
-                    f"According to the official Ministry of Coal statistical report [{matching_doc.filename}, Page {m_rows[0].page_number}], "
-                    f"coal production figures for **{p['month']} {p['year']}** are:\n\n"
-                    + "\n".join(sub_lines[:6])
-                )
+
+                if target_entity and len(m_rows) <= 3:
+                    answer = (
+                        f"According to the official Ministry of Coal statistical report [{matching_doc.filename}, Page {m_rows[0].page_number}], "
+                        f"{target_entity} {target_metric_name.lower()} figures for **{p['month']} {p['year']}** are:\n\n"
+                        + "\n".join(sub_lines)
+                    )
+                else:
+                    answer = (
+                        f"According to the official Ministry of Coal statistical report [{matching_doc.filename}, Page {m_rows[0].page_number}], "
+                        f"{target_metric_name.lower()} figures for **{p['month']} {p['year']}** are:\n\n"
+                        + "\n".join(sub_lines)
+                    )
                 return {
                     "query": query_text,
                     "answer": answer,

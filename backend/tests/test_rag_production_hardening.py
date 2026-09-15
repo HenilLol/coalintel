@@ -138,6 +138,71 @@ class TestRAGProductionHardening(unittest.TestCase):
                 )
                 db.add(m)
 
+            # Seed Cumulative Coal Production metrics for Table 1
+            for sub, val in sub_prod:
+                cum_val = val * Decimal("8.5")
+                mine_label = "CIL Corporate" if sub == "CIL Corporate" else f"{sub} Total"
+                sub_label = "CIL" if sub == "CIL Corporate" else sub
+                cum_m = ExtractedMetric(
+                    document_id=doc.id,
+                    page_number=5,
+                    mine_name=mine_label,
+                    subsidiary=sub_label,
+                    metric_name="Cumulative Coal Production",
+                    numeric_value=cum_val,
+                    unit="MT",
+                    standard_value=cum_val,
+                    standard_unit="MT",
+                    fiscal_year=fy,
+                    confidence_score=Decimal("0.98"),
+                    validation_status="VALIDATED",
+                    raw_snippet=f"{sub}: {cum_val} MT (Table 1: Cumulative Production upto {month} {year})",
+                    data_origin="OFFICIAL"
+                )
+                db.add(cum_m)
+
+            # Seed Monthly Production Target metrics for Table 1
+            for sub, val in sub_prod:
+                tgt_val = val * Decimal("1.05")
+                mine_label = "CIL Corporate" if sub == "CIL Corporate" else f"{sub} Total"
+                sub_label = "CIL" if sub == "CIL Corporate" else sub
+                tgt_m = ExtractedMetric(
+                    document_id=doc.id,
+                    page_number=5,
+                    mine_name=mine_label,
+                    subsidiary=sub_label,
+                    metric_name="Monthly Production Target",
+                    numeric_value=tgt_val,
+                    unit="MT",
+                    standard_value=tgt_val,
+                    standard_unit="MT",
+                    fiscal_year=fy,
+                    confidence_score=Decimal("0.98"),
+                    validation_status="VALIDATED",
+                    raw_snippet=f"{sub}: {tgt_val} MT (Table 1: Monthly Target for {month} {year})",
+                    data_origin="OFFICIAL"
+                )
+                db.add(tgt_m)
+
+            # Seed an unrelated high-value production metric to test mixed-metric contamination immunity
+            unrelated_m = ExtractedMetric(
+                document_id=doc.id,
+                page_number=120,
+                mine_name="Project Alpha",
+                subsidiary="CIL",
+                metric_name="Project Production",
+                numeric_value=Decimal("999.00"),
+                unit="MT",
+                standard_value=Decimal("999.00"),
+                standard_unit="MT",
+                fiscal_year=fy,
+                confidence_score=Decimal("0.90"),
+                validation_status="VALIDATED",
+                raw_snippet=f"Project Alpha Production: 999.00 MT on Page 120",
+                data_origin="OFFICIAL"
+            )
+            db.add(unrelated_m)
+
             # Seed an OBR metric for this report (e.g. 10.0 M.Cu.M.)
             obr_m = ExtractedMetric(
                 document_id=doc.id,
@@ -373,6 +438,161 @@ class TestRAGProductionHardening(unittest.TestCase):
         self.assertNotIn("42.50 MT", res["answer"])
         self.assertNotIn("85.76 MT", res["answer"])
 
+    # =========================================================================
+    # REQ-TEST-A: Monthly production query selects ONLY "Coal Production"
+    # =========================================================================
+    def test_req_test_a_monthly_production_intent_exact_selection(self):
+        """REQ-TEST-A: Monthly production query must select 'Coal Production' and exclude Cumulative, Target, and unrelated metrics."""
+        query = "What was the coal production in March 2025?"
+        res = execute_rag_query(self.db, query, top_k=5)
+        self.assertEqual(res["mode"], "EVIDENCE_GROUNDED")
+        answer = res["answer"]
+        self.assertIn("coal production figures", answer.lower())
+        # Authoritative monthly figures from test fixtures
+        self.assertIn("22.38", answer)  # MCL
+        self.assertIn("5.76", answer)   # ECL
+        # Must strictly EXCLUDE cumulative figures (e.g. 190.23, 48.96)
+        self.assertNotIn("190.23", answer)
+        self.assertNotIn("48.96", answer)
+        # Must strictly EXCLUDE target figures (e.g. 23.499, 6.048)
+        self.assertNotIn("23.499", answer)
+        self.assertNotIn("6.048", answer)
+        # Must strictly EXCLUDE unrelated production metrics (e.g. 999.00)
+        self.assertNotIn("999.00", answer)
+        self.assertNotIn("Project Alpha", answer)
+
+    # =========================================================================
+    # REQ-TEST-B: Cumulative query selects ONLY "Cumulative Coal Production"
+    # =========================================================================
+    def test_req_test_b_cumulative_production_intent_exact_selection(self):
+        """REQ-TEST-B: Cumulative inquiry must select 'Cumulative Coal Production'."""
+        query = "What was the cumulative coal production up to March 2025?"
+        res = execute_rag_query(self.db, query, top_k=5)
+        self.assertEqual(res["mode"], "EVIDENCE_GROUNDED")
+        answer = res["answer"]
+        self.assertIn("cumulative coal production figures", answer.lower())
+        # Authoritative cumulative figures from test fixtures (val * 8.5)
+        self.assertIn("190.23", answer)  # MCL cumulative
+        self.assertIn("48.96", answer)   # ECL cumulative
+        # Must strictly EXCLUDE monthly actuals
+        self.assertNotIn("22.38 MT", answer)
+        self.assertNotIn("999.00", answer)
+
+    # =========================================================================
+    # REQ-TEST-C: Target query selects ONLY "Monthly Production Target"
+    # =========================================================================
+    def test_req_test_c_monthly_production_target_intent_exact_selection(self):
+        """REQ-TEST-C: Target inquiry must select 'Monthly Production Target'."""
+        query = "What was the monthly production target for March 2025?"
+        res = execute_rag_query(self.db, query, top_k=5)
+        self.assertEqual(res["mode"], "EVIDENCE_GROUNDED")
+        answer = res["answer"]
+        self.assertIn("monthly production target figures", answer.lower())
+        # Target figures from test fixtures (val * 1.05)
+        self.assertIn("23.499", answer)  # MCL target
+        self.assertIn("6.048", answer)   # ECL target
+        # Must strictly EXCLUDE monthly actuals and cumulative
+        self.assertNotIn("22.38 MT", answer)
+        self.assertNotIn("190.23", answer)
+        self.assertNotIn("999.00", answer)
+
+    # =========================================================================
+    # REQ-TEST-D: Entity-filtered monthly query
+    # =========================================================================
+    def test_req_test_d_entity_filtered_monthly_query(self):
+        """REQ-TEST-D: Subsidiary filter (e.g. ECL) must isolate the requested entity with Coal Production."""
+        query = "What was ECL production in March 2025?"
+        res = execute_rag_query(self.db, query, top_k=5)
+        self.assertEqual(res["mode"], "EVIDENCE_GROUNDED")
+        answer = res["answer"]
+        self.assertIn("ECL", answer)
+        self.assertIn("5.76", answer)
+        # Must not list other subsidiaries
+        self.assertNotIn("MCL", answer)
+        self.assertNotIn("SECL", answer)
+        # Must not contain cumulative or target figures for ECL
+        self.assertNotIn("48.96", answer)
+        self.assertNotIn("6.048", answer)
+        self.assertNotIn("999.00", answer)
+
+    # =========================================================================
+    # REQ-TEST-E: Cross-month generic behavior
+    # =========================================================================
+    def test_req_test_e_cross_month_generic_behavior(self):
+        """REQ-TEST-E: System adapts dynamically to different periods (Nov 2024 and Mar 2025) without hardcoding."""
+        # 1. November 2024 corpus query
+        query_nov = "What was the coal production in November 2024?"
+        res_nov = execute_rag_query(self.db, query_nov, top_k=5)
+        self.assertEqual(res_nov["mode"], "EVIDENCE_GROUNDED")
+        ans_nov = res_nov["answer"]
+        self.assertIn("November 2024", ans_nov)
+        self.assertIn("18.50", ans_nov)  # Nov MCL
+        self.assertIn("4.30", ans_nov)   # Nov ECL
+        self.assertNotIn("22.38", ans_nov)  # March MCL must NOT leak into Nov
+
+        # 2. November 2024 entity-filtered query
+        query_nov_ecl = "What was ECL production in November 2024?"
+        res_nov_ecl = execute_rag_query(self.db, query_nov_ecl, top_k=5)
+        self.assertEqual(res_nov_ecl["mode"], "EVIDENCE_GROUNDED")
+        ans_nov_ecl = res_nov_ecl["answer"]
+        self.assertIn("ECL", ans_nov_ecl)
+        self.assertIn("4.30", ans_nov_ecl)
+        self.assertNotIn("5.76", ans_nov_ecl)  # March ECL must NOT leak into Nov
+
+    # =========================================================================
+    # REQ-TEST-F: Mixed-metric contamination immunity
+    # =========================================================================
+    def test_req_test_f_mixed_metric_contamination_cannot_override_intent(self):
+        """
+        REQ-TEST-F: A numerically larger unrelated production metric (Project Alpha: 999.00 MT on Page 120)
+        must NEVER be selected ahead of Coal Production. Proves numeric sorting cannot override metric intent.
+        """
+        query = "What was the coal production in March 2025?"
+        res = execute_rag_query(self.db, query, top_k=5)
+        self.assertEqual(res["mode"], "EVIDENCE_GROUNDED")
+        answer = res["answer"]
+        self.assertNotIn("Project Alpha", answer)
+        self.assertNotIn("999.00", answer)
+        self.assertNotIn("Page 120", answer)
+        self.assertIn("Page 5", answer)
+        self.assertIn("22.38", answer)
+
+    # =========================================================================
+    # REQ-TEST-G: Structured Query Routing Boundary Protection
+    # =========================================================================
+    def test_req_test_g_structured_query_routing_boundaries(self):
+        """
+        REQ-TEST-G: Ordinary conceptual/evidence questions containing 'coal' but NOT asking
+        for a production metric must NOT enter the structured production analytical path.
+        """
+        boundary_queries = [
+            "What is coal?",
+            "What are the main types of coal?",
+            "Explain coal mining in March 2025.",
+            "What is the role of coal in India's energy sector?",
+        ]
+        for query in boundary_queries:
+            struct_res = handle_structured_analytical_query(self.db, query)
+            self.assertIsNone(
+                struct_res,
+                f"Query '{query}' must NOT enter structured analytical production handling!"
+            )
+
+        # Full RAG execution checks: provider must not be structured_analytics
+        for query in boundary_queries:
+            rag_res = execute_rag_query(self.db, query, top_k=5)
+            self.assertNotEqual(
+                rag_res.get("provider"),
+                "structured_analytics",
+                f"Query '{query}' must NOT be answered by structured_analytics provider!"
+            )
+            # Must not output the structured production figures table header
+            self.assertNotIn(
+                "coal production figures for **March 2025** are:",
+                rag_res.get("answer", "")
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
+
