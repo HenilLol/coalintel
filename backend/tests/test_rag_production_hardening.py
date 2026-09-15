@@ -557,6 +557,41 @@ class TestRAGProductionHardening(unittest.TestCase):
         self.assertIn("Page 5", answer)
         self.assertIn("22.38", answer)
 
+    # =========================================================================
+    # REQ-TEST-G: Structured Query Routing Boundary Protection
+    # =========================================================================
+    def test_req_test_g_structured_query_routing_boundaries(self):
+        """
+        REQ-TEST-G: Ordinary conceptual/evidence questions containing 'coal' but NOT asking
+        for a production metric must NOT enter the structured production analytical path.
+        """
+        boundary_queries = [
+            "What is coal?",
+            "What are the main types of coal?",
+            "Explain coal mining in March 2025.",
+            "What is the role of coal in India's energy sector?",
+        ]
+        for query in boundary_queries:
+            struct_res = handle_structured_analytical_query(self.db, query)
+            self.assertIsNone(
+                struct_res,
+                f"Query '{query}' must NOT enter structured analytical production handling!"
+            )
+
+        # Full RAG execution checks: provider must not be structured_analytics
+        for query in boundary_queries:
+            rag_res = execute_rag_query(self.db, query, top_k=5)
+            self.assertNotEqual(
+                rag_res.get("provider"),
+                "structured_analytics",
+                f"Query '{query}' must NOT be answered by structured_analytics provider!"
+            )
+            # Must not output the structured production figures table header
+            self.assertNotIn(
+                "coal production figures for **March 2025** are:",
+                rag_res.get("answer", "")
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -650,7 +650,7 @@ def handle_structured_analytical_query(
 
     # D. Single Month Production Query (e.g. "What was the coal production in March 2025?")
     is_prod_intent = bool(
-        ("production" in q_lower or "coal" in q_lower or "produce" in q_lower or "target" in q_lower)
+        re.search(r"\b(?:production|produce|produced|output|target|targeted|targetted|planned|how\s+much\s+coal)\b", q_lower)
         and not ("overburden" in q_lower or "obr" in q_lower)
     )
     if len(periods) == 1 and not target_mines and is_prod_intent:
