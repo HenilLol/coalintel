@@ -158,8 +158,67 @@ export default function LoginPage() {
             </Button>
           </form>
 
+          {/* Quick Evaluator Access Section */}
+          <div className="space-y-2 pt-2 border-t border-[#30383D]">
+            <span className="text-[11px] font-mono text-[#9BA5A8] uppercase tracking-wider block text-center">
+              Quick Hackathon Evaluator Access
+            </span>
+            <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('coalintel_token', 'demo_analyst_token');
+                    localStorage.setItem(
+                      'coalintel_user',
+                      JSON.stringify({ username: 'CMPDI Analyst', role: 'Analyst', subsidiary: 'CMPDI' })
+                    );
+                  }
+                  router.push('/dashboard');
+                }}
+                className="p-2 rounded bg-[#151A1D] border border-[#30383D] text-[#C58B3A] hover:bg-[#242C30] hover:border-[#C58B3A]/40 transition-colors font-bold text-center"
+              >
+                Analyst
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('coalintel_token', 'demo_reviewer_token');
+                    localStorage.setItem(
+                      'coalintel_user',
+                      JSON.stringify({ username: 'CIL Executive', role: 'Reviewer', subsidiary: 'CIL HQ' })
+                    );
+                  }
+                  router.push('/dashboard');
+                }}
+                className="p-2 rounded bg-[#151A1D] border border-[#30383D] text-[#14B8A6] hover:bg-[#242C30] hover:border-[#14B8A6]/40 transition-colors font-bold text-center"
+              >
+                Reviewer
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('coalintel_token', 'demo_admin_token');
+                    localStorage.setItem(
+                      'coalintel_user',
+                      JSON.stringify({ username: 'System Admin', role: 'Admin', subsidiary: 'CIL HQ' })
+                    );
+                  }
+                  router.push('/dashboard');
+                }}
+                className="p-2 rounded bg-[#151A1D] border border-[#30383D] text-[#10B981] hover:bg-[#242C30] hover:border-[#10B981]/40 transition-colors font-bold text-center"
+              >
+                Admin
+              </button>
+            </div>
+          </div>
+
           {/* Future-Ready Architecture Notice */}
-          <div className="pt-4 border-t border-[#30383D] text-center text-xs text-[#9BA5A8]">
+          <div className="pt-3 border-t border-[#30383D] text-center text-xs text-[#9BA5A8]">
             <span>New subsidiary user? </span>
             <span className="text-[#C58B3A] hover:text-[#D6A052] font-semibold cursor-not-allowed" title="Account provisioning is managed by CIL HQ System Administrators">
               Request Access from Admin

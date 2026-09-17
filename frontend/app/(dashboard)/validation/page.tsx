@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ValidationFeedTable } from '@/components/validation/ValidationFeedTable';
+import { ValidationFormulaVisualizer } from '@/components/validation/ValidationFormulaVisualizer';
 import { validationApi } from '@/lib/api/validationApi';
 import { CIL_SUBSIDIARIES } from '@/lib/constants';
 import { ShieldCheck } from 'lucide-react';
@@ -30,9 +31,9 @@ export default function ValidationPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
-        title="Arithmetic Validation Feed"
-        description="Deterministic unit normalization (Lakh Tonnes → MT) and arithmetic discrepancy monitoring (> 5% calculation threshold)."
-        breadcrumbs={[{ label: 'Validation Feed' }]}
+        title="Arithmetic Validation Center"
+        description="Deterministic unit normalization (Lakh Tonnes → MT) and automated stock reconciliation: Opening Stock + Production − Dispatch = Closing Stock."
+        breadcrumbs={[{ label: 'Validation Center' }]}
         badge={<Badge variant="amber">Deterministic Engine</Badge>}
         actions={
           <Select
@@ -43,6 +44,9 @@ export default function ValidationPage() {
           />
         }
       />
+
+      {/* Signature Animated Arithmetic Visualizer */}
+      <ValidationFormulaVisualizer />
 
       {/* Error Alert */}
       {isError && <ErrorState message={error instanceof Error ? error.message : 'Failed to fetch validation feed.'} />}

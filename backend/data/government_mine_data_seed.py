@@ -1706,12 +1706,18 @@ def run_government_data_ingestion():
         db.commit()
         logger.info(f"Ingestion run completed successfully. {records_inserted} records inserted.")
 
-        # Execute Canonical Mines Expansion (Phases 3 & 4)
         try:
             from data.canonical_expansion_seed import run_canonical_expansion
             run_canonical_expansion()
         except Exception as exp_err:
             logger.warning(f"Canonical expansion note: {exp_err}")
+
+        # Execute Contract Historical & Aggregate Data Seeding
+        try:
+            from data.contract_historical_seed import run_contract_seed
+            run_contract_seed()
+        except Exception as cont_err:
+            logger.warning(f"Contract seed note: {cont_err}")
 
     except Exception as e:
         db.rollback()

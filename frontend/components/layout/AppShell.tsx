@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { IntelligentBackground } from './IntelligentBackground';
 import { UserRole } from '@/types/auth';
 
 interface AppShellProps {
@@ -39,7 +40,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1113] flex font-sans text-[#E8ECEB] antialiased selection:bg-[#C58B3A]/30 selection:text-[#E8ECEB]">
+    <div className="min-h-screen bg-[#0E1113] flex font-sans text-[#E8ECEB] antialiased selection:bg-[#C58B3A]/30 selection:text-[#E8ECEB] relative">
+      {/* Background Ambience & Survey Grid */}
+      <IntelligentBackground />
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <Sidebar

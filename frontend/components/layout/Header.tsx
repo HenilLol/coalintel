@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Menu, Bell, Shield, Database, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
 import { Logo } from '@/components/ui/Logo';
 import { useScope } from '@/context/ScopeContext';
 import { CIL_SUBSIDIARIES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
+import { GlobalSearchModal } from '@/components/layout/GlobalSearchModal';
 
 interface HeaderProps {
   onMobileMenuToggle?: () => void;
@@ -23,6 +23,19 @@ export const Header: React.FC<HeaderProps> = ({
   showLogoOnDesktop = true,
 }) => {
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear } = useScope();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Global Ctrl + K / Cmd + K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <header className="sticky top-0 z-20 h-16 bg-[#151A1D] border-b border-[#30383D] px-3.5 sm:px-4 lg:px-6 flex items-center justify-between shadow-sm gap-2 sm:gap-4">
@@ -66,21 +79,31 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Center Search Affordance */}
-      <div className="hidden lg:flex w-60 xl:w-80 relative items-center">
-        <Input
-          placeholder="Search mining metrics, documents, mines..."
-          leftIcon={<Search className="h-4 w-4 text-[#9BA5A8]" />}
-          className="bg-[#151A1D] border-[#30383D] text-[#E8ECEB] placeholder:text-[#9BA5A8]/70 text-xs py-2 pr-12 focus:border-[#C58B3A]"
-        />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden xl:block">
-          <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#242C30] border border-[#30383D] text-[#9BA5A8]">
-            Ctrl K
-          </kbd>
+      <button
+        onClick={() => setIsSearchOpen(true)}
+        className="hidden lg:flex w-60 xl:w-80 relative items-center justify-between px-3 py-2 rounded-lg bg-[#151A1D] border border-[#30383D] text-[#9BA5A8] hover:border-[#C58B3A]/50 hover:text-[#E8ECEB] transition-colors text-xs text-left group"
+        aria-label="Open global search"
+      >
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-[#9BA5A8] group-hover:text-[#C58B3A] transition-colors" />
+          <span className="truncate">Search mines, metrics, documents...</span>
         </div>
-      </div>
+        <kbd className="hidden xl:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#242C30] border border-[#30383D] text-[#9BA5A8]">
+          Ctrl K
+        </kbd>
+      </button>
 
       {/* Right User & System Status */}
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        {/* Mobile Search Toggle Button */}
+        <button
+          onClick={() => setIsSearchOpen(true)}
+          className="p-2 rounded-lg bg-[#1C2226] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] lg:hidden transition-colors"
+          aria-label="Open search"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+
         {/* System Health / Status Indicator */}
         <div className="hidden 2xl:flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#242C30]/50 border border-[#30383D] text-[11px] font-mono text-[#9BA5A8]">
           <span className="relative flex h-2 w-2">
@@ -116,6 +139,9 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
   );
 };
