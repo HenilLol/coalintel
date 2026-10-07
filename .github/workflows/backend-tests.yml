@@ -1,0 +1,76 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: coalintel
+          POSTGRES_PASSWORD: coalintel_ci
+          POSTGRES_DB: coalintel_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U coalintel -d coalintel_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://coalintel:coalintel_ci@localhost:5432/coalintel_ci
+      ENVIRONMENT: development
+      SECRET_KEY: ci-only-ephemeral-signing-key-not-a-real-secret-0000000000
+      LLM_PROVIDER: degraded
+      STORAGE_PROVIDER: local
+      UPLOAD_DIR: ./storage/uploads
+      CHROMA_DB_DIR: ./storage/chroma_db
+      REPORT_DIR: ./storage/reports
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile check (syntax gate)
+        working-directory: backend
+        run: python -m compileall -q app main.py config.py database.py database_seed.py
+
+      - name: Run backend test suite
+        working-directory: backend
+        run: python -m pytest tests/ -q --tb=short
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: |
+            backend/storage/
+          retention-days: 7
