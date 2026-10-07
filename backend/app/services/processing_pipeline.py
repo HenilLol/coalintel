@@ -49,6 +49,7 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
         logger.info(f"Document #{doc.id} background processing started ('{doc.filename}').")
         doc.status = "PROCESSING"
         doc.error_message = None
+        doc.processing_started_at = datetime.now(timezone.utc)  # Issue #58
         db.commit()
 
         # Step 1: Retrieve Document Binary & Parse Document Pages (PyMuPDF / OCR)
@@ -224,7 +225,13 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
 def recover_stale_processing_documents(db: Session, stale_minutes: int = 15) -> int:
     """
     Startup and on-demand recovery mechanism for orphaned PROCESSING records.
-    Transitions documents that are stale (> stale_minutes) AND have lost storage binaries.
+    Issue #58: staleness is judged by processing_started_at (when processing
+    actually began), NOT created_at (upload time). A document that was
+    uploaded >15 min ago but only recently started processing is NOT stale.
+    Legacy rows without processing_started_at fall back to created_at.
+
+    A compare-and-swap status check ensures we never clobber a document that
+    transitioned (e.g. to PARSED) between our query and our commit.
     """
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(minutes=stale_minutes)
@@ -233,7 +240,8 @@ def recover_stale_processing_documents(db: Session, stale_minutes: int = 15) -> 
     recovered_count = 0
 
     for doc in stale_docs:
-        doc_time = doc.created_at
+        # Issue #58: judge staleness by when PROCESSING began, not upload time
+        doc_time = doc.processing_started_at or doc.created_at
         if doc_time is not None and doc_time.tzinfo is None:
             doc_time = doc_time.replace(tzinfo=timezone.utc)
 
@@ -241,9 +249,18 @@ def recover_stale_processing_documents(db: Session, stale_minutes: int = 15) -> 
 
         if is_stale:
             if not document_binary_exists(doc.file_path):
+                # CAS: only fail if still PROCESSING (state may have changed meanwhile)
+                still_processing = (
+                    db.query(Document)
+                    .filter(Document.id == doc.id, Document.status == "PROCESSING")
+                    .first()
+                )
+                if still_processing is None:
+                    continue
                 logger.warning(
                     f"Recovering stale Document #{doc.id} ('{doc.filename}'): "
-                    f"Created at {doc.created_at}, storage binary missing. Marking FAILED."
+                    f"processing started at {doc.processing_started_at or doc.created_at}, "
+                    f"storage binary missing. Marking FAILED."
                 )
                 doc.status = "FAILED"
                 doc.error_message = "Processing was interrupted during server restart and source file is unavailable in storage. Please re-upload the document."
