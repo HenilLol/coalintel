@@ -42,6 +42,7 @@ jobs:
       UPLOAD_DIR: ./storage/uploads
       CHROMA_DB_DIR: ./storage/chroma_db
       REPORT_DIR: ./storage/reports
+      HF_HOME: ${{ github.workspace }}/.hf-cache
 
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +58,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Pre-cache embedding model artifacts (offline inference contract)
+        working-directory: backend
+        env:
+          HF_HOME: ${{ github.workspace }}/.hf-cache
+        run: |
+          python - <<'EOF'
+          # The embedding service enforces local_files_only=True (offline
+          # inference). CI must provision the artifacts the same way the
+          # Docker image build is documented to.
+          from huggingface_hub import hf_hub_download
+          for fname in ("onnx/model.onnx", "tokenizer.json"):
+              path = hf_hub_download(repo_id="sentence-transformers/all-MiniLM-L6-v2", filename=fname)
+              print("cached:", path)
+          EOF
 
       - name: Compile check (syntax gate)
         working-directory: backend

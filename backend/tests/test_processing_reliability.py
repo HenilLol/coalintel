@@ -57,6 +57,15 @@ class TestDocumentProcessingReliability(unittest.TestCase):
         cls.SessionLocal = sessionmaker(bind=cls.engine)
         Base.metadata.create_all(bind=cls.engine)
 
+    @classmethod
+    def tearDownClass(cls):
+        # CI fix: reset the process-global embedding singleton so this file's
+        # MOCK-model side effect cannot leak into test_low_memory_embedding.py
+        # (which asserts a real/ONNX backend). Cross-file pollution caused
+        # 'MOCK' == 'MOCK' assertion failures in CI.
+        import app.services.embedding_service as emb_module
+        emb_module._model_instance = None
+
     def setUp(self):
         self.db = self.SessionLocal()
         # Seed test admin user
