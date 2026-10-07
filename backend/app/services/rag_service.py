@@ -16,6 +16,7 @@ from app.services.llm_provider import get_llm_provider, DegradedLLMProvider
 from app.services.normalization_service import (
     normalize_subsidiary_scope,
     get_base_mine_name,
+    mine_name_variants,
     detect_query_fiscal_year,
     classify_document_authority,
     chunk_has_metric_for_entity,
@@ -114,15 +115,18 @@ def extract_and_validate_citations(
         # 2. Semantic Entity Compatibility
         if target_mines:
             # Specific mine query requires that the cited chunk explicitly contains
-            # either the full mine name or its base name
+            # the full mine name, its base name, or a suffix-alias variant
+            # (Issue #68: 'Kusmunda OCP' query must match 'Kusmunda OC' text)
             has_entity_support = False
             for tm in target_mines:
-                base_tm = get_base_mine_name(tm)
                 if tm.lower() in chunk_text_lower:
                     has_entity_support = True
                     break
-                if len(base_tm) >= 3 and re.search(r"\b" + re.escape(base_tm) + r"\b", chunk_text, re.IGNORECASE):
-                    has_entity_support = True
+                for variant in mine_name_variants(tm):
+                    if len(variant) >= 3 and re.search(r"\b" + re.escape(variant) + r"\b", chunk_text, re.IGNORECASE):
+                        has_entity_support = True
+                        break
+                if has_entity_support:
                     break
             if not has_entity_support:
                 logger.warning(
@@ -840,6 +844,33 @@ def execute_rag_query(
             "degraded_mode": False,
             "mode": "INSUFFICIENT_EVIDENCE"
         }
+
+    # Issue #68: false-refusal telemetry — the authority gate is about to refuse
+    # while retrieved top-k evidence exists. Surface WHY (entity alias miss vs.
+    # metric-domain miss) so gate behavior is observable and tunable.
+    if not has_official_for_metric and evidence_chunks:
+        refusal_reasons = []
+        if target_mines:
+            mine_terms_all = set()
+            for tm in target_mines:
+                for v in mine_name_variants(tm):
+                    if len(v) >= 3:
+                        mine_terms_all.add(v.lower())
+            mentioned_anywhere = any(
+                any(mt in c.get("text", "").lower() for mt in mine_terms_all)
+                for c in evidence_chunks
+            )
+            if not mentioned_anywhere:
+                refusal_reasons.append(f"entity alias miss (queried {target_mines}, no variant found in top-{len(evidence_chunks)} chunks)")
+        if metric_domain or target_metric:
+            refusal_reasons.append("metric domain not matched in retrieved chunks")
+        if not refusal_reasons:
+            refusal_reasons.append("no OFFICIAL authority chunk passed the gate")
+        logger.warning(
+            "RAG false-refusal candidate: query '%s' refused while %d evidence chunk(s) "
+            "retrieved. Reasons: %s",
+            query_text, len(evidence_chunks), "; ".join(refusal_reasons)
+        )
 
     # Entity-specific validation is applied ONLY when a verified/recognized mine/entity was actually extracted
     if not has_official_for_metric and not has_synthetic_for_metric:

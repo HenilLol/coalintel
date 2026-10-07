@@ -20,6 +20,10 @@ class Document(Base):
     uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    # Issue #58: actual processing start timestamp — recovery must compare THIS,
+    # not created_at (upload time). An in-flight doc uploaded >15 min ago that IS
+    # legitimately processing must never be falsely marked FAILED by recovery.
+    processing_started_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     uploader = relationship("User", back_populates="documents")

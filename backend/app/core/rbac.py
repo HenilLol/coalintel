@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -8,17 +8,33 @@ from config import settings
 from database import get_db
 from app.models.user import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
+    access_token_cookie: Optional[str] = Cookie(default=None, alias="access_token"),
     db: Session = Depends(get_db)
 ) -> User:
     """
     Decodes JWT bearer token and retrieves authenticated User ORM model from database.
     Raises HTTP 401 Unauthorized if token is invalid or user does not exist.
+
+    Issue #60: also verifies the token's 'ver' claim against the user's current
+    token_version. A bumped token_version (role change, password reset, forced
+    logout) invalidates ALL previously issued tokens immediately.
+    Issue #65: accepts the token from the Authorization header (API clients) OR
+    from the httpOnly 'access_token' cookie (browser clients). Header wins when
+    both are present.
     """
+    # Header takes precedence; fall back to the httpOnly cookie
+    token = token or access_token_cookie
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate authentication credentials",
@@ -29,12 +45,18 @@ def get_current_user(
         username: Optional[str] = payload.get("sub")
         if username is None:
             raise credentials_exception
+        token_ver = payload.get("ver", 0)
     except JWTError:
         raise credentials_exception
 
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
+
+    # Issue #60: revocation check — stale tokens from before a token_version bump
+    if token_ver != user.token_version:
+        raise credentials_exception
+
     return user
 
 

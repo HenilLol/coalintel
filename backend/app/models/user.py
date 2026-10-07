@@ -15,6 +15,10 @@ class User(Base):
     full_name = Column(String(150), nullable=True)
     email = Column(String(255), unique=True, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    # Issue #60: token version for JWT revocation. Embedded in every issued token
+    # and verified in get_current_user. Bumping invalidates ALL outstanding tokens
+    # for this user (role change, password reset, forced logout).
+    token_version = Column(Integer, nullable=False, default=0)
 
     # Relationships
     documents = relationship("Document", back_populates="uploader")

@@ -2,17 +2,17 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api/client';
 
 export default function RootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('coalintel_token') : null;
-    if (token) {
-      router.replace('/dashboard');
-    } else {
-      router.replace('/login');
-    }
+    // Issue #65: httpOnly cookie session — probe the server for auth state
+    apiClient
+      .get('/auth/me')
+      .then(() => router.replace('/dashboard'))
+      .catch(() => router.replace('/login'));
   }, [router]);
 
   return (

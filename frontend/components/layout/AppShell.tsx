@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { UserRole } from '@/types/auth';
+import { apiClient } from '@/lib/api/client';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -43,11 +44,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   }, [mobileOpen]);
 
   const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('coalintel_token');
-      localStorage.removeItem('coalintel_user');
-    }
-    router.push('/login');
+    // Issue #65: ask the server to clear the httpOnly session cookie and
+    // log the audit event; also clear legacy localStorage remnants.
+    apiClient
+      .post('/auth/logout')
+      .catch(() => {
+        /* server unreachable: cookie expiry is the fallback; still redirect */
+      })
+      .finally(() => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('coalintel_token');
+          localStorage.removeItem('coalintel_user');
+        }
+        router.push('/login');
+      });
   };
 
   return (
