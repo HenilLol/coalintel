@@ -24,23 +24,68 @@ GENERIC_MINE_PHRASES = {
 def get_base_mine_name(name: str) -> str:
     """
     Extracts the base mine name by stripping mining type suffixes.
-    Supported suffixes: OC, OpenCast, UG, Underground, Mine, Colliery, Project, Block, Washery.
+    Supported suffixes: OC, OCP, OCM, OpenCast, Open Cast, Opencast, UG, Underground,
+    Mine, Colliery, Project, Block, Washery (Issue #68: government reports alternate
+    between 'Gevra OC', 'Gevra OCP', 'Gevra OCM', 'Gevra OpenCast' etc.).
     Examples:
         "Gevra OC" -> "Gevra"
+        "Gevra OCP" -> "Gevra"
         "Gevra OpenCast" -> "Gevra"
+        "Gevra Open Cast" -> "Gevra"
         "Alpha Mine" -> "Alpha"
         "Alpha UG" -> "Alpha"
     """
     if not name:
         return ""
     clean = str(name).strip()
-    base = re.sub(
-        r"\s+(?:OC|OpenCast|UG|Underground|Mine|Colliery|Project|Block|Washery)\b",
-        "",
-        clean,
-        flags=re.IGNORECASE
-    ).strip()
+    # Strip suffix tokens repeatedly (handles "Gevra OC Project" style stacking)
+    base = clean
+    for _ in range(3):
+        new_base = re.sub(
+            r"\s+(?:OC|OCP|OCM|OpenCast|Open\s+Cast|Opencast|UG|Underground|Mine|Colliery|Project|Block|Washery)\b",
+            "",
+            base,
+            flags=re.IGNORECASE
+        ).strip()
+        if new_base == base:
+            break
+        base = new_base
     return base if base else clean
+
+
+# Issue #68: explicit suffix alias map for symmetric query<->evidence matching.
+# All variants within a family are treated as interchangeable when matching a
+# mine mention in chunk text against a queried mine (and vice versa).
+MINE_SUFFIX_ALIAS_FAMILIES: List[List[str]] = [
+    ["OC", "OCP", "OCM", "OpenCast", "Open Cast", "Opencast", "Project"],
+    ["UG", "Underground"],
+    ["Mine", "Colliery", "Block", "Washery"],
+]
+
+
+def mine_name_variants(name: str) -> List[str]:
+    """
+    Issue #68: returns the base mine name plus all common suffixed variants,
+    e.g. "Gevra" -> ["Gevra", "Gevra OC", "Gevra OCP", "Gevra OCM",
+    "Gevra OpenCast", "Gevra Open Cast", "Gevra Opencast", "Gevra Project",
+    "Gevra UG", "Gevra Underground", ...]. Used so a query mentioning
+    'Kusmunda OCP' matches evidence text saying 'Kusmunda OC' or bare
+    'Kusmunda', symmetrically.
+    """
+    if not name:
+        return []
+    base = get_base_mine_name(name)
+    if not base:
+        return [str(name).strip()] if name else []
+    variants = [base]
+    seen = {base.lower()}
+    for family in MINE_SUFFIX_ALIAS_FAMILIES:
+        for suffix in family:
+            v = f"{base} {suffix}"
+            if v.lower() not in seen:
+                seen.add(v.lower())
+                variants.append(v)
+    return variants
 
 
 def canonicalize_mine_name(name: str) -> str:
@@ -635,9 +680,11 @@ def chunk_has_metric_for_entity(
         for tm in target_mines:
             if tm.lower() in chunk_lower:
                 return True
-            base_tm = get_base_mine_name(tm)
-            if base_tm and len(base_tm) >= 3 and base_tm.lower() in chunk_lower:
-                return True
+            # Issue #68: symmetric alias matching — any suffix variant of the
+            # base name counts (OCP/OCM/OpenCast/Project/UG/...)
+            for variant in mine_name_variants(tm):
+                if len(variant) >= 3 and variant.lower() in chunk_lower:
+                    return True
         return False
 
     # Check for structured extraction format:
@@ -679,9 +726,11 @@ def chunk_has_metric_for_entity(
     mine_terms = []
     for tm in target_mines:
         mine_terms.append(tm.lower())
-        base_tm = get_base_mine_name(tm)
-        if base_tm and len(base_tm) >= 3 and base_tm.lower() not in mine_terms:
-            mine_terms.append(base_tm.lower())
+        # Issue #68: expand to all suffix variants for symmetric matching
+        for variant in mine_name_variants(tm):
+            v_lower = variant.lower()
+            if len(v_lower) >= 3 and v_lower not in mine_terms:
+                mine_terms.append(v_lower)
 
     # Check if mine is mentioned in the chunk at all
     if not any(mt in chunk_lower for mt in mine_terms):
