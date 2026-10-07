@@ -9,9 +9,14 @@
 #     without a toolchain); 0.15.1 is the patch release that adds it.
 #   * chromadb: 0.4.22 pins chroma-hnswlib==0.7.3 which has NO cp312 wheels
 #     on any platform — uninstallable on Python 3.12. 0.5.5 pins
-#     chroma-hnswlib==0.7.6 (Linux/macOS wheels only, CI runs ubuntu — OK).
-#     NOTE: local Windows/py3.12 dev without chromadb installed is unaffected;
-#     the app degrades gracefully (storage_service falls back to local mode).
+#     chroma-hnswlib==0.7.6 (Linux/macOS wheels only). This resolves on the
+#     Linux deployment target (docker-compose, GitHub Actions ubuntu runners)
+#     and every CI environment. Local Windows/py3.12 dev installs should use
+#     the lock minus chromadb (the app degrades gracefully without it —
+#     storage_service falls back to local mode):
+#       grep -v '^chromadb' requirements.lock > /tmp/lock && pip install -r /tmp/lock
+#     All other pins in this file are verified to resolve with binary wheels
+#     on both Windows and Linux py3.12 (pip install --dry-run --only-binary).
 # - Re-pin from a fully-equipped verified environment with:
 #     pip freeze > requirements.lock
 # Install with:  pip install -r requirements.lock
