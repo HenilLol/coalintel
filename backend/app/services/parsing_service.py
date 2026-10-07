@@ -23,6 +23,17 @@ except ImportError:
     logger.warning("pytesseract or PIL is not installed. OCR fallback will be disabled.")
 
 
+class DocumentParsingError(Exception):
+    """
+    Raised when a document cannot be parsed (corrupt file, unsupported encoding, etc.).
+
+    Issue #57: parse failures must propagate to the processing pipeline so the
+    document is marked FAILED. Error text must NEVER be returned as document
+    content (it would otherwise be chunked, embedded, and citable by the RAG layer).
+    """
+    pass
+
+
 def parse_pdf_document(file_path: str, file_bytes: Optional[bytes] = None) -> List[Dict[str, Any]]:
     """
     Parses digital and scanned PDF documents page-by-page.
@@ -104,8 +115,11 @@ def parse_pdf_document(file_path: str, file_bytes: Optional[bytes] = None) -> Li
         return pages_data
 
     except Exception as e:
+        # Issue #57: parse failures must NEVER become corpus content.
+        # Log server-side and re-raise so the processing pipeline marks the
+        # document FAILED instead of chunking/embedding an error message.
         logger.error(f"Failed to parse PDF document '{file_path}': {e}")
-        return [{"page_number": 1, "text": f"Error parsing document: {e}", "is_ocr": False}]
+        raise DocumentParsingError(f"PDF parsing failed: {e}") from e
 
 
 def parse_docx_document(file_path: str, file_bytes: Optional[bytes] = None) -> List[Dict[str, Any]]:
@@ -119,8 +133,9 @@ def parse_docx_document(file_path: str, file_bytes: Optional[bytes] = None) -> L
         full_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
         return [{"page_number": 1, "text": full_text or "DOCX document", "is_ocr": False}]
     except Exception as e:
+        # Issue #57: fail loudly; never store error text as content
         logger.error(f"Failed to parse DOCX file '{file_path}': {e}")
-        return [{"page_number": 1, "text": f"DOCX document content for {os.path.basename(file_path)}", "is_ocr": False}]
+        raise DocumentParsingError(f"DOCX parsing failed: {e}") from e
 
 
 def parse_excel_csv_document(file_path: str, file_type: str, file_bytes: Optional[bytes] = None) -> List[Dict[str, Any]]:
@@ -139,8 +154,9 @@ def parse_excel_csv_document(file_path: str, file_type: str, file_bytes: Optiona
         text_content = df.to_string()
         return [{"page_number": 1, "text": text_content, "is_ocr": False}]
     except Exception as e:
+        # Issue #57: fail loudly; never store error text as content
         logger.error(f"Failed to parse {file_type} file '{file_path}': {e}")
-        return [{"page_number": 1, "text": f"{file_type} table data for {os.path.basename(file_path)}", "is_ocr": False}]
+        raise DocumentParsingError(f"{file_type} parsing failed: {e}") from e
 
 
 def parse_document_file(file_path: str, file_type: str, file_bytes: Optional[bytes] = None) -> List[Dict[str, Any]]:

@@ -92,7 +92,23 @@ docker-compose up --build -d
 
 ---
 
-## 5. Development Roadmap
+## 5. Production Deployment Checklist
+
+Before exposing COALINTEL to any real deployment (including SIH final evaluation environments), complete every item:
+
+- [ ] **SECRET_KEY** — set a strong random value (32+ chars). Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"`. The backend **refuses to start in production** with the placeholder value.
+- [ ] **ENVIRONMENT=production** — also disables the automatic CORS dev-origin append in `main.py`.
+- [ ] **POSTGRES_PASSWORD** — change from the default; never expose port 5432 outside the compose network.
+- [ ] **Bootstrap credentials** — set `BOOTSTRAP_ADMIN_PASSWORD` (and other `BOOTSTRAP_<ROLE>_PASSWORD` vars) before first boot. Without them, random passwords are generated and **printed once in the startup logs** — retrieve them from the logs and change them immediately.
+- [ ] **ALLOWED_ORIGINS / FRONTEND_URL** — set to the real frontend origin only.
+- [ ] **HTTPS** — terminate TLS at the proxy; mark cookies `Secure`.
+- [ ] **Auth rate limiting** — active by default (5 failed attempts per username+IP per 15 min → 15 min lockout). For multi-worker deployments, front the API with a reverse-proxy limiter (e.g. nginx `limit_req`) since the built-in limiter is per-process.
+- [ ] **Supabase keys** — service-role key stays backend-only (never `NEXT_PUBLIC_*`/`VITE_*` prefixed).
+- [ ] **Monitoring** — watch the `/health` endpoint plus LOGIN_FAILED audit-log spikes (brute-force indicator).
+
+---
+
+## 6. Development Roadmap
 * **Day 0:** Project Foundation & Environment Configuration (COMPLETE)
 * **Day 1:** System Foundation & Database Schemas (DDL & ORM)
 * **Day 2:** Frontend React Shell & Layout Component Sprint

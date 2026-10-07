@@ -18,8 +18,12 @@ from app.core.security import create_access_token
 
 
 @pytest.fixture
-def isolated_client():
+def isolated_client(monkeypatch):
     """Creates a temporary isolated SQLite database and TestClient for testing."""
+    # Issue #56: deterministic bootstrap passwords for tests (no hardcoded repo credentials)
+    monkeypatch.setenv("BOOTSTRAP_ADMIN_PASSWORD", "TestAdmin@2026")
+    monkeypatch.setenv("BOOTSTRAP_ANALYST_PASSWORD", "TestAnalyst@2026")
+
     test_engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -168,20 +172,20 @@ def test_auth_signup_flow(isolated_client):
 def test_quick_login_shortcuts(isolated_client):
     client, db = isolated_client
 
-    # Admin quick login credentials
+    # Admin quick login credentials (from bootstrap env — Issue #56)
     admin_res = client.post(
         "/api/v1/auth/login",
-        json={"username": "admin", "password": "Admin@123"},
+        json={"username": "admin", "password": "TestAdmin@2026"},
     )
     assert admin_res.status_code == 200
     admin_data = admin_res.json()
     assert admin_data["user"]["role"] == "Admin"
     assert "access_token" in admin_data
 
-    # Analyst quick login credentials
+    # Analyst quick login credentials (from bootstrap env — Issue #56)
     analyst_res = client.post(
         "/api/v1/auth/login",
-        json={"username": "analyst", "password": "Analyst@123"},
+        json={"username": "analyst", "password": "TestAnalyst@2026"},
     )
     assert analyst_res.status_code == 200
     analyst_data = analyst_res.json()

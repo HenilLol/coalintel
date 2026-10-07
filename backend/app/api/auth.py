@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -13,21 +13,99 @@ from app.schemas.auth import LoginRequest, SignupRequest, TokenResponse, UserRes
 
 router = APIRouter(tags=["Authentication"])
 
+# ============================================================================
+# Login Rate Limiting (Issue #55)
+# ============================================================================
+# In-process sliding-window limiter for auth endpoints. Tracks failed attempts
+# per (username, client IP). Locks the combination for LOCKOUT_MINUTES after
+# MAX_FAILED_ATTEMPTS failures within WINDOW_MINUTES. Successful login clears
+# the record. NOTE: per-process only — a multi-worker deployment should move
+# this to shared storage (Redis) or a reverse-proxy limiter; for the single-node
+# SIH deployment profile this closes the brute-force/credential-stuffing hole.
+import time
+from collections import defaultdict
+from threading import Lock
+
+MAX_FAILED_ATTEMPTS = 5
+WINDOW_MINUTES = 15
+LOCKOUT_MINUTES = 15
+WINDOW_SECONDS = WINDOW_MINUTES * 60
+LOCKOUT_SECONDS = LOCKOUT_MINUTES * 60
+
+_failed_attempts: dict = defaultdict(list)  # key -> [timestamps of failures]
+_rate_limit_lock = Lock()
+
+
+def _client_key(payload_username: str, request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown")
+    return f"{payload_username.strip().lower()}|{client_ip}"
+
+
+def _is_rate_limited(key: str) -> int:
+    """Returns seconds remaining in lockout, or 0 if not locked out."""
+    now = time.monotonic()
+    with _rate_limit_lock:
+        attempts = _failed_attempts.get(key, [])
+        if len(attempts) >= MAX_FAILED_ATTEMPTS and (now - attempts[-1]) < LOCKOUT_SECONDS:
+            return int(LOCKOUT_SECONDS - (now - attempts[-1]))
+    return 0
+
+
+def _record_failure(key: str) -> None:
+    now = time.monotonic()
+    with _rate_limit_lock:
+        attempts = _failed_attempts[key]
+        attempts.append(now)
+        # Drop attempts outside the sliding window
+        _failed_attempts[key] = [t for t in attempts if now - t < WINDOW_SECONDS]
+
+
+def _clear_failures(key: str) -> None:
+    with _rate_limit_lock:
+        _failed_attempts.pop(key, None)
+
+
+# Constant-time password check baseline (Issue #55): when the username does not
+# exist we still burn an equivalent bcrypt verification against a fixed dummy
+# hash so response timing does not reveal whether the account exists.
+_DUMMY_BCRYPT_HASH = get_password_hash("timing-equalization-dummy-password")
+
 
 @router.post("/auth/login", response_model=TokenResponse)
 def login(
     payload: LoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
     OAuth2 Username & Password Authentication Endpoint.
     Verifies bcrypt password hash against PostgreSQL users table, issues JWT bearer token,
     and writes event to immutable audit log.
+
+    Security (Issue #55):
+    - Rate limited: 5 failed attempts per (username, IP) per 15 min -> 15 min lockout.
+    - Constant-time: bcrypt verification runs even when the user does not exist.
     """
+    rl_key = _client_key(payload.username, request)
+
+    lockout_remaining = _is_rate_limited(rl_key)
+    if lockout_remaining > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many failed login attempts. Try again in {max(1, lockout_remaining // 60)} minute(s).",
+            headers={"Retry-After": str(max(1, lockout_remaining))},
+        )
+
     user = db.query(User).filter(User.username == payload.username).first()
-    
-    if not user or not verify_password(payload.password, user.hashed_password):
-        # Log failed login attempt
+
+    # Constant-time path: always run bcrypt, even for unknown usernames
+    stored_hash = user.hashed_password if user else _DUMMY_BCRYPT_HASH
+    password_ok = verify_password(payload.password, stored_hash)
+
+    if not user or not password_ok:
+        _record_failure(rl_key)
+        # Log failed login attempt (username existence is not revealed to the client)
         failed_audit = AuditLog(
             user_id=user.id if user else None,
             action="LOGIN_FAILED",
@@ -35,12 +113,14 @@ def login(
         )
         db.add(failed_audit)
         db.commit()
-        
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    _clear_failures(rl_key)
 
     # Generate JWT Bearer Token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
