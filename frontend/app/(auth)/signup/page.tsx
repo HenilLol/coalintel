@@ -65,8 +65,8 @@ export default function SignupPage() {
         subsidiary,
       });
 
+      // Issue #65: httpOnly cookie session — no token in localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem('coalintel_token', data.access_token);
         localStorage.setItem('coalintel_user', JSON.stringify(data.user));
       }
 

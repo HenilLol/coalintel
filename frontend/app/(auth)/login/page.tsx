@@ -29,8 +29,9 @@ export default function LoginPage() {
 
     try {
       const data = await authApi.login(username, password);
+      // Issue #65: session lives in the backend-set httpOnly cookie now.
+      // Only the display user object is stored client-side (no secret material).
       if (typeof window !== 'undefined') {
-        localStorage.setItem('coalintel_token', data.access_token);
         localStorage.setItem('coalintel_user', JSON.stringify(data.user));
       }
       router.push('/dashboard');
@@ -57,8 +58,8 @@ export default function LoginPage() {
 
     try {
       const data = await authApi.login(creds.username, creds.password);
+      // Issue #65: httpOnly cookie session — no token in localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem('coalintel_token', data.access_token);
         localStorage.setItem('coalintel_user', JSON.stringify(data.user));
       }
       router.push('/dashboard');

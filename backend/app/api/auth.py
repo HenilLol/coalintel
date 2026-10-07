@@ -1,6 +1,6 @@
 from datetime import timedelta
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -77,6 +77,7 @@ _DUMMY_BCRYPT_HASH = get_password_hash("timing-equalization-dummy-password")
 def login(
     payload: LoginRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """
@@ -142,6 +143,20 @@ def login(
     db.add(success_audit)
     db.commit()
 
+    # Issue #65: also set the token as an httpOnly cookie so browser clients
+    # (the frontend) never need to persist it in localStorage where XSS could
+    # steal it. Non-browser API clients keep using the Authorization header
+    # with the token from the response body.
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        secure=settings.ENVIRONMENT.lower() == "production",
+        samesite="lax",
+        path="/",
+    )
+
     return TokenResponse(
         access_token=token,
         token_type="bearer",
@@ -152,6 +167,7 @@ def login(
 @router.post("/auth/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def signup(
     payload: SignupRequest,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """
@@ -222,6 +238,17 @@ def signup(
         subsidiary=new_user.subsidiary or "CIL HQ",
         expires_delta=access_token_expires,
         token_version=new_user.token_version  # Issue #60
+    )
+
+    # Issue #65: httpOnly cookie for browser clients (see login)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        secure=settings.ENVIRONMENT.lower() == "production",
+        samesite="lax",
+        path="/",
     )
 
     return TokenResponse(
@@ -321,4 +348,25 @@ def change_user_role(
     db.commit()
     db.refresh(target)
     return UserResponse.model_validate(target)
+
+
+@router.post("/auth/logout")
+def logout(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Issue #65: server-side logout. Clears the httpOnly access_token cookie and
+    records a LOGOUT audit event. The client should ALSO discard any token it
+    holds (API clients) — cookies are cleared here.
+    """
+    response.delete_cookie(key="access_token", path="/")
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action="LOGOUT",
+        details=f"User '{current_user.username}' logged out."
+    ))
+    db.commit()
+    return {"detail": "Logged out successfully"}
 
