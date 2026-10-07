@@ -24,7 +24,8 @@ def create_access_token(
     subject: Union[str, Any],
     role: str,
     subsidiary: str,
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
+    token_version: int = 0
 ) -> str:
     """Generate OAuth2 JWT bearer token with claims."""
     if expires_delta:
@@ -36,6 +37,7 @@ def create_access_token(
         "sub": str(subject),
         "role": role,
         "subsidiary": subsidiary,
+        "ver": token_version,  # Issue #60: revocation epoch
         "exp": expire
     }
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
