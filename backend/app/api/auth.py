@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -7,7 +8,7 @@ from database import get_db
 from app.models.user import User
 from app.models.audit_log import AuditLog
 from app.core.security import verify_password, get_password_hash, create_access_token
-from app.core.rbac import get_current_user
+from app.core.rbac import get_current_user, require_roles
 from app.schemas.auth import LoginRequest, SignupRequest, TokenResponse, UserResponse
 
 
@@ -128,7 +129,8 @@ def login(
         subject=user.username,
         role=user.role,
         subsidiary=user.subsidiary or "CIL HQ",
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
+        token_version=user.token_version  # Issue #60: bind token to revocation epoch
     )
 
     # Log successful login event
@@ -218,7 +220,8 @@ def signup(
         subject=new_user.username,
         role=new_user.role,
         subsidiary=new_user.subsidiary or "CIL HQ",
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
+        token_version=new_user.token_version  # Issue #60
     )
 
     return TokenResponse(
@@ -232,4 +235,90 @@ def signup(
 def get_me(current_user: User = Depends(get_current_user)):
     """Returns profile information for currently authenticated user."""
     return UserResponse.model_validate(current_user)
+
+
+# ============================================================================
+# Admin User Management (Issue #60)
+# ============================================================================
+
+VALID_ROLES = {"Admin", "Analyst", "Reviewer", "Viewer"}
+
+
+@router.get("/auth/users", response_model=List[UserResponse])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["Admin"]))
+):
+    """Lists all user accounts (Admin only)."""
+    return [UserResponse.model_validate(u) for u in db.query(User).order_by(User.id).all()]
+
+
+@router.post("/auth/users/{username}/revoke-tokens", response_model=UserResponse)
+def revoke_user_tokens(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["Admin"]))
+):
+    """
+    Invalidates ALL outstanding JWTs for a user immediately (Admin only).
+    Issue #60: bumps token_version; every previously issued token fails the
+    'ver' check in get_current_user on its next request.
+    """
+    target = db.query(User).filter(User.username == username).first()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{username}' not found.")
+
+    target.token_version = (target.token_version or 0) + 1
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action="USER_TOKENS_REVOKED",
+        resource_type="User",
+        resource_id=target.id,
+        details=f"Admin '{current_user.username}' revoked all tokens for '{target.username}'."
+    ))
+    db.commit()
+    db.refresh(target)
+    return UserResponse.model_validate(target)
+
+
+@router.post("/auth/users/{username}/role", response_model=UserResponse)
+def change_user_role(
+    username: str,
+    new_role: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["Admin"]))
+):
+    """
+    Changes a user's role (Admin only). Issue #60: also bumps token_version so
+    the demoted/promoted user cannot keep using tokens issued under the old role
+    window.
+    """
+    new_role = (new_role or "").strip().title()
+    if new_role not in VALID_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role '{new_role}'. Valid roles: {sorted(VALID_ROLES)}"
+        )
+    target = db.query(User).filter(User.username == username).first()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{username}' not found.")
+    if target.username == current_user.username and new_role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admins cannot demote their own account."
+        )
+
+    old_role = target.role
+    target.role = new_role
+    target.token_version = (target.token_version or 0) + 1  # revoke outstanding tokens
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action="USER_ROLE_CHANGED",
+        resource_type="User",
+        resource_id=target.id,
+        details=f"Admin '{current_user.username}' changed role of '{target.username}': {old_role} -> {new_role}. All prior tokens revoked."
+    ))
+    db.commit()
+    db.refresh(target)
+    return UserResponse.model_validate(target)
 
