@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -10,62 +10,106 @@ from app.schemas.audit import AuditLogResponse
 
 router = APIRouter(tags=["System Audit Ledger"])
 
+# Issue #69: bounded page size — the audit ledger grows unboundedly by design,
+# so the API must never allow unbounded result sets.
+MAX_PAGE_LIMIT = 200
+
 
 @router.get("/audit/logs", response_model=List[AuditLogResponse])
 def get_audit_logs(
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=MAX_PAGE_LIMIT, description="Page size (max 200)"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    action: Optional[str] = Query(None, description="Filter by exact action (e.g. LOGIN_FAILED)"),
+    start_date: Optional[str] = Query(None, description="Inclusive start (YYYY-MM-DD), UTC"),
+    end_date: Optional[str] = Query(None, description="Inclusive end (YYYY-MM-DD), UTC"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin"]))
 ):
     """
-    Returns paginated system security audit trail events sorted chronologically descending.
+    Returns the system security audit trail, newest first.
     Requires Admin RBAC role.
+
+    Issue #69: real rows only — no seeded/fabricated placeholder entries.
+    Paginated (limit capped at 200) with optional action and date-range
+    filters so the ledger stays queryable as it grows.
     """
-    logs = db.query(AuditLog, User.username).\
-        outerjoin(User, AuditLog.user_id == User.id).\
-        order_by(AuditLog.timestamp.desc()).\
-        limit(limit).all()
+    query = (
+        db.query(AuditLog, User.username)
+        .outerjoin(User, AuditLog.user_id == User.id)
+    )
+
+    if action:
+        query = query.filter(AuditLog.action == action.strip())
+    if start_date:
+        from datetime import datetime, timezone
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            query = query.filter(AuditLog.timestamp >= start_dt)
+        except ValueError:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="start_date must be YYYY-MM-DD")
+    if end_date:
+        from datetime import datetime, timedelta, timezone
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end_dt = end_dt + timedelta(days=1)  # inclusive day
+            query = query.filter(AuditLog.timestamp < end_dt)
+        except ValueError:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="end_date must be YYYY-MM-DD")
+
+    logs = (
+        query.order_by(AuditLog.timestamp.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
     result = []
     for log, username in logs:
-        ts_str = log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "2026-08-29 12:00:00"
+        ts_str = log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else ""
         result.append(AuditLogResponse(
             id=log.id,
             user=username or "system",
             action=log.action or "EVENT",
-            details=log.details or "Audit log entry.",
-            ip=log.ip_address or "192.168.1.1",
+            details=log.details or "",
+            ip=log.ip_address or "",
             timestamp=ts_str
         ))
 
-    # Provide rich baseline seed logs if table is currently small
-    if len(result) < 3:
-        baseline_logs = [
-            AuditLogResponse(
-                id=1,
-                user="admin",
-                action="LOGIN_SUCCESS",
-                details="User 'admin' (Role: Admin, Subsidiary: CIL HQ) authenticated successfully.",
-                ip="192.168.1.10",
-                timestamp="2026-08-29 16:30:12"
-            ),
-            AuditLogResponse(
-                id=2,
-                user="analyst",
-                action="DOCUMENT_UPLOAD",
-                details="Uploaded document ECL_Annual_Report_2023-24.pdf (SHA-256 verified).",
-                ip="192.168.1.24",
-                timestamp="2026-08-29 16:15:00"
-            ),
-            AuditLogResponse(
-                id=3,
-                user="reviewer",
-                action="CONFLICT_RESOLVE",
-                details="Resolved cross-document discrepancy for Rajmahal OC (Accepted Doc A).",
-                ip="192.168.1.45",
-                timestamp="2026-08-29 15:45:22"
-            )
-        ]
-        return baseline_logs
-
     return result
+
+
+@router.get("/audit/stats")
+def get_audit_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["Admin"]))
+):
+    """
+    Issue #69: retention observability — total row count, oldest/newest event
+    timestamps, and per-action counts so Admins can monitor ledger growth and
+    plan archival. Read-only; the ledger itself stays immutable.
+    """
+    from sqlalchemy import func
+
+    total = db.query(func.count(AuditLog.id)).scalar() or 0
+    oldest = db.query(func.min(AuditLog.timestamp)).scalar()
+    newest = db.query(func.max(AuditLog.timestamp)).scalar()
+
+    by_action = (
+        db.query(AuditLog.action, func.count(AuditLog.id))
+        .group_by(AuditLog.action)
+        .order_by(func.count(AuditLog.id).desc())
+        .limit(20)
+        .all()
+    )
+
+    return {
+        "total_events": total,
+        "oldest_event": oldest.strftime("%Y-%m-%d %H:%M:%S") if oldest else None,
+        "newest_event": newest.strftime("%Y-%m-%d %H:%M:%S") if newest else None,
+        "retention_policy": "immutable ledger; archive records older than "
+                            "AUDIT_RETENTION_MONTHS (default 24) to cold storage "
+                            "via the documented archival procedure (see README)",
+        "events_by_action": {action: count for action, count in by_action},
+    }

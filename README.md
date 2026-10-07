@@ -105,6 +105,7 @@ Before exposing COALINTEL to any real deployment (including SIH final evaluation
 - [ ] **Auth rate limiting** — active by default (5 failed attempts per username+IP per 15 min → 15 min lockout). For multi-worker deployments, front the API with a reverse-proxy limiter (e.g. nginx `limit_req`) since the built-in limiter is per-process.
 - [ ] **Supabase keys** — service-role key stays backend-only (never `NEXT_PUBLIC_*`/`VITE_*` prefixed).
 - [ ] **Monitoring** — watch the `/health` endpoint plus LOGIN_FAILED audit-log spikes (brute-force indicator).
+- [ ] **Audit retention** — the audit ledger is immutable and grows unboundedly by design. Monitor growth via `GET /api/v1/audit/stats` (total events, oldest/newest, per-action counts). Archive records older than **24 months** to cold storage (Parquet/object store) via a documented, logged export procedure; keep the exported manifest's SHA-256 in the ledger itself for chain-of-custody. Indexes on `(timestamp)` and `(user_id, timestamp)` keep queries fast as the table grows.
 
 ### Database migrations (Alembic)
 
