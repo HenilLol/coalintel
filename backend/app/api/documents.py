@@ -19,7 +19,7 @@ from app.schemas.document import (
 from app.models.audit_log import AuditLog
 from app.services.storage_service import delete_uploaded_file, delete_document_binary
 from app.services.vector_store_service import delete_document_vectors
-from app.services.ingestion_service import process_file_ingestion
+from app.services.ingestion_service import process_file_ingestion, MAX_FILE_SIZE_BYTES
 from app.services.processing_pipeline import execute_document_processing_pipeline
 
 router = APIRouter(tags=["Documents"])
@@ -55,9 +55,37 @@ async def upload_document(
     - Inserts document record with status 'PENDING' and logs audit event.
     - Dispatches Document Processing Pipeline (parsing, chunking, extraction, vector indexing)
       asynchronously via BackgroundTasks, returning HTTP 201 immediately.
+
+    Issue #67: the file is streamed in 1 MB chunks with a running size check,
+    so oversized uploads are rejected (413) after at most 51 MB instead of
+    being fully buffered in memory first.
     """
-    file_bytes = await file.read()
-    
+    import hashlib
+
+    # Reject by declared size up front when the client provides it
+    declared_size = getattr(file, "size", None)
+    if declared_size and declared_size > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File size ({declared_size / (1024*1024):.2f} MB) exceeds maximum allowed limit of 50 MB."
+        )
+
+    # Stream to memory with a hard cap (single-node profile; storage layer
+    # expects bytes). Oversized streams abort early with 413.
+    file_bytes = bytearray()
+    _CHUNK = 1024 * 1024  # 1 MB
+    while True:
+        chunk = await file.read(_CHUNK)
+        if not chunk:
+            break
+        file_bytes.extend(chunk)
+        if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds maximum allowed limit of 50 MB."
+            )
+    file_bytes = bytes(file_bytes)
+
     doc = process_file_ingestion(
         db=db,
         file_bytes=file_bytes,
@@ -69,7 +97,7 @@ async def upload_document(
 
     # Schedule background processing decoupled from HTTP request lifecycle
     background_tasks.add_task(run_background_document_processing, doc.id)
-    
+
     return DocumentResponse.model_validate(doc)
 
 

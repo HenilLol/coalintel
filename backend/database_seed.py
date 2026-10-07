@@ -1,5 +1,7 @@
 import os
+import secrets
 import logging
+from typing import Tuple
 from sqlalchemy.orm import Session
 from database import engine, SessionLocal, Base
 from config import settings
@@ -112,15 +114,41 @@ def ensure_sample_documents_exist():
             logger.warning(f"Could not generate MCL sample XLSX on disk: {e}")
 
 
+def _resolve_bootstrap_password(role_key: str, default_password: str) -> Tuple[str, bool]:
+    """
+    Resolves the bootstrap password for a seeded account (Issue #56).
+
+    Priority:
+    1. Explicit env var (BOOTSTRAP_<ROLE>_PASSWORD) — for reproducible deployments.
+    2. Cryptographically random password (secrets.token_urlsafe) — generated once
+       per seed run and logged so the operator can capture it.
+
+    Returns (password, was_randomly_generated).
+    Hardcoded credentials are never used: this is a public repository.
+    """
+    env_name = f"BOOTSTRAP_{role_key.upper()}_PASSWORD"
+    env_val = os.environ.get(env_name)
+    if env_val and env_val.strip():
+        return env_val.strip(), False
+
+    generated = secrets.token_urlsafe(16)
+    # Keep 'was_generated' info for the caller so it can warn loudly.
+    _ = default_password  # retained for signature clarity; never used as an actual credential
+    return generated, True
+
+
 def seed_default_users(db: Session) -> dict:
     """
     Idempotently seeds default institutional user accounts if not present.
     Returns mapping of username -> user_id.
+
+    Security (Issue #56): bootstrap passwords are NEVER hardcoded. They come from
+    BOOTSTRAP_<ROLE>_PASSWORD env vars, or are randomly generated and logged once.
     """
     default_users = [
         {
             "username": "admin",
-            "password": "Admin@123",
+            "role_key": "admin",
             "full_name": "System Administrator",
             "email": "admin@coalintel.cil.in",
             "role": "Admin",
@@ -128,7 +156,7 @@ def seed_default_users(db: Session) -> dict:
         },
         {
             "username": "analyst",
-            "password": "Analyst@123",
+            "role_key": "analyst",
             "full_name": "CMPDI Mining Analyst",
             "email": "analyst@cmpdi.co.in",
             "role": "Analyst",
@@ -136,7 +164,7 @@ def seed_default_users(db: Session) -> dict:
         },
         {
             "username": "reviewer",
-            "password": "Reviewer@123",
+            "role_key": "reviewer",
             "full_name": "ECL Report Reviewer",
             "email": "reviewer@easterncoal.in",
             "role": "Reviewer",
@@ -144,7 +172,7 @@ def seed_default_users(db: Session) -> dict:
         },
         {
             "username": "auditor",
-            "password": "Auditor@123",
+            "role_key": "auditor",
             "full_name": "Ministry Technical Auditor",
             "email": "auditor@coal.gov.in",
             "role": "Viewer",
@@ -153,12 +181,14 @@ def seed_default_users(db: Session) -> dict:
     ]
 
     user_map = {}
+    generated_credentials = []
     for user_data in default_users:
         existing_user = db.query(User).filter(User.username == user_data["username"]).first()
         if not existing_user:
+            password, was_generated = _resolve_bootstrap_password(user_data["role_key"], "")
             new_user = User(
                 username=user_data["username"],
-                hashed_password=get_password_hash(user_data["password"]),
+                hashed_password=get_password_hash(password),
                 full_name=user_data["full_name"],
                 email=user_data["email"],
                 role=user_data["role"],
@@ -168,9 +198,24 @@ def seed_default_users(db: Session) -> dict:
             db.commit()
             db.refresh(new_user)
             user_map[user_data["username"]] = new_user.id
-            logger.info(f"Seeded default user: {user_data['username']} (Role: {user_data['role']})")
+            if was_generated:
+                generated_credentials.append((user_data["username"], user_data["role"], password))
+                logger.info(f"Seeded default user: {user_data['username']} (Role: {user_data['role']})")
+            else:
+                logger.info(f"Seeded default user: {user_data['username']} (Role: {user_data['role']}, password from {user_data['role_key'].upper()}_PASSWORD env)")
         else:
             user_map[user_data["username"]] = existing_user.id
+
+    if generated_credentials:
+        logger.warning(
+            "=" * 80 + "\n"
+            "BOOTSTRAP CREDENTIALS GENERATED (Issue #56 remediation).\n"
+            "Random passwords were created for the default institutional accounts because\n"
+            "no BOOTSTRAP_<ROLE>_PASSWORD environment variables were provided.\n"
+            "Copy these NOW — they are shown once and NOT stored in plaintext anywhere:\n"
+            + "\n".join(f"  {u:<10} (Role: {r:<9}) password: {p}" for u, r, p in generated_credentials)
+            + "\n" + "=" * 80
+        )
 
     return user_map
 
@@ -188,17 +233,52 @@ def init_db(db: Session) -> None:
     ensure_sample_documents_exist()
     upload_dir = os.path.abspath(settings.UPLOAD_DIR)
 
+    def _real_file_fingerprint(path: str, filename: str) -> dict:
+        """
+        Issue #59: compute the REAL SHA-256 hash and size of the generated sample
+        file so seed Document rows carry verifiable provenance instead of
+        fabricated placeholder hashes.
+
+        If the binary could not be generated on this host (e.g. PyMuPDF absent),
+        derive a deterministic, honestly-derived fallback hash from the seed
+        identity itself — sha256("seed-document:<filename>") — which:
+          - satisfies the NOT NULL / unique schema,
+          - is idempotent (same filename -> same hash -> re-seeding dedups),
+          - never masquerades as a content hash of bytes that don't exist.
+        """
+        import hashlib
+        try:
+            h = hashlib.sha256()
+            size = 0
+            with open(path, "rb") as f:
+                for block in iter(lambda: f.read(1024 * 1024), b""):
+                    h.update(block)
+                    size += len(block)
+            return {"file_hash": h.hexdigest(), "file_size_bytes": size}
+        except Exception as fp_err:
+            fallback = hashlib.sha256(f"seed-document:{filename}".encode("utf-8")).hexdigest()
+            logger.warning(
+                f"Seed binary '{filename}' not readable on this host ({fp_err}). "
+                f"Using deterministic seed-identity hash {fallback[:16]}... instead of a content hash."
+            )
+            return {"file_hash": fallback, "file_size_bytes": 0}
+
     # 1. Seed Default Users
     user_map = seed_default_users(db)
 
-    # 2. Seed Default Mining Documents
+    # 2. Seed Default Mining Documents (with real, computed SHA-256 hashes — Issue #59)
+    _ecl_fp = _real_file_fingerprint(os.path.join(upload_dir, "ECL_Annual_Report_2023-24.pdf"), "ECL_Annual_Report_2023-24.pdf")
+    _bccl_fp = _real_file_fingerprint(os.path.join(upload_dir, "BCCL_Production_Audit_Q4.pdf"), "BCCL_Production_Audit_Q4.pdf")
+    _secl_fp = _real_file_fingerprint(os.path.join(upload_dir, "SECL_Gevra_Monthly_Despatch.csv"), "SECL_Gevra_Monthly_Despatch.csv")
+    _mcl_fp = _real_file_fingerprint(os.path.join(upload_dir, "MCL_Samaleswari_Performance.xlsx"), "MCL_Samaleswari_Performance.xlsx")
+
     default_docs = [
         {
             "filename": "ECL_Annual_Report_2023-24.pdf",
             "file_path": os.path.join(upload_dir, "ECL_Annual_Report_2023-24.pdf"),
-            "file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "file_hash": _ecl_fp["file_hash"],
             "file_type": "PDF",
-            "file_size_bytes": 14889728,
+            "file_size_bytes": _ecl_fp["file_size_bytes"],
             "subsidiary": "ECL",
             "fiscal_year": "2023-24",
             "status": "PARSED",
@@ -207,9 +287,9 @@ def init_db(db: Session) -> None:
         {
             "filename": "BCCL_Production_Audit_Q4.pdf",
             "file_path": os.path.join(upload_dir, "BCCL_Production_Audit_Q4.pdf"),
-            "file_hash": "8f4e5d6c7b8a90123456789abcdef0123456789abcdef0123456789abcdef012",
+            "file_hash": _bccl_fp["file_hash"],
             "file_type": "PDF",
-            "file_size_bytes": 9122611,
+            "file_size_bytes": _bccl_fp["file_size_bytes"],
             "subsidiary": "BCCL",
             "fiscal_year": "2023-24",
             "status": "PARSED",
@@ -218,9 +298,9 @@ def init_db(db: Session) -> None:
         {
             "filename": "SECL_Gevra_Monthly_Despatch.csv",
             "file_path": os.path.join(upload_dir, "SECL_Gevra_Monthly_Despatch.csv"),
-            "file_hash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+            "file_hash": _secl_fp["file_hash"],
             "file_type": "CSV",
-            "file_size_bytes": 524288,
+            "file_size_bytes": _secl_fp["file_size_bytes"],
             "subsidiary": "SECL",
             "fiscal_year": "2023-24",
             "status": "PARSED",
@@ -229,9 +309,9 @@ def init_db(db: Session) -> None:
         {
             "filename": "MCL_Samaleswari_Performance.xlsx",
             "file_path": os.path.join(upload_dir, "MCL_Samaleswari_Performance.xlsx"),
-            "file_hash": "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0",
+            "file_hash": _mcl_fp["file_hash"],
             "file_type": "XLSX",
-            "file_size_bytes": 2202009,
+            "file_size_bytes": _mcl_fp["file_size_bytes"],
             "subsidiary": "MCL",
             "fiscal_year": "2023-24",
             "status": "PARSED",

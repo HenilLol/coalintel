@@ -40,17 +40,26 @@ def generate_report_endpoint(
 def list_reports(
     subsidiary_filter: Optional[str] = None,
     approval_status_filter: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Retrieves paginated list of generated institutional reports."""
+    """
+    Retrieves paginated list of generated institutional reports.
+    Issue #61: bounded result set — limit defaults to 50, capped at 200.
+    """
+    if limit > 200:
+        limit = 200
+    if skip < 0:
+        skip = 0
     query = db.query(Report)
     if subsidiary_filter and subsidiary_filter != "ALL":
         query = query.filter(Report.subsidiary == subsidiary_filter)
     if approval_status_filter:
         query = query.filter(Report.approval_status == approval_status_filter.upper())
 
-    reports = query.order_by(Report.created_at.desc()).all()
+    reports = query.order_by(Report.created_at.desc()).offset(skip).limit(limit).all()
     return [ReportResponse.model_validate(r) for r in reports]
 
 
