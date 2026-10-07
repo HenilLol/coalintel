@@ -106,6 +106,24 @@ Before exposing COALINTEL to any real deployment (including SIH final evaluation
 - [ ] **Supabase keys** — service-role key stays backend-only (never `NEXT_PUBLIC_*`/`VITE_*` prefixed).
 - [ ] **Monitoring** — watch the `/health` endpoint plus LOGIN_FAILED audit-log spikes (brute-force indicator).
 
+### Database migrations (Alembic)
+
+Schema changes are managed with Alembic (Issue #63). The two legacy SQL scripts in `backend/migrations/` are preserved as the source of truth for behavior, but all future changes go through Alembic revisions:
+
+```bash
+# Existing deployment with tables already created (created via create_all or legacy SQL):
+cd backend
+alembic stamp baseline_create_all     # mark current state, no DDL
+alembic upgrade head                  # apply any pending column migrations
+
+# New column change workflow:
+alembic revision -m "describe change" --autogenerate   # generate from ORM models
+# review the generated file in backend/alembic/versions/, then:
+alembic upgrade head
+```
+
+Startup continues to run `create_all` for fresh dev/test bootstrap; production should run `alembic upgrade head` as the deploy step.
+
 ---
 
 ## 6. Development Roadmap
