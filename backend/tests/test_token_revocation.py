@@ -60,9 +60,12 @@ def test_token_carries_version_claim(client):
     assert res.status_code == 200
     token = res.json()["access_token"]
 
+    # CI fix: decode with the key the APP actually signs with (app.core.security
+    # captures settings at import time; config.settings can be a reloaded object
+    # with a different SECRET_KEY if another test file reloaded config).
     from jose import jwt as jose_jwt
-    from config import settings
-    payload = jose_jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    from app.core import security as app_security
+    payload = jose_jwt.decode(token, app_security.settings.SECRET_KEY, algorithms=[app_security.settings.ALGORITHM])
     assert "ver" in payload
     assert payload["ver"] == 0
 

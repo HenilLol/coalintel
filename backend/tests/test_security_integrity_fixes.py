@@ -5,9 +5,11 @@ Run: python -m pytest tests/test_security_integrity_fixes.py -q
 import os
 import sys
 import unittest
+import importlib
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import config  # noqa: E402  (after sys.path setup)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -15,53 +17,63 @@ from sqlalchemy.orm import sessionmaker
 class TestIssue54SecretKeyValidation(unittest.TestCase):
     """Issue #54: production must refuse to boot with a weak/default SECRET_KEY."""
 
+    def setUp(self):
+        # CI fix: snapshot the ORIGINAL config settings object and SECRET_KEY so
+        # every test restores them exactly. importlib.reload(config) creates a NEW
+        # settings object; app modules (security.py, rbac.py) still hold a reference
+        # to the ORIGINAL. If reloads leave a mismatched object in sys.modules,
+        # tokens signed by the app's original key fail decode via config.settings
+        # in LATER test files (observed as JWTError in CI's test ordering).
+        import config
+        self._orig_settings = config.settings
+        self._orig_secret = config.settings.SECRET_KEY
+
+    def tearDown(self):
+        # CI fix: restore the ORIGINAL SECRET_KEY and reload config so the
+        # settings object in sys.modules matches the key the app modules
+        # (security.py, rbac.py) captured at first import.
+        os.environ["SECRET_KEY"] = self._orig_secret
+        importlib.reload(config)
+        self.assertEqual(config.settings.SECRET_KEY, self._orig_secret)
+
     def test_placeholder_markers_detected(self):
-        # Re-import config with a production-like env should raise; simulate the logic directly
-        import importlib
         os.environ["ENVIRONMENT"] = "production"
         os.environ["SECRET_KEY"] = "coalintel-super-secret-jwt-signing-key-change-in-production"
+        raised = False
         try:
-            import config
             importlib.reload(config)
-            raised = False
         except RuntimeError:
             raised = True
         finally:
             os.environ["ENVIRONMENT"] = "development"
-            os.environ["SECRET_KEY"] = "coalintel-super-secret-jwt-signing-key-change-in-production"
-            import config
+            os.environ["SECRET_KEY"] = self._orig_secret
             importlib.reload(config)
         self.assertTrue(raised, "Production boot must fail with the placeholder SECRET_KEY")
 
     def test_weak_key_rejected_in_production(self):
-        import importlib
         os.environ["ENVIRONMENT"] = "production"
         os.environ["SECRET_KEY"] = "short"  # < 32 chars
+        raised = False
         try:
-            import config
             importlib.reload(config)
-            raised = False
         except RuntimeError:
             raised = True
         finally:
             os.environ["ENVIRONMENT"] = "development"
-            os.environ["SECRET_KEY"] = "coalintel-super-secret-jwt-signing-key-change-in-production"
-            import config
+            os.environ["SECRET_KEY"] = self._orig_secret
             importlib.reload(config)
         self.assertTrue(raised, "Production boot must fail with a weak SECRET_KEY")
 
     def test_strong_key_accepted_in_production(self):
-        import importlib
         os.environ["ENVIRONMENT"] = "production"
         os.environ["SECRET_KEY"] = "x" * 64  # strong random-looking key
+        ok = False
         try:
-            import config
             importlib.reload(config)
             ok = config.settings.SECRET_KEY == "x" * 64
         finally:
             os.environ["ENVIRONMENT"] = "development"
-            os.environ["SECRET_KEY"] = "coalintel-super-secret-jwt-signing-key-change-in-production"
-            import config
+            os.environ["SECRET_KEY"] = self._orig_secret
             importlib.reload(config)
         self.assertTrue(ok, "Production boot must succeed with a strong SECRET_KEY")
 
