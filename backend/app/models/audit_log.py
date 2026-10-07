@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Index
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -16,6 +16,12 @@ class AuditLog(Base):
     details_json = Column(JSON, nullable=True)
     ip_address = Column(String(45), nullable=True)
     timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    # Issue #69: composite index for the common admin query pattern
+    # "this user's events, newest first" (user-scoped audit drill-down)
+    __table_args__ = (
+        Index("ix_audit_logs_user_id_timestamp", "user_id", "timestamp"),
+    )
 
     # Relationships
     user = relationship("User", back_populates="audit_logs")
