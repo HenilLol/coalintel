@@ -26,6 +26,25 @@ logger = logging.getLogger(__name__)
 RRF_K_CONSTANT = 60  # Frozen RRF Constant k=60
 OPERATING_SUBSIDIARIES = ["ECL", "BCCL", "CCL", "WCL", "SECL", "NCL", "MCL", "NEC"]
 
+# Issue #79: geographic & sector entity dimensions. Real government tables
+# (CCO Coal Directory etc.) report state / sector / national aggregates, not
+# only mine-level rows. The citation gate needs these to be first-class
+# entities or it refuses queries about them.
+GEOGRAPHIC_ENTITIES = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+    "Jharkhand", "Madhya Pradesh", "Maharashtra", "Odisha", "Punjab",
+    "Rajasthan", "Tamil Nadu", "Telangana", "Uttar Pradesh", "West Bengal",
+    "Uttarakhand", "Jammu & Kashmir", "Goa", "Gujarat", "Kerala",
+    # spelling variants seen in official publications
+    "Chattisgarh", "Orissa", "Tamilnadu",
+]
+
+SECTOR_ENTITIES = [
+    "Power (Utility)", "Power (Captive)", "Steel", "Cement", "Fertilisers",
+    "Sponge Iron", "Bricks", "Textiles", "Pulp & Paper", "Chemical",
+    "Coking Coal", "Non-Coking Coal", "Lignite", "Washed Coal", "Middlings",
+]
+
 
 CALENDAR_MONTHS = [
     "january", "february", "march", "april", "may", "june",
@@ -141,6 +160,13 @@ def detect_query_entities(query_text: str) -> Dict[str, Any]:
         exclude_from_mines.update(MONTH_ABBREVIATIONS)
         for sub in OPERATING_SUBSIDIARIES:
             exclude_from_mines.add(sub.lower())
+        # Issue #79: geographic & sector words are not mine names
+        for g in GEOGRAPHIC_ENTITIES:
+            exclude_from_mines.update(w.lower() for w in g.split())
+            exclude_from_mines.add(g.lower())
+        for s in SECTOR_ENTITIES:
+            exclude_from_mines.update(w.lower() for w in s.replace("(", " ").replace(")", " ").split())
+            exclude_from_mines.add(s.lower())
 
         # Explicit "mine <NAME>" check (e.g. "mine XYZ", "mine Rajmahal")
         explicit_mine_m = re.findall(r"\bmine\s+([A-Za-z0-9\-_]+)\b", text_for_mines, re.IGNORECASE)
@@ -196,8 +222,16 @@ def detect_query_entities(query_text: str) -> Dict[str, Any]:
         if has_parent_corporate or any(re.search(pat, q_lower, re.IGNORECASE) for pat in corp_keywords) or is_subsidiary_total_only:
             is_corporate = True
 
+    # Issue #79: geographic (state) & sector entities — real government tables
+    # report aggregates at these levels. Detected explicitly so they are NOT
+    # captured by the generic capitalized-word mine fallback.
+    target_geographies = [g for g in GEOGRAPHIC_ENTITIES if g.lower() in q_lower]
+    target_sectors = [s for s in SECTOR_ENTITIES if s.lower() in q_lower]
+
     return {
         "mines": target_mines,
+        "geographies": target_geographies,
+        "sectors": target_sectors,
         "subsidiary": target_subsidiary,
         "metric": target_metric,
         "metric_domain": domain_info,

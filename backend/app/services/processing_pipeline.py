@@ -11,6 +11,7 @@ from app.services.chunking_service import chunk_text_by_tokens
 from app.services.normalization_service import (
     extract_entity_tuples_from_text,
     extract_entity_tuples_from_tables,
+    extract_year_series_metrics_from_tables,
     classify_document_authority,
 )
 from app.services.vector_store_service import add_chunks_to_vector_store, delete_document_vectors
@@ -130,6 +131,21 @@ def execute_document_processing_pipeline(db: Session, document_id: int) -> bool:
                     )
                 except Exception as tab_ext_err:
                     logger.warning(f"Table metric extraction note on page {page_num}: {tab_ext_err}")
+
+                # Issue #79: year-series columnar tables (Item | Unit | FY columns) —
+                # the layout used by CCO Coal Directory and similar government
+                # publications. Additive; dedup below keeps table metrics first.
+                try:
+                    year_series_metrics = extract_year_series_metrics_from_tables(
+                        tables=page_tables,
+                        page_number=page_num,
+                        page_text=page_text,
+                        default_subsidiary=doc.subsidiary or "CIL HQ",
+                        default_year=doc.fiscal_year or "2023-24",
+                    )
+                    table_metrics = (year_series_metrics or []) + (table_metrics or [])
+                except Exception as ys_ext_err:
+                    logger.warning(f"Year-series metric extraction note on page {page_num}: {ys_ext_err}")
 
             # Merge and deduplicate: table metrics take precedence for matching (page, entity, metric, year, value)
             seen_page_keys = set()

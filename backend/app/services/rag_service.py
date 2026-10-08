@@ -88,6 +88,8 @@ def extract_and_validate_citations(
     # Parse query entities if query_text is available
     q_entities = detect_query_entities(query_text) if query_text else {}
     target_mines = q_entities.get("mines", [])
+    # Issue #79: state/sector entities for aggregate-level government data
+    target_entities = (q_entities.get("geographies", []) or []) + (q_entities.get("sectors", []) or [])
     target_metric = q_entities.get("metric")
     metric_domain = q_entities.get("metric_domain")
     target_fy = q_entities.get("fiscal_year")
@@ -113,6 +115,15 @@ def extract_and_validate_citations(
         chunk_text_lower = chunk_text.lower()
 
         # 2. Semantic Entity Compatibility
+        # Issue #79: geographic/sector entities must also be present in the chunk
+        if target_entities and not target_mines:
+            has_entity_support = any(et.lower() in chunk_text_lower for et in target_entities)
+            if not has_entity_support:
+                logger.warning(
+                    f"Semantic Citation Gate REJECTED '{tag}': query targets entity/entities {target_entities} "
+                    f"but evidence chunk lacks matching entity mention."
+                )
+                continue
         if target_mines:
             # Specific mine query requires that the cited chunk explicitly contains
             # the full mine name, its base name, or a suffix-alias variant
@@ -163,7 +174,8 @@ def extract_and_validate_citations(
                 chunk_text,
                 target_mines=target_mines,
                 metric_domain=metric_domain,
-                target_metric=target_metric
+                target_metric=target_metric,
+                target_entities=target_entities,
             ):
                 domain_name = metric_domain.get("canonical_name") or metric_domain.get("domain_key") if metric_domain else target_metric
                 logger.warning(
@@ -808,6 +820,7 @@ def execute_rag_query(
     # Check if there is any OFFICIAL evidence supporting the requested query entity & metric
     q_entities = detect_query_entities(query_text)
     target_mines = q_entities.get("mines", [])
+    target_entities = (q_entities.get("geographies", []) or []) + (q_entities.get("sectors", []) or [])
     metric_domain = q_entities.get("metric_domain")
     target_metric = q_entities.get("metric")
 
@@ -817,7 +830,8 @@ def execute_rag_query(
             c.get("text", ""),
             target_mines=target_mines,
             metric_domain=metric_domain,
-            target_metric=target_metric
+            target_metric=target_metric,
+            target_entities=target_entities,
         ):
             relevant_chunks.append(c)
 
