@@ -30,6 +30,7 @@ interface SidebarProps {
   userName?: string;
   userSubsidiary?: string;
   onLogout?: () => void;
+  onNavigate?: () => void;
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -52,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userName = 'CMPDI Analyst',
   userSubsidiary = 'CMPDI',
   onLogout,
+  onNavigate,
 }) => {
   const pathname = usePathname();
 
@@ -61,63 +63,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return item.roles.includes(userRole);
   });
 
-  const operationsHrefs = ['/dashboard', '/mines', '/documents', '/comparison', '/validation'];
-  const operationsNav = filteredNav.filter((i) => operationsHrefs.includes(i.href));
-  const intelligenceNav = filteredNav.filter((i) => !operationsHrefs.includes(i.href));
+  const intelligenceHrefs = ['/dashboard', '/query', '/mines', '/analytics'];
+  const repositoryHrefs = ['/documents', '/comparison', '/validation', '/conflicts'];
+  const reportingHrefs = ['/parliamentary', '/reports'];
+  const governanceHrefs = ['/audit'];
 
-  const renderNavGroup = (items: NavItem[], groupTitle: string) => (
-    <div className="space-y-1">
-      {!collapsed && (
-        <p className="px-3 text-[10px] font-mono uppercase tracking-widest text-[#9BA5A8] pt-3 pb-1 font-semibold">
-          {groupTitle}
-        </p>
-      )}
+  const intelligenceNav = filteredNav.filter((i) => intelligenceHrefs.includes(i.href));
+  const repositoryNav = filteredNav.filter((i) => repositoryHrefs.includes(i.href));
+  const reportingNav = filteredNav.filter((i) => reportingHrefs.includes(i.href));
+  const governanceNav = filteredNav.filter((i) => governanceHrefs.includes(i.href));
 
-      {items.map((item) => {
-        const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+  const renderNavGroup = (items: NavItem[], groupTitle: string) => {
+    if (items.length === 0) return null;
+    return (
+      <div className="space-y-1">
+        {!collapsed && (
+          <p className="px-3 text-[10px] font-mono uppercase tracking-widest text-[#9BA5A8] pt-2 pb-1 font-semibold">
+            {groupTitle}
+          </p>
+        )}
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'group relative flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150',
-              isActive
-                ? 'bg-[#C58B3A]/15 text-[#C58B3A] font-semibold border border-[#C58B3A]/40 shadow-sm'
-                : 'text-[#9BA5A8] hover:text-[#E8ECEB] hover:bg-[#1C2226] hover:border-[#30383D] border border-transparent'
-            )}
-            aria-current={isActive ? 'page' : undefined}
-          >
-            {/* Left Accent indicator */}
-            {isActive && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#C58B3A] rounded-r" />
-            )}
+        {items.map((item) => {
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
 
-            <div
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => {
+                if (onNavigate) onNavigate();
+              }}
               className={cn(
-                'shrink-0 transition-colors duration-150',
-                isActive ? 'text-[#C58B3A]' : 'text-[#9BA5A8] group-hover:text-[#E8ECEB]'
+                'group relative flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150',
+                isActive
+                  ? 'bg-[#C58B3A]/15 text-[#C58B3A] font-semibold border border-[#C58B3A]/40 shadow-sm'
+                  : 'text-[#9BA5A8] hover:text-[#E8ECEB] hover:bg-[#1C2226] hover:border-[#30383D] border border-transparent'
               )}
+              aria-current={isActive ? 'page' : undefined}
             >
-              {iconMap[item.icon]}
-            </div>
+              {/* Left Accent indicator */}
+              {isActive && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#C58B3A] rounded-r" />
+              )}
 
-            {!collapsed && <span className="truncate">{item.label}</span>}
-
-            {/* Tooltip for collapsed mode */}
-            {collapsed && (
-              <div className="absolute left-full ml-3.5 px-2.5 py-1 bg-[#1C2226] border border-[#30383D] text-[#E8ECEB] text-xs rounded-md shadow-dropdown whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 z-50 flex items-center gap-1.5">
-                <span>{item.label}</span>
-                {item.roles && item.roles.length > 0 && (
-                  <span className="text-[9px] font-mono text-[#C58B3A]">[{item.roles[0]}]</span>
+              <div
+                className={cn(
+                  'shrink-0 transition-colors duration-150',
+                  isActive ? 'text-[#C58B3A]' : 'text-[#9BA5A8] group-hover:text-[#E8ECEB]'
                 )}
+              >
+                {iconMap[item.icon]}
               </div>
-            )}
-          </Link>
-        );
-      })}
-    </div>
-  );
+
+              {!collapsed && <span className="truncate">{item.label}</span>}
+
+              {/* Tooltip for collapsed mode */}
+              {collapsed && (
+                <div className="absolute left-full ml-3.5 px-2.5 py-1 bg-[#1C2226] border border-[#30383D] text-[#E8ECEB] text-xs rounded-md shadow-dropdown whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 z-50 flex items-center gap-1.5">
+                  <span>{item.label}</span>
+                  {item.roles && item.roles.length > 0 && (
+                    <span className="text-[9px] font-mono text-[#C58B3A]">[{item.roles[0]}]</span>
+                  )}
+                </div>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <aside
@@ -142,10 +156,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-3 scrollbar-thin">
-        {renderNavGroup(operationsNav, 'Operations & Repository')}
-        <div className="h-px bg-[#30383D] mx-1 my-1" />
-        {renderNavGroup(intelligenceNav, 'Analytical Suite')}
+      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-2.5 scrollbar-thin">
+        {renderNavGroup(intelligenceNav, 'Intelligence Suite')}
+        <div className="h-px bg-[#30383D]/60 mx-1 my-1" />
+        {renderNavGroup(repositoryNav, 'Repository & Verification')}
+        <div className="h-px bg-[#30383D]/60 mx-1 my-1" />
+        {renderNavGroup(reportingNav, 'Reporting & Parliament')}
+        {governanceNav.length > 0 && (
+          <>
+            <div className="h-px bg-[#30383D]/60 mx-1 my-1" />
+            {renderNavGroup(governanceNav, 'Governance & Audit')}
+          </>
+        )}
       </nav>
 
       {/* User Profile & Logout Section */}

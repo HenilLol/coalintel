@@ -33,6 +33,19 @@ from app.models.data_provenance import (
 from app.models.data_conflict import DataConflict
 
 
+@pytest.fixture(autouse=True, scope="module")
+def ensure_canonical_schema():
+    """
+    Hermetic schema tests: guarantee the canonical tables exist on the target
+    engine before inspection. Without this the tests depended on other test
+    files having run first (create_all side effect) — failing on a fresh DB
+    such as CI's PostgreSQL service.
+    """
+    import app.models  # register all ORM models with Base.metadata
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
 def test_required_tables_exist():
     """Verify all 10 canonical tables required by Phase 2 exist in database metadata."""
     inspector = inspect(engine)

@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.extracted_metric import ExtractedMetric
+from app.models.data_conflict import DataConflict
 from app.core.rbac import get_current_user, require_roles
 from app.schemas.document import (
     DocumentResponse,
@@ -16,9 +17,9 @@ from app.schemas.document import (
     DocumentDeleteResponse,
 )
 from app.models.audit_log import AuditLog
-from app.services.storage_service import delete_uploaded_file
+from app.services.storage_service import delete_uploaded_file, delete_document_binary
 from app.services.vector_store_service import delete_document_vectors
-from app.services.ingestion_service import process_file_ingestion
+from app.services.ingestion_service import process_file_ingestion, MAX_FILE_SIZE_BYTES
 from app.services.processing_pipeline import execute_document_processing_pipeline
 
 router = APIRouter(tags=["Documents"])
@@ -47,16 +48,44 @@ async def upload_document(
     current_user: User = Depends(require_roles(["Admin", "Analyst"]))
 ):
     """
-    Ingests a raw document file (.pdf, .docx, .xlsx, .csv up to 100MB).
-    - Enforces max size limit (100MB) and extension whitelist.
+    Ingests a raw document file (.pdf, .docx, .xlsx, .csv up to 50MB).
+    - Enforces max size limit (50MB) and extension whitelist.
     - Computes SHA-256 digest and blocks duplicate uploads with HTTP 409 Conflict.
     - Saves file safely via storage abstraction.
     - Inserts document record with status 'PENDING' and logs audit event.
     - Dispatches Document Processing Pipeline (parsing, chunking, extraction, vector indexing)
       asynchronously via BackgroundTasks, returning HTTP 201 immediately.
+
+    Issue #67: the file is streamed in 1 MB chunks with a running size check,
+    so oversized uploads are rejected (413) after at most 51 MB instead of
+    being fully buffered in memory first.
     """
-    file_bytes = await file.read()
-    
+    import hashlib
+
+    # Reject by declared size up front when the client provides it
+    declared_size = getattr(file, "size", None)
+    if declared_size and declared_size > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File size ({declared_size / (1024*1024):.2f} MB) exceeds maximum allowed limit of 50 MB."
+        )
+
+    # Stream to memory with a hard cap (single-node profile; storage layer
+    # expects bytes). Oversized streams abort early with 413.
+    file_bytes = bytearray()
+    _CHUNK = 1024 * 1024  # 1 MB
+    while True:
+        chunk = await file.read(_CHUNK)
+        if not chunk:
+            break
+        file_bytes.extend(chunk)
+        if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds maximum allowed limit of 50 MB."
+            )
+    file_bytes = bytes(file_bytes)
+
     doc = process_file_ingestion(
         db=db,
         file_bytes=file_bytes,
@@ -68,7 +97,7 @@ async def upload_document(
 
     # Schedule background processing decoupled from HTTP request lifecycle
     background_tasks.add_task(run_background_document_processing, doc.id)
-    
+
     return DocumentResponse.model_validate(doc)
 
 
@@ -180,6 +209,7 @@ def get_document_lineage(
         "metrics": [
             {
                 "id": m.id,
+                "page_number": m.page_number,
                 "mine_name": m.mine_name,
                 "metric_name": m.metric_name,
                 "numeric_value": float(m.numeric_value) if m.numeric_value is not None else 0.0,
@@ -217,8 +247,9 @@ def delete_document(
     2. Validates document existence (returns HTTP 404 Not Found if missing).
     3. Cleans ChromaDB vector embeddings via delete_document_vectors(id).
     4. Removes stored source file from storage via delete_uploaded_file(file_path).
-    5. Transactionally deletes all document-owned DB records (DocumentChunk, ExtractedMetric, Document).
-    6. Records an immutable audit event (DOCUMENT_DELETED).
+    5. Disassociates conflict records referencing this document (preserves conflict history).
+    6. Transactionally deletes all document-owned DB records (DocumentChunk, ExtractedMetric, Document).
+    7. Records an immutable audit event (DOCUMENT_DELETED).
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -246,15 +277,23 @@ def delete_document(
 
     # 3. Delete physical source file from storage abstraction (idempotent)
     try:
-        delete_uploaded_file(doc_file_path)
+        delete_document_binary(doc_file_path)
     except Exception as file_err:
         logger.warning(f"Storage file cleanup note for Document #{doc_id} ('{doc_file_path}'): {file_err}")
 
     # 4. Transactional PostgreSQL Cleanup
     try:
+        # Disassociate conflict records referencing this document to preserve conflict history and avoid FK violation
+        db.query(DataConflict).filter(DataConflict.doc_a_id == doc_id).update(
+            {DataConflict.doc_a_id: None}, synchronize_session=False
+        )
+        db.query(DataConflict).filter(DataConflict.doc_b_id == doc_id).update(
+            {DataConflict.doc_b_id: None}, synchronize_session=False
+        )
+
         # Delete document chunks and extracted metrics owned by this document
-        db.query(DocumentChunk).filter(DocumentChunk.document_id == doc_id).delete()
-        db.query(ExtractedMetric).filter(ExtractedMetric.document_id == doc_id).delete()
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == doc_id).delete(synchronize_session=False)
+        db.query(ExtractedMetric).filter(ExtractedMetric.document_id == doc_id).delete(synchronize_session=False)
         db.delete(doc)
         db.flush()
 

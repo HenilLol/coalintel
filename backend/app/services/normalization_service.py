@@ -24,23 +24,68 @@ GENERIC_MINE_PHRASES = {
 def get_base_mine_name(name: str) -> str:
     """
     Extracts the base mine name by stripping mining type suffixes.
-    Supported suffixes: OC, OpenCast, UG, Underground, Mine, Colliery, Project, Block, Washery.
+    Supported suffixes: OC, OCP, OCM, OpenCast, Open Cast, Opencast, UG, Underground,
+    Mine, Colliery, Project, Block, Washery (Issue #68: government reports alternate
+    between 'Gevra OC', 'Gevra OCP', 'Gevra OCM', 'Gevra OpenCast' etc.).
     Examples:
         "Gevra OC" -> "Gevra"
+        "Gevra OCP" -> "Gevra"
         "Gevra OpenCast" -> "Gevra"
+        "Gevra Open Cast" -> "Gevra"
         "Alpha Mine" -> "Alpha"
         "Alpha UG" -> "Alpha"
     """
     if not name:
         return ""
     clean = str(name).strip()
-    base = re.sub(
-        r"\s+(?:OC|OpenCast|UG|Underground|Mine|Colliery|Project|Block|Washery)\b",
-        "",
-        clean,
-        flags=re.IGNORECASE
-    ).strip()
+    # Strip suffix tokens repeatedly (handles "Gevra OC Project" style stacking)
+    base = clean
+    for _ in range(3):
+        new_base = re.sub(
+            r"\s+(?:OC|OCP|OCM|OpenCast|Open\s+Cast|Opencast|UG|Underground|Mine|Colliery|Project|Block|Washery)\b",
+            "",
+            base,
+            flags=re.IGNORECASE
+        ).strip()
+        if new_base == base:
+            break
+        base = new_base
     return base if base else clean
+
+
+# Issue #68: explicit suffix alias map for symmetric query<->evidence matching.
+# All variants within a family are treated as interchangeable when matching a
+# mine mention in chunk text against a queried mine (and vice versa).
+MINE_SUFFIX_ALIAS_FAMILIES: List[List[str]] = [
+    ["OC", "OCP", "OCM", "OpenCast", "Open Cast", "Opencast", "Project"],
+    ["UG", "Underground"],
+    ["Mine", "Colliery", "Block", "Washery"],
+]
+
+
+def mine_name_variants(name: str) -> List[str]:
+    """
+    Issue #68: returns the base mine name plus all common suffixed variants,
+    e.g. "Gevra" -> ["Gevra", "Gevra OC", "Gevra OCP", "Gevra OCM",
+    "Gevra OpenCast", "Gevra Open Cast", "Gevra Opencast", "Gevra Project",
+    "Gevra UG", "Gevra Underground", ...]. Used so a query mentioning
+    'Kusmunda OCP' matches evidence text saying 'Kusmunda OC' or bare
+    'Kusmunda', symmetrically.
+    """
+    if not name:
+        return []
+    base = get_base_mine_name(name)
+    if not base:
+        return [str(name).strip()] if name else []
+    variants = [base]
+    seen = {base.lower()}
+    for family in MINE_SUFFIX_ALIAS_FAMILIES:
+        for suffix in family:
+            v = f"{base} {suffix}"
+            if v.lower() not in seen:
+                seen.add(v.lower())
+                variants.append(v)
+    return variants
 
 
 def canonicalize_mine_name(name: str) -> str:
@@ -86,7 +131,13 @@ def detect_query_fiscal_year(query_text: str) -> Optional[str]:
         start_yr_short = int(m2.group(1))
         full_start = 2000 + start_yr_short if start_yr_short < 70 else 1900 + start_yr_short
         return f"{full_start}-{m2.group(2)}"
+    # Match single FY YYYY e.g. FY2035 or FY 2035
+    m3 = re.search(r"\bFY\s*((?:19|20)\d{2})\b", query_text, re.IGNORECASE)
+    if m3:
+        yr = int(m3.group(1))
+        return f"{yr-1}-{str(yr)[-2:]}"
     return None
+
 
 
 def classify_document_authority(filename: str) -> str:
@@ -107,6 +158,58 @@ def classify_document_authority(filename: str) -> str:
     ]):
         return "OFFICIAL"
     return "INTERNAL"
+
+
+HISTORICAL_INCEPTION_PATTERNS = [
+    r"\b(?:came\s+into\s+being|year\s+of\s+its\s+inception|at\s+(?:the\s+)?inception|since\s+inception)\b",
+    r"\b(?:established|incorporated|founded)\s+in\s+19\d{2}\b",
+    r"\b(?:modest\s+production\s+of|inception\s+in)\s+19\d{2}\b",
+    r"\b(?:taking\s+over\s+private\s+coal\s+mines|in\s+November\s+1975|in\s+1975)\b",
+]
+
+
+def is_historical_evidence_snippet(text: Optional[str], target_fy: Optional[str] = None) -> bool:
+    """
+    Identifies historical / inception context snippets (e.g. 1975 CIL inception)
+    that must not be confused with modern fiscal year operational metrics.
+    """
+    if not text:
+        return False
+    t_lower = text.lower()
+    for pat in HISTORICAL_INCEPTION_PATTERNS:
+        if re.search(pat, t_lower, re.IGNORECASE):
+            if target_fy:
+                target_short = target_fy[-5:] if len(target_fy) >= 5 else target_fy
+                # If target fiscal year is NOT present in text, this is clearly historical
+                if target_fy not in text and target_short not in text:
+                    return True
+                # If target FY is present elsewhere in chunk, check whether inception phrasing qualifies the metric
+                if re.search(r"\b(?:modest\s+production\s+of|at\s+(?:the\s+)?inception|came\s+into\s+being)\b", t_lower):
+                    return True
+            else:
+                return True
+    return False
+
+
+def is_corporate_context_snippet(text: Optional[str]) -> bool:
+    """
+    Identifies corporate / overarching CIL aggregate context in text snippets.
+    e.g. company-wide production, CIL milestones, national coal production, annual corporate target, etc.
+    """
+    if not text:
+        return False
+    corp_patterns = [
+        r"\b(?:company-wide|organization-wide|group-wide|nationwide)\b",
+        r"\b(?:corporate-level|corporate\s+production|consolidated\s+production|aggregate\s+production)\b",
+        r"\b(?:milestones\s+in\s+20\d{2}|annual\s+(?:corporate\s+)?target|growth\s+over\s+last\s+fiscal\s+year)\b",
+        r"\b(?:cil\s+as\s+a\s+whole|coal\s+india\s+as\s+a\s+whole|company\s+as\s+a\s+whole)\b",
+        r"\b(?:total\s+production\s+of\s+(?:cil|coal\s+india)|all\s+mines\s+of\s+cil|corporate\s+cil|overall\s+cil\s+production)\b",
+        r"\b(?:cil['’]?s\s+subsidiaries|across\s+all\s+subsidiaries|all\s+subsidiaries\s+of\s+cil|single\s+largest\s+coal\s+producer)\b",
+        r"\b(?:coal\s+production\s+of\s+[\d\.]+\s*(?:mt|million\s+tonnes)\s+during\b)",
+    ]
+    t_lower = text.lower()
+    return any(re.search(pat, t_lower, re.IGNORECASE) for pat in corp_patterns)
+
 
 
 # Specificity Precedence Rules for Metric Classification
@@ -189,13 +292,15 @@ METRIC_DOMAINS = [
 def normalize_subsidiary_scope(scope: Optional[str]) -> Optional[str]:
     """
     Normalizes subsidiary scope strings into either:
-    - None: representing unrestricted/global scope ("ALL", "ALL CIL", "", None, "NULL", "NONE")
+    - None: representing unrestricted/global scope ("ALL", "ALL CIL", "ALL SUBSIDIARIES", "ALL_CIL", "ALL_SUBSIDIARIES", "", None, "NULL", "NONE")
     - Normalized uppercase subsidiary name (e.g. "SECL", "ECL", "WCL")
     """
     if not scope:
         return None
     s = str(scope).strip()
-    if not s or s.upper() in ["ALL", "ALL CIL", "NONE", "NULL"]:
+    if not s or s.upper() in ["ALL", "ALL CIL", "ALL SUBSIDIARIES", "ALL_CIL", "ALL_SUBSIDIARIES", "NONE", "NULL"]:
+        return None
+    if s.upper().startswith("ALL ") or s.upper().startswith("ALL_"):
         return None
     return s.upper()
 
@@ -575,9 +680,11 @@ def chunk_has_metric_for_entity(
         for tm in target_mines:
             if tm.lower() in chunk_lower:
                 return True
-            base_tm = get_base_mine_name(tm)
-            if base_tm and len(base_tm) >= 3 and base_tm.lower() in chunk_lower:
-                return True
+            # Issue #68: symmetric alias matching — any suffix variant of the
+            # base name counts (OCP/OCM/OpenCast/Project/UG/...)
+            for variant in mine_name_variants(tm):
+                if len(variant) >= 3 and variant.lower() in chunk_lower:
+                    return True
         return False
 
     # Check for structured extraction format:
@@ -619,9 +726,11 @@ def chunk_has_metric_for_entity(
     mine_terms = []
     for tm in target_mines:
         mine_terms.append(tm.lower())
-        base_tm = get_base_mine_name(tm)
-        if base_tm and len(base_tm) >= 3 and base_tm.lower() not in mine_terms:
-            mine_terms.append(base_tm.lower())
+        # Issue #68: expand to all suffix variants for symmetric matching
+        for variant in mine_name_variants(tm):
+            v_lower = variant.lower()
+            if len(v_lower) >= 3 and v_lower not in mine_terms:
+                mine_terms.append(v_lower)
 
     # Check if mine is mentioned in the chunk at all
     if not any(mt in chunk_lower for mt in mine_terms):
@@ -657,3 +766,296 @@ def chunk_has_metric_for_entity(
                 return True
 
     return False
+
+
+def parse_numeric_cell(cell_val: Any) -> Optional[float]:
+    """
+    Deterministically parses numeric tokens from table cells, safely handling boundary bleed
+    where adjacent percentage/growth numbers bleed into the cell (e.g. '7.07 1' -> 7.07).
+    """
+    if cell_val is None:
+        return None
+    raw_str = str(cell_val).strip()
+    if not raw_str or raw_str in ["-", "--", "N/A", "NA", "nil", "Nil"]:
+        return None
+
+    # Remove trend arrows and currency indicators (do not strip decimal dot)
+    clean_str = re.sub(r"[▲▼\u25b2\u25bc₹$]+", " ", raw_str).strip()
+
+    tokens = clean_str.split()
+    for tok in tokens:
+        norm_tok = tok.replace(",", "").rstrip("%").strip()
+        if re.match(r"^[-+]?(?:\d+(?:\.\d+)?|\.\d+)$", norm_tok):
+            try:
+                return float(norm_tok)
+            except ValueError:
+                continue
+    return None
+
+
+def detect_table_unit(raw_rows: List[List[Any]], page_text: str = "") -> str:
+    """
+    Detects table-level or header-level unit from table rows or page text.
+    Handles 'Fig. in MT', 'Qty. in MT', '(Qty. in MT)', 'All Figures in MT', 'M.Cu.M', etc.
+    """
+    combined_header_text = ""
+    for r in raw_rows[:3]:
+        combined_header_text += " " + " ".join(str(c) for c in r if c is not None)
+    search_corpus = f"{combined_header_text} {page_text[:600]}"
+
+    unit_m = re.search(
+        r"\b(?:Fig\.?|Qty\.?|Figures?|Quantity|All\s+Figures)?\s*(?:in\s+)?(MT|M\.?Cu\.?M\.?|MCuM|M\.Cum|Tonnes?|Lakh\s+Te|Lakh\s+Tonnes?|Te)\b",
+        search_corpus,
+        re.IGNORECASE
+    )
+    if unit_m:
+        raw_u = unit_m.group(1).upper()
+        if "CU" in raw_u:
+            return "M.Cu.M"
+        if "LAKH" in raw_u:
+            return "Lakh Tonnes"
+        if "TONNE" in raw_u:
+            return "Tonnes"
+        return "MT"
+
+    return "MT"
+
+
+def extract_entity_tuples_from_tables(
+    tables: List[Dict[str, Any]],
+    page_number: int,
+    page_text: str = "",
+    default_subsidiary: Optional[str] = "CIL HQ",
+    default_year: Optional[str] = "2023-24"
+) -> List[Dict[str, Any]]:
+    """
+    Additive table-aware extraction: parses PyMuPDF native table rows, resolves multi-level
+    headers, inherits header-level units (e.g. 'Fig. in MT' -> MT), handles cell boundary bleed,
+    and produces structured ExtractedMetric tuples with high confidence (0.98).
+    """
+    if not tables:
+        return []
+
+    extracted_metrics = []
+
+    for tab_info in tables:
+        raw_rows = tab_info.get("raw_rows", [])
+        if not raw_rows or len(raw_rows) < 3:
+            continue
+
+        table_unit = detect_table_unit(raw_rows, page_text)
+
+        # Detect table title from nearby text or row 0
+        title_m = re.search(r"\bTable\s*[\d\.]+\s*[:\-]?[^\n]{0,80}(?:Production|Despatch|OBR|Overburden|Offtake|Coal)[^\n]{0,80}", page_text, re.IGNORECASE)
+        if not title_m:
+            title_m = re.search(r"\bTable\s*[\d\.]+\s*[:\-]?[^\n]{1,80}", page_text, re.IGNORECASE)
+        table_title = title_m.group(0).strip() if title_m else ""
+
+        # Step 1: Detect header rows (Row 0 and optionally Row 1)
+        row0 = [str(c).replace("\n", " ").strip() if c is not None else "" for c in raw_rows[0]]
+        row1 = [str(c).replace("\n", " ").strip() if c is not None else "" for c in raw_rows[1]]
+
+        is_two_level_header = False
+        if any(re.search(r"\b(?:FY|Achmt|Growth|Actual|Target)\b", c, re.IGNORECASE) for c in row1):
+            is_two_level_header = True
+
+        data_start_idx = 2 if is_two_level_header else 1
+
+        # Build column metadata
+        col_count = max(len(row0), len(row1))
+        col_headers = []
+
+        last_parent = ""
+        for c_idx in range(col_count):
+            r0_val = row0[c_idx] if c_idx < len(row0) else ""
+            if r0_val:
+                last_parent = r0_val
+            parent = r0_val or last_parent
+            sub = row1[c_idx] if (is_two_level_header and c_idx < len(row1)) else ""
+            combined_header = f"{parent} {sub}".strip()
+            col_headers.append(combined_header)
+
+        # Step 2: Identify column roles
+        entity_col_idx = None
+        monthly_prod_col_idx = None
+        cumulative_prod_col_idx = None
+        target_col_idx = None
+
+        for c_idx, h in enumerate(col_headers):
+            h_lower = h.lower()
+            if entity_col_idx is None and any(w in h_lower for w in ["subs", "company", "entity"]):
+                entity_col_idx = c_idx
+            elif entity_col_idx is None and "mine" in h_lower:
+                entity_col_idx = c_idx
+
+            # Monthly production column (e.g. 'Production during Mar FY 25')
+            if ("production during" in h_lower or ("production" in h_lower and "upto" not in h_lower and "cumulative" not in h_lower)):
+                if "fy 25" in h_lower or "fy25" in h_lower or "2024-25" in h_lower:
+                    monthly_prod_col_idx = c_idx
+                elif monthly_prod_col_idx is None and not any(f"fy {y}" in h_lower for y in ["24", "23", "22", "21"]):
+                    monthly_prod_col_idx = c_idx
+
+            # Cumulative production column (e.g. 'Production upto Mar FY 25')
+            if "production upto" in h_lower or "cumulative" in h_lower or "upto" in h_lower:
+                if "fy 25" in h_lower or "fy25" in h_lower or "2024-25" in h_lower:
+                    cumulative_prod_col_idx = c_idx
+                elif cumulative_prod_col_idx is None and not any(f"fy {y}" in h_lower for y in ["24", "23", "22", "21"]):
+                    cumulative_prod_col_idx = c_idx
+
+            # Monthly target column
+            if "target" in h_lower and target_col_idx is None:
+                target_col_idx = c_idx
+
+        # Fallback for entity column: Col 1 (after Sl No) or Col 0
+        if entity_col_idx is None:
+            if col_count > 1 and "sl" in col_headers[0].lower():
+                entity_col_idx = 1
+            else:
+                entity_col_idx = 0
+
+        # Check if table semantically pertains to coal production vs other metric families (OBR, Despatch, etc.)
+        combined_title_headers = f"{table_title} " + " ".join(col_headers)
+        is_other_family = bool(re.search(r"\b(?:overburden|obr|despatch|offtake|exploration|safety)\b", combined_title_headers, re.IGNORECASE))
+        has_production_keyword = bool(re.search(r"\b(?:production|prod)\b", combined_title_headers, re.IGNORECASE))
+        is_production_table = has_production_keyword and not is_other_family
+
+        # Fallback for monthly production: Col 3 (ONLY if table is clearly a production table)
+        if monthly_prod_col_idx is None and col_count >= 4:
+            if is_production_table:
+                monthly_prod_col_idx = 3
+            else:
+                monthly_prod_col_idx = None
+
+        # Step 3: Detect Temporal Context (Month & FY)
+        table_month = None
+        for m_name in ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]:
+            short_m = m_name[:3]
+            if any(short_m.lower() in h.lower() for h in col_headers) or short_m.lower() in page_text[:400].lower():
+                table_month = m_name
+                break
+
+        table_fy = default_year or "2024-25"
+        fy_m = re.search(r"\b(?:FY\s*(\d{2})|20(\d{2})[-/](\d{2}))\b", " ".join(col_headers) + " " + page_text[:400], re.IGNORECASE)
+        if fy_m:
+            if fy_m.group(1):
+                y2 = int(fy_m.group(1))
+                table_fy = f"20{y2-1}-{y2:02d}"
+            elif fy_m.group(2) and fy_m.group(3):
+                table_fy = f"20{fy_m.group(2)}-{fy_m.group(3)}"
+
+        # Step 4: Iterate Data Rows
+        for r_idx in range(data_start_idx, len(raw_rows)):
+            row = raw_rows[r_idx]
+            if not row or len(row) <= entity_col_idx:
+                continue
+
+            raw_entity_cell = str(row[entity_col_idx]).strip() if row[entity_col_idx] is not None else ""
+            if not raw_entity_cell and entity_col_idx > 0 and row[0]:
+                raw_entity_cell = str(row[0]).strip()
+
+            clean_entity = re.sub(r"[\r\n\t]+", " ", raw_entity_cell).strip()
+            if not clean_entity or clean_entity in ["-", "--", "Sl No", "Total"]:
+                if row[0] and "total" in str(row[0]).lower():
+                    clean_entity = str(row[0]).strip()
+
+            ent_upper = clean_entity.upper()
+
+            # Map organization / entity semantics
+            if "GRAND TOTAL" in ent_upper or ent_upper == "TOTAL":
+                entity_label = "Grand Total"
+                subsidiary = None
+                mine_name = "Grand Total"
+            elif "CIL" in ent_upper or ent_upper == "CIL TOTAL":
+                entity_label = "CIL Total"
+                subsidiary = None
+                mine_name = "CIL Total"
+            elif "CAPTIVE" in ent_upper:
+                entity_label = "Captive/Others"
+                subsidiary = None
+                mine_name = "Captive/Others"
+            elif ent_upper in ["ECL", "BCCL", "CCL", "NCL", "WCL", "SECL", "MCL", "NEC", "SCCL"]:
+                entity_label = ent_upper
+                subsidiary = ent_upper
+                mine_name = ent_upper
+            else:
+                matched_sub = None
+                for sub in ["ECL", "BCCL", "CCL", "NCL", "WCL", "SECL", "MCL", "NEC", "SCCL"]:
+                    if sub in ent_upper:
+                        matched_sub = sub
+                        break
+                if matched_sub:
+                    entity_label = clean_entity
+                    subsidiary = matched_sub
+                    mine_name = clean_entity
+                else:
+                    entity_label = clean_entity
+                    subsidiary = default_subsidiary
+                    mine_name = clean_entity
+
+            month_str = f" ({table_month} {table_fy})" if table_month else f" ({table_fy})"
+            snip_title = table_title or "Coal Production Table"
+
+            # Extract Monthly Production
+            if is_production_table and monthly_prod_col_idx is not None and monthly_prod_col_idx < len(row):
+                m_val = parse_numeric_cell(row[monthly_prod_col_idx])
+                if m_val is not None:
+                    std_val, std_unit = normalize_unit_to_mt(m_val, table_unit)
+                    raw_snip = f"{snip_title} | {entity_label} | Monthly Production{month_str}: {m_val} {table_unit} | Page {page_number}"
+                    extracted_metrics.append({
+                        "mine_name": mine_name,
+                        "subsidiary": subsidiary,
+                        "metric_name": "Coal Production",
+                        "numeric_value": m_val,
+                        "unit": table_unit,
+                        "standard_value": std_val,
+                        "standard_unit": std_unit,
+                        "fiscal_year": table_fy,
+                        "page_number": page_number,
+                        "confidence_score": 0.980,
+                        "validation_status": "VALIDATED",
+                        "raw_snippet": raw_snip
+                    })
+
+            # Extract Cumulative Production
+            if is_production_table and cumulative_prod_col_idx is not None and cumulative_prod_col_idx < len(row):
+                c_val = parse_numeric_cell(row[cumulative_prod_col_idx])
+                if c_val is not None:
+                    std_val, std_unit = normalize_unit_to_mt(c_val, table_unit)
+                    raw_snip = f"{snip_title} | {entity_label} | Cumulative Production upto {table_month or 'Month'}{month_str}: {c_val} {table_unit} | Page {page_number}"
+                    extracted_metrics.append({
+                        "mine_name": mine_name,
+                        "subsidiary": subsidiary,
+                        "metric_name": "Cumulative Coal Production",
+                        "numeric_value": c_val,
+                        "unit": table_unit,
+                        "standard_value": std_val,
+                        "standard_unit": std_unit,
+                        "fiscal_year": table_fy,
+                        "page_number": page_number,
+                        "confidence_score": 0.980,
+                        "validation_status": "VALIDATED",
+                        "raw_snippet": raw_snip
+                    })
+
+            # Extract Monthly Target if present
+            if is_production_table and target_col_idx is not None and target_col_idx < len(row):
+                t_val = parse_numeric_cell(row[target_col_idx])
+                if t_val is not None:
+                    std_val, std_unit = normalize_unit_to_mt(t_val, table_unit)
+                    raw_snip = f"{snip_title} | {entity_label} | Monthly Target{month_str}: {t_val} {table_unit} | Page {page_number}"
+                    extracted_metrics.append({
+                        "mine_name": mine_name,
+                        "subsidiary": subsidiary,
+                        "metric_name": "Monthly Production Target",
+                        "numeric_value": t_val,
+                        "unit": table_unit,
+                        "standard_value": std_val,
+                        "standard_unit": std_unit,
+                        "fiscal_year": table_fy,
+                        "page_number": page_number,
+                        "confidence_score": 0.980,
+                        "validation_status": "VALIDATED",
+                        "raw_snippet": raw_snip
+                    })
+
+    return extracted_metrics

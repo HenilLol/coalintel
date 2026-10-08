@@ -1,22 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { ConflictResolveModal } from '@/components/validation/ConflictResolveModal';
 import { validationApi, ConflictItem, ResolveConflictPayload } from '@/lib/api/validationApi';
 import { useScope } from '@/context/ScopeContext';
 import { GitCompare, RefreshCw } from 'lucide-react';
 
-export default function ConflictsPage() {
+function ConflictsContent() {
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get('id') || searchParams.get('resolve');
   const { selectedSubsidiary } = useScope();
   const queryClient = useQueryClient();
   const [selectedStatus] = useState('ALL');
   const [activeConflict, setActiveConflict] = useState<ConflictItem | null>(null);
+  const [directFetchError, setDirectFetchError] = useState<string | null>(null);
 
   const {
     data: conflicts = [],
@@ -30,12 +35,48 @@ export default function ConflictsPage() {
     staleTime: 30000,
   });
 
+  useEffect(() => {
+    if (!targetId) return;
+
+    if (conflicts && conflicts.length > 0) {
+      const match = conflicts.find((c) => String(c.id) === targetId);
+      if (match) {
+        setActiveConflict(match);
+        setDirectFetchError(null);
+        return;
+      }
+    }
+
+    // Direct lookup by ID if not in currently loaded list
+    let isMounted = true;
+    validationApi
+      .getConflictById(targetId)
+      .then((item) => {
+        if (isMounted && item) {
+          setActiveConflict(item);
+          setDirectFetchError(null);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load specific conflict by ID:', err);
+        if (isMounted) {
+          setDirectFetchError(`Discrepancy record #${targetId} could not be loaded or was not found.`);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [targetId, conflicts]);
+
   const resolveMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: ResolveConflictPayload }) =>
       validationApi.resolveConflict(id, payload),
     onSuccess: () => {
       setActiveConflict(null);
       queryClient.invalidateQueries({ queryKey: ['conflicts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['comparison'] });
     },
   });
 
@@ -56,6 +97,7 @@ export default function ConflictsPage() {
 
       {/* Error Alert */}
       {isError && <ErrorState message={error instanceof Error ? error.message : 'Failed to fetch conflict list.'} />}
+      {directFetchError && <ErrorState message={directFetchError} />}
 
       {/* Main Conflicts Data Table Card */}
       <Card className="border-[#30383D] bg-[#1C2226]">
@@ -169,3 +211,12 @@ export default function ConflictsPage() {
     </div>
   );
 }
+
+export default function ConflictsPage() {
+  return (
+    <Suspense fallback={<LoadingState label="Loading Cross-Document Conflicts..." />}>
+      <ConflictsContent />
+    </Suspense>
+  );
+}
+

@@ -31,24 +31,11 @@ export default function RootLandingPage() {
   const router = useRouter();
   const [isQuickEntering, setIsQuickEntering] = useState(false);
 
-  // Instant seamless evaluator access
+  // Navigate to the platform — auth is enforced by the dashboard layout's
+  // server-side session probe (GET /auth/me), which redirects to /login
+  // when there is no valid session. No tokens are fabricated client-side.
   const handleEnterIntelligenceCenter = (destination = '/dashboard') => {
     setIsQuickEntering(true);
-    if (typeof window !== 'undefined') {
-      const existingToken = localStorage.getItem('coalintel_token');
-      if (!existingToken) {
-        // Automatically establish verified demo session
-        localStorage.setItem('coalintel_token', 'demo_jwt_session_token_sih26023');
-        localStorage.setItem(
-          'coalintel_user',
-          JSON.stringify({
-            username: 'CMPDI Analyst',
-            role: 'Analyst',
-            subsidiary: 'CMPDI',
-          })
-        );
-      }
-    }
     router.push(destination);
   };
 

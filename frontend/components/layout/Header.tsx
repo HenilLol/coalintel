@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Menu, Bell, Shield, Database, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Logo } from '@/components/ui/Logo';
@@ -22,76 +23,36 @@ export const Header: React.FC<HeaderProps> = ({
   userRole = 'Analyst',
   showLogoOnDesktop = true,
 }) => {
+  const router = useRouter();
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear } = useScope();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Global Ctrl + K / Cmd + K listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
+        searchInputRef.current?.focus();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  return (
-    <header className="sticky top-0 z-20 h-16 bg-[#151A1D] border-b border-[#30383D] px-3.5 sm:px-4 lg:px-6 flex items-center justify-between shadow-sm gap-2 sm:gap-4">
-      {/* Left: Mobile Toggle, Header Branding & Context Indicator */}
-      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-        {onMobileMenuToggle && (
-          <button
-            onClick={onMobileMenuToggle}
-            className="p-2 rounded-lg bg-[#1C2226] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] lg:hidden transition-colors shrink-0"
-            aria-label="Open mobile navigation"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        )}
-
-        {/* Header Branding */}
-        <div className={cn('flex items-center min-w-0 shrink-0', !showLogoOnDesktop && 'lg:hidden')}>
-          <Logo size="sm" showText={true} />
+      <form onSubmit={handleSearchSubmit} className="hidden lg:flex w-56 xl:w-80 relative items-center">
+        <Input
+          ref={searchInputRef}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search mining metrics, documents..."
+          leftIcon={<Search className="h-4 w-4 text-[#9BA5A8]" />}
+          className="bg-[#151A1D] border-[#30383D] text-[#E8ECEB] placeholder:text-[#9BA5A8]/70 text-xs py-2 pr-12 focus:border-[#C58B3A]"
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden xl:block">
+          <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#242C30] border border-[#30383D] text-[#9BA5A8]">
+            Ctrl K
+          </kbd>
         </div>
-
-        {/* Global Operational Context Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#1C2226] border border-[#30383D] text-xs font-mono shadow-sm shrink-0">
-          <Database className="h-3.5 w-3.5 text-[#C58B3A] shrink-0" />
-          <span className="text-[#9BA5A8]">Scope:</span>
-          <select
-            value={selectedSubsidiary}
-            onChange={(e) => setSelectedSubsidiary(e.target.value)}
-            className="bg-[#151A1D] border border-[#30383D] text-[#E8ECEB] font-bold rounded-md px-1.5 py-0.5 focus:outline-none focus:border-[#C58B3A] text-xs transition-colors cursor-pointer"
-            aria-label="Select Subsidiary Scope"
-          >
-            <option value="ALL CIL">ALL CIL (Corporate)</option>
-            {CIL_SUBSIDIARIES.filter((s) => s.value !== 'ALL').map((sub) => (
-              <option key={sub.value} value={sub.value}>
-                {sub.value}
-              </option>
-            ))}
-          </select>
-          <span className="text-[#30383D]">|</span>
-          <span className="text-[#C58B3A] font-semibold">{selectedFiscalYear}</span>
-        </div>
-      </div>
-
-      {/* Center Search Affordance */}
-      <button
-        onClick={() => setIsSearchOpen(true)}
-        className="hidden lg:flex w-60 xl:w-80 relative items-center justify-between px-3 py-2 rounded-lg bg-[#151A1D] border border-[#30383D] text-[#9BA5A8] hover:border-[#C58B3A]/50 hover:text-[#E8ECEB] transition-colors text-xs text-left group"
-        aria-label="Open global search"
-      >
-        <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-[#9BA5A8] group-hover:text-[#C58B3A] transition-colors" />
-          <span className="truncate">Search mines, metrics, documents...</span>
-        </div>
-        <kbd className="hidden xl:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#242C30] border border-[#30383D] text-[#9BA5A8]">
-          Ctrl K
-        </kbd>
-      </button>
+      </form>
 
       {/* Right User & System Status */}
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">

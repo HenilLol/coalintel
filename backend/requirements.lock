@@ -1,0 +1,46 @@
+# COALINTEL pinned dependency lock (Issue #64)
+# Exact reproducible install set for the backend.
+# - Core packages are pinned to the exact versions the full test suite
+#   passes with in the verification environment.
+# - Heavy optional packages not present in the verification environment are
+#   pinned to the nearest VERIFIABLY INSTALLABLE version (checked against PyPI
+#   wheel availability), not blindly to the requirements.txt floor:
+#   * tokenizers: 0.15.0 ships no Windows cp312 wheel (Rust sdist build fails
+#     without a toolchain); 0.15.1 is the patch release that adds it.
+#   * chromadb: 0.4.22 pins chroma-hnswlib==0.7.3 which has NO cp312 wheels
+#     on any platform — uninstallable on Python 3.12. 0.5.5 pins
+#     chroma-hnswlib==0.7.6 (Linux/macOS wheels only). This resolves on the
+#     Linux deployment target (docker-compose, GitHub Actions ubuntu runners)
+#     and every CI environment. Local Windows/py3.12 dev installs should use
+#     the lock minus chromadb (the app degrades gracefully without it —
+#     storage_service falls back to local mode):
+#       grep -v '^chromadb' requirements.lock > /tmp/lock && pip install -r /tmp/lock
+#     All other pins in this file are verified to resolve with binary wheels
+#     on both Windows and Linux py3.12 (pip install --dry-run --only-binary).
+# - Re-pin from a fully-equipped verified environment with:
+#     pip freeze > requirements.lock
+# Install with:  pip install -r requirements.lock
+fastapi==0.142.3
+uvicorn[standard]==0.27.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+sqlalchemy==2.1.4
+psycopg2-binary==2.9.9
+alembic==1.20.0
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+bcrypt==5.0.0
+pymupdf==1.23.8
+pytesseract==0.3.10
+python-docx==1.2.0
+openpyxl==3.1.2
+pandas==2.2.3
+tokenizers==0.15.1
+huggingface-hub==0.20.0
+onnxruntime==1.17.0
+chromadb==0.5.5
+reportlab==4.0.9
+jinja2==3.1.6
+httpx==0.28.1
+python-multipart==0.0.32
+pytest==8.4.2

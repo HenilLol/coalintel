@@ -86,7 +86,8 @@ def ask_question(
         citations=citation_items,
         evidence_chunks=evidence_items,
         provider=result["provider"],
-        degraded_mode=result["degraded_mode"]
+        degraded_mode=result["degraded_mode"],
+        mode=result.get("mode", "EVIDENCE_GROUNDED")
     )
 
 

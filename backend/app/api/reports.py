@@ -40,17 +40,26 @@ def generate_report_endpoint(
 def list_reports(
     subsidiary_filter: Optional[str] = None,
     approval_status_filter: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Retrieves paginated list of generated institutional reports."""
+    """
+    Retrieves paginated list of generated institutional reports.
+    Issue #61: bounded result set — limit defaults to 50, capped at 200.
+    """
+    if limit > 200:
+        limit = 200
+    if skip < 0:
+        skip = 0
     query = db.query(Report)
     if subsidiary_filter and subsidiary_filter != "ALL":
         query = query.filter(Report.subsidiary == subsidiary_filter)
     if approval_status_filter:
         query = query.filter(Report.approval_status == approval_status_filter.upper())
 
-    reports = query.order_by(Report.created_at.desc()).all()
+    reports = query.order_by(Report.created_at.desc()).offset(skip).limit(limit).all()
     return [ReportResponse.model_validate(r) for r in reports]
 
 
@@ -62,20 +71,39 @@ def download_report_pdf(
 ):
     """
     Streams generated PDF report file for download.
+    Supports legacy local files, new local StorageProvider files, and remote Supabase Storage objects.
     """
+    from fastapi.responses import Response
+    from app.services.storage_service import (
+        report_binary_exists,
+        read_report_binary,
+        parse_storage_reference,
+    )
+
     report = db.query(Report).filter(Report.id == id).first()
-    if not report or not report.file_path or not os.path.exists(report.file_path):
-        # Return fallback ReportLab demo PDF if exact file was created transiently
+    if not report or not report.file_path or not report_binary_exists(report.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Report file for ID #{id} not found on server storage."
         )
 
     filename = os.path.basename(report.file_path)
-    return FileResponse(
-        path=report.file_path,
+    ref_type, bucket, path = parse_storage_reference(report.file_path)
+
+    # If local filesystem file exists at path, return FileResponse
+    if ref_type == "local" and os.path.exists(os.path.abspath(report.file_path)):
+        return FileResponse(
+            path=os.path.abspath(report.file_path),
+            media_type="application/pdf",
+            filename=filename
+        )
+
+    # Supabase or non-local storage: retrieve binary bytes securely through StorageProvider
+    pdf_bytes = read_report_binary(report.file_path)
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
-        filename=filename
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 

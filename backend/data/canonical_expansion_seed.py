@@ -16,8 +16,10 @@ Strict Authenticity Rules:
 import os
 import sys
 import logging
+from typing import Optional
 from datetime import datetime, timezone
 from decimal import Decimal
+from sqlalchemy.orm import Session
 
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
@@ -666,8 +668,11 @@ EXPANSION_MINES = [
 ]
 
 
-def run_canonical_expansion():
-    db = SessionLocal()
+def run_canonical_expansion(db: Optional[Session] = None):
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
     inserted_count = 0
     updated_count = 0
 
@@ -715,7 +720,7 @@ def run_canonical_expansion():
                     source_url="https://coal.gov.in/",
                     source_chapter="Chapter 9: Lignite Statistics / Chapter 3: Production",
                     verification_status="verified",
-                    data_origin="government"
+                    data_origin="OFFICIAL"
                 )
                 db.add(mine)
                 inserted_count += 1
@@ -729,7 +734,7 @@ def run_canonical_expansion():
                 mine.captive_or_commercial = "Captive" if m_data["ownership_type"] == "Captive" else ("Commercial" if m_data["ownership_type"] == "Commercial" else "PSU Allocation")
                 mine.financial_year = "2024-25"
                 mine.verification_status = "verified"
-                mine.data_origin = "government"
+                mine.data_origin = "OFFICIAL"
                 updated_count += 1
 
 
@@ -787,7 +792,7 @@ def run_canonical_expansion():
                         source_url="https://coal.gov.in/",
                         verification_status="verified" if prod is not None else "provisional",
                         quality_status="ytd" if met.get("period") == "YTD" else ("provisional" if prod is None else "verified"),
-                        data_origin="government"
+                        data_origin="OFFICIAL"
                     )
                     db.add(new_ym)
                     inserted_count += 1
@@ -824,7 +829,8 @@ def run_canonical_expansion():
         logger.error(f"Error during expansion: {e}", exc_info=True)
         raise
     finally:
-        db.close()
+        if should_close:
+            db.close()
 
 
 if __name__ == "__main__":

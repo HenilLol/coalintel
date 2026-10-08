@@ -3,19 +3,22 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
+import { apiClient } from '@/lib/api/client';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('coalintel_token') : null;
-    if (!token) {
-      setIsAuthenticated(false);
-      router.replace('/login');
-    } else {
-      setIsAuthenticated(true);
-    }
+    // Issue #65: session lives in an httpOnly cookie — verify against the
+    // server instead of reading localStorage (which no longer holds a token).
+    apiClient
+      .get('/auth/me')
+      .then(() => setIsAuthenticated(true))
+      .catch(() => {
+        setIsAuthenticated(false);
+        router.replace('/login');
+      });
   }, [router]);
 
   if (isAuthenticated === null) {

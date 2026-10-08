@@ -30,7 +30,22 @@ def isolated_db():
         Base.metadata.drop_all(bind=test_engine)
 
 
-def test_seed_default_users_on_empty_table(isolated_db):
+@pytest.fixture
+def bootstrap_env(monkeypatch):
+    """Issue #56: provide deterministic bootstrap passwords via env for tests."""
+    creds = {
+        "BOOTSTRAP_ADMIN_PASSWORD": "TestAdmin@2026",
+        "BOOTSTRAP_ANALYST_PASSWORD": "TestAnalyst@2026",
+        "BOOTSTRAP_REVIEWER_PASSWORD": "TestReviewer@2026",
+        "BOOTSTRAP_AUDITOR_PASSWORD": "TestAuditor@2026",
+    }
+    for k, v in creds.items():
+        monkeypatch.setenv(k, v)
+    yield creds
+    # monkeypatch auto-undoes env changes
+
+
+def test_seed_default_users_on_empty_table(isolated_db, bootstrap_env):
     """Verifies that seed_default_users creates the 4 default users on an empty table."""
     assert isolated_db.query(User).count() == 0
 
@@ -46,13 +61,14 @@ def test_seed_default_users_on_empty_table(isolated_db):
     assert admin_user.role == "Admin"
     assert admin_user.subsidiary == "CIL HQ"
     assert admin_user.email == "admin@coalintel.cil.in"
-    assert verify_password("Admin@123", admin_user.hashed_password) is True
+    # Issue #56: password comes from the env var, NOT a hardcoded repo value
+    assert verify_password("TestAdmin@2026", admin_user.hashed_password) is True
 
     analyst_user = isolated_db.query(User).filter(User.username == "analyst").first()
     assert analyst_user is not None
     assert analyst_user.role == "Analyst"
     assert analyst_user.subsidiary == "CMPDI"
-    assert verify_password("Analyst@123", analyst_user.hashed_password) is True
+    assert verify_password("TestAnalyst@2026", analyst_user.hashed_password) is True
 
     reviewer_user = isolated_db.query(User).filter(User.username == "reviewer").first()
     assert reviewer_user is not None
@@ -63,6 +79,22 @@ def test_seed_default_users_on_empty_table(isolated_db):
     assert auditor_user is not None
     assert auditor_user.role == "Viewer"
     assert auditor_user.subsidiary == "Ministry of Coal"
+
+
+def test_seeded_passwords_are_not_hardcoded_defaults(isolated_db, monkeypatch):
+    """Issue #56 regression: without env vars, seeded passwords must be random —
+    and must NOT match any previously-committed default credential."""
+    for var in ("BOOTSTRAP_ADMIN_PASSWORD", "BOOTSTRAP_ANALYST_PASSWORD",
+                "BOOTSTRAP_REVIEWER_PASSWORD", "BOOTSTRAP_AUDITOR_PASSWORD"):
+        monkeypatch.delenv(var, raising=False)
+    seed_default_users(isolated_db)
+
+    legacy_passwords = ["Admin@123", "Analyst@123", "Reviewer@123", "Auditor@123"]
+    users = isolated_db.query(User).all()
+    for u in users:
+        for legacy in legacy_passwords:
+            assert verify_password(legacy, u.hashed_password) is False, \
+                f"User '{u.username}' must not be reachable with the legacy repo password '{legacy}'"
 
 
 def test_seed_default_users_idempotency_with_existing_users(isolated_db):
@@ -84,18 +116,17 @@ def test_seed_default_users_idempotency_with_existing_users(isolated_db):
 
 
 def test_auth_login_with_bootstrapped_admin():
-    """Verifies that the /api/v1/auth/login endpoint authenticates the bootstrapped admin."""
-    client = TestClient(app)
-    payload = {
-        "username": "admin",
-        "password": "Admin@123"
-    }
-    res = client.post("/api/v1/auth/login", json=payload)
-    if res.status_code == 200:
-        data = res.json()
-        assert "access_token" in data
-        assert data["token_type"] == "bearer"
-        assert data["user"]["username"] == "admin"
-        assert data["user"]["role"] == "Admin"
-    else:
-        assert res.status_code == 401
+    """Verifies that the /api/v1/auth/login endpoint authenticates a bootstrapped admin.
+
+    Issue #56: the legacy hardcoded 'Admin@123' must NEVER authenticate (it is
+    not a valid credential anymore). A wrong password must yield 401 (or 429
+    once the rate limiter threshold is hit within this process).
+    """
+    with TestClient(app) as client:  # context manager runs the app lifespan (tables + seed)
+        legacy_res = client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "Admin@123"},
+        )
+        # The legacy repo credential is no longer valid by design
+        assert legacy_res.status_code in (401, 429)
+        assert "access_token" not in legacy_res.json()

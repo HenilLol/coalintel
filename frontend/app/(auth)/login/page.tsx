@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Logo } from '@/components/ui/Logo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -28,8 +29,9 @@ export default function LoginPage() {
 
     try {
       const data = await authApi.login(username, password);
+      // Issue #65: session lives in the backend-set httpOnly cookie now.
+      // Only the display user object is stored client-side (no secret material).
       if (typeof window !== 'undefined') {
-        localStorage.setItem('coalintel_token', data.access_token);
         localStorage.setItem('coalintel_user', JSON.stringify(data.user));
       }
       router.push('/dashboard');
@@ -43,24 +45,52 @@ export default function LoginPage() {
     }
   };
 
+  const handleQuickLogin = async (role: 'admin' | 'analyst') => {
+    setIsLoading(true);
+    setError(null);
+    const creds =
+      role === 'admin'
+        ? { username: 'admin', password: 'Admin@123' }
+        : { username: 'analyst', password: 'Analyst@123' };
+
+    setUsername(creds.username);
+    setPassword(creds.password);
+
+    try {
+      const data = await authApi.login(creds.username, creds.password);
+      // Issue #65: httpOnly cookie session — no token in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('coalintel_user', JSON.stringify(data.user));
+      }
+      router.push('/dashboard');
+    } catch (err: any) {
+      console.error('Quick login error:', err);
+      const detail =
+        err.response?.data?.detail || 'Authentication failed. Please verify credentials.';
+      setError(detail);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0E1113] flex flex-col lg:flex-row relative overflow-hidden font-sans select-none">
-      {/* Left Column: Institutional Brand & Operational Storytelling (Desktop) */}
-      <div className="relative flex-1 flex flex-col justify-between p-8 lg:p-16 z-10 bg-[#151A1D] border-b lg:border-b-0 lg:border-r border-[#30383D]">
+      {/* Institutional Brand & Operational Storytelling */}
+      <div className="relative flex-1 flex flex-col justify-between p-6 sm:p-8 lg:p-16 z-10 bg-[#151A1D] border-b lg:border-b-0 lg:border-r border-[#30383D] order-2 lg:order-1">
         <div>
           <Logo size="lg" />
 
-          <div className="mt-12 space-y-6 max-w-xl">
+          <div className="mt-8 lg:mt-12 space-y-4 lg:space-y-6 max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#C58B3A]/15 border border-[#C58B3A]/30 text-[#C58B3A] text-xs font-mono">
               <Sparkles className="h-3.5 w-3.5" />
               <span>SIH26023 Enterprise Platform</span>
             </div>
 
-            <h1 className="text-3xl lg:text-5xl font-extrabold tracking-tight text-[#E8ECEB] font-sans leading-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-5xl font-extrabold tracking-tight text-[#E8ECEB] font-sans leading-tight">
               AI-Powered Evidence-Driven <span className="text-[#C58B3A]">Mining Intelligence</span> & Reporting
             </h1>
 
-            <p className="text-sm lg:text-base text-[#9BA5A8] leading-relaxed">
+            <p className="text-xs sm:text-sm lg:text-base text-[#9BA5A8] leading-relaxed">
               Automated geological and production document processing, unit-normalized extraction,
               arithmetic validation, and institutional parliamentary report generation for Coal India Limited and CMPDI.
             </p>
@@ -68,7 +98,7 @@ export default function LoginPage() {
         </div>
 
         {/* Operational Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
+        <div className="hidden sm:grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 lg:mt-12">
           <div className="p-4 rounded-lg bg-[#1C2226] border border-[#30383D] space-y-2">
             <div className="p-2 rounded-lg bg-[#242C30] text-[#C58B3A] w-fit">
               <Database className="h-4 w-4" />
@@ -94,13 +124,13 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-[#30383D] text-xs text-[#9BA5A8] font-mono">
+        <div className="mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-[#30383D] text-xs text-[#9BA5A8] font-mono">
           Ministry of Coal • Coal India Limited (CIL) • CMPDI Technical Platform
         </div>
       </div>
 
-      {/* Right Column: Authentication Panel */}
-      <div className="relative flex-1 flex items-center justify-center p-6 lg:p-16 z-10 bg-[#0E1113]">
+      {/* Authentication Panel */}
+      <div className="relative flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-16 z-10 bg-[#0E1113] order-1 lg:order-2">
         <div className="w-full max-w-md space-y-8 p-8 rounded-lg bg-[#1C2226] border border-[#30383D] shadow-sm">
           <div className="space-y-2 text-center sm:text-left">
             <h2 className="text-2xl font-bold tracking-tight text-[#E8ECEB]">Sign in to Platform</h2>
@@ -110,6 +140,35 @@ export default function LoginPage() {
           </div>
 
           {error && <ErrorState message={error} />}
+
+          {/* Role Selection Helpers / Demo Quick Login Shortcuts */}
+          <div className="space-y-2">
+            <span className="text-[11px] uppercase tracking-wider text-[#9BA5A8] font-mono block">
+              Predefined Demo Shortcuts
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                onClick={() => handleQuickLogin('admin')}
+                className="text-xs border-[#C58B3A]/60 text-[#C58B3A] hover:bg-[#C58B3A]/10"
+              >
+                Admin Login
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                onClick={() => handleQuickLogin('analyst')}
+                className="text-xs border-[#4F8A62]/60 text-[#4F8A62] hover:bg-[#4F8A62]/10"
+              >
+                Analyst Login
+              </Button>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
@@ -141,7 +200,7 @@ export default function LoginPage() {
                 <span>Remember session</span>
               </label>
 
-              <span className="text-[#9BA5A8] cursor-not-allowed" title="Contact System Administrator for credentials">
+              <span className="text-[#9BA5A8] cursor-not-allowed" title="Contact System Administrator for credential resets">
                 Forgot password?
               </span>
             </div>
@@ -158,74 +217,19 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Quick Evaluator Access Section */}
-          <div className="space-y-2 pt-2 border-t border-[#30383D]">
-            <span className="text-[11px] font-mono text-[#9BA5A8] uppercase tracking-wider block text-center">
-              Quick Hackathon Evaluator Access
-            </span>
-            <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('coalintel_token', 'demo_analyst_token');
-                    localStorage.setItem(
-                      'coalintel_user',
-                      JSON.stringify({ username: 'CMPDI Analyst', role: 'Analyst', subsidiary: 'CMPDI' })
-                    );
-                  }
-                  router.push('/dashboard');
-                }}
-                className="p-2 rounded bg-[#151A1D] border border-[#30383D] text-[#C58B3A] hover:bg-[#242C30] hover:border-[#C58B3A]/40 transition-colors font-bold text-center"
-              >
-                Analyst
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('coalintel_token', 'demo_reviewer_token');
-                    localStorage.setItem(
-                      'coalintel_user',
-                      JSON.stringify({ username: 'CIL Executive', role: 'Reviewer', subsidiary: 'CIL HQ' })
-                    );
-                  }
-                  router.push('/dashboard');
-                }}
-                className="p-2 rounded bg-[#151A1D] border border-[#30383D] text-[#14B8A6] hover:bg-[#242C30] hover:border-[#14B8A6]/40 transition-colors font-bold text-center"
-              >
-                Reviewer
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('coalintel_token', 'demo_admin_token');
-                    localStorage.setItem(
-                      'coalintel_user',
-                      JSON.stringify({ username: 'System Admin', role: 'Admin', subsidiary: 'CIL HQ' })
-                    );
-                  }
-                  router.push('/dashboard');
-                }}
-                className="p-2 rounded bg-[#151A1D] border border-[#30383D] text-[#10B981] hover:bg-[#242C30] hover:border-[#10B981]/40 transition-colors font-bold text-center"
-              >
-                Admin
-              </button>
-            </div>
-          </div>
-
-          {/* Future-Ready Architecture Notice */}
-          <div className="pt-3 border-t border-[#30383D] text-center text-xs text-[#9BA5A8]">
-            <span>New subsidiary user? </span>
-            <span className="text-[#C58B3A] hover:text-[#D6A052] font-semibold cursor-not-allowed" title="Account provisioning is managed by CIL HQ System Administrators">
-              Request Access from Admin
-            </span>
+          {/* Institutional Access & Signup Link */}
+          <div className="pt-4 border-t border-[#30383D] text-center text-xs text-[#9BA5A8]">
+            <span>Don&apos;t have an account? </span>
+            <Link
+              href="/signup"
+              className="text-[#C58B3A] hover:text-[#D6A052] font-semibold underline underline-offset-2 ml-1"
+            >
+              Sign up
+            </Link>
           </div>
         </div>
       </div>
     </div>
   );
 }
+

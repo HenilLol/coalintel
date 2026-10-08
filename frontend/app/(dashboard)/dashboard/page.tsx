@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
@@ -13,7 +13,9 @@ import { ValidationFeedWidget } from '@/components/dashboard/ValidationFeedWidge
 import { DataPipeline3D } from '@/components/3d/DataPipeline3D';
 import { GeologicalCrossSection3D } from '@/components/3d/GeologicalCrossSection3D';
 import { dashboardApi } from '@/lib/api/dashboardApi';
+import { documentApi } from '@/lib/api/documentApi';
 import { DashboardKpis, ProductionSeriesItem, ValidationFeedItem } from '@/types/dashboard';
+import { DocumentItem } from '@/types/document';
 import { useScope } from '@/context/ScopeContext';
 import {
   Upload,
@@ -39,15 +41,24 @@ export default function DashboardPage() {
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [productionData, setProductionData] = useState<ProductionSeriesItem[]>([]);
   const [validationItems, setValidationItems] = useState<ValidationFeedItem[]>([]);
-  const [activeCenterView, setActiveCenterView] = useState<'analytics' | 'geology'>('analytics');
+  const [recentDocuments, setRecentDocuments] = useState<DocumentItem[]>([]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [kpiRes, chartRes, feedRes] = await Promise.allSettled([
-        dashboardApi.getKpis(),
-        dashboardApi.getCharts(),
+      const filterParams = {
+        subsidiary_filter: selectedSubsidiary,
+        fiscal_year: selectedFiscalYear,
+      };
+
+      const [kpiRes, chartRes, feedRes, docRes] = await Promise.allSettled([
+        dashboardApi.getKpis(filterParams),
+        dashboardApi.getCharts(filterParams),
         dashboardApi.getValidationFeed(),
+        documentApi.getDocuments({
+          subsidiary_filter: selectedSubsidiary,
+          limit: 5,
+        }),
       ]);
 
       if (kpiRes.status === 'fulfilled' && kpiRes.value) {
@@ -62,16 +73,20 @@ export default function DashboardPage() {
       if (feedRes.status === 'fulfilled' && Array.isArray(feedRes.value)) {
         setValidationItems(feedRes.value);
       }
+
+      if (docRes.status === 'fulfilled' && docRes.value?.items) {
+        setRecentDocuments(docRes.value.items);
+      }
     } catch (error) {
       console.warn('Dashboard API fetch note:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedSubsidiary, selectedFiscalYear]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [selectedSubsidiary, selectedFiscalYear]);
+  }, [fetchDashboardData]);
 
   return (
     <div className="space-y-6">
@@ -192,91 +207,64 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="p-4">
-            <div className="space-y-3">
-              {/* Event 1 */}
-              <div className="p-3 rounded-lg bg-[#151A1D] border border-[#30383D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-[#242C30] text-[#10B981] border border-[#30383D]">
-                    <ShieldCheck className="h-4 w-4" />
+          <CardContent>
+            <div className="divide-y divide-[#30383D]">
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="py-3 px-2 flex items-center justify-between animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-[#242C30]" />
+                      <div className="space-y-1">
+                        <div className="h-4 w-48 bg-[#242C30] rounded" />
+                        <div className="h-3 w-32 bg-[#242C30] rounded" />
+                      </div>
+                    </div>
+                    <div className="h-5 w-24 bg-[#242C30] rounded" />
                   </div>
-                  <div>
-                    <span className="text-[#E8ECEB] font-bold block font-sans">
-                      Rajmahal OCP Opening Stock Arithmetic Audit
-                    </span>
-                    <span className="text-[#9BA5A8] text-[11px]">
-                      Formula: 4.2 MT + 17.8 MT - 18.1 MT = 3.9 MT (Variance: 0.0%)
-                    </span>
-                  </div>
+                ))
+              ) : recentDocuments.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#9BA5A8] font-mono">
+                  No recently ingested documents found in this scope. Ingest a document or select another subsidiary.
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="success" size="sm">VALIDATED</Badge>
-                  <span className="text-[10px] text-[#9BA5A8]">2 mins ago</span>
-                </div>
-              </div>
+              ) : (
+                recentDocuments.map((doc) => {
+                  const statusVariant =
+                    doc.status === 'PARSED' || doc.status === 'INDEXED'
+                      ? 'success'
+                      : doc.status === 'FAILED'
+                      ? 'danger'
+                      : 'warning';
 
-              {/* Event 2 */}
-              <div className="p-3 rounded-lg bg-[#151A1D] border border-[#30383D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-[#242C30] text-[#EF4444] border border-[#30383D]">
-                    <GitCompare className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <span className="text-[#E8ECEB] font-bold block font-sans">
-                      BCCL Moonidih UG Cross-Document Discrepancy Flagged
-                    </span>
-                    <span className="text-[#9BA5A8] text-[11px]">
-                      Annual Report (1.20 MT) vs Ministry Monthly Return (1.35 MT) • Delta: 12.5%
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="danger" size="sm">CONFLICT DETECTED</Badge>
-                  <span className="text-[10px] text-[#9BA5A8]">14 mins ago</span>
-                </div>
-              </div>
-
-              {/* Event 3 */}
-              <div className="p-3 rounded-lg bg-[#151A1D] border border-[#30383D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-[#242C30] text-[#3B82F6] border border-[#30383D]">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <span className="text-[#E8ECEB] font-bold block font-sans">
-                      SECL_Gevra_Operational_Review_FY24.pdf
-                    </span>
-                    <span className="text-[#9BA5A8] text-[11px]">
-                      112 Pages Ingested • 480 Vector Chunks Indexed to ChromaDB
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="info" size="sm">INDEXED</Badge>
-                  <span className="text-[10px] text-[#9BA5A8]">42 mins ago</span>
-                </div>
-              </div>
-
-              {/* Event 4 */}
-              <div className="p-3 rounded-lg bg-[#151A1D] border border-[#30383D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-[#242C30] text-[#8B5CF6] border border-[#30383D]">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <span className="text-[#E8ECEB] font-bold block font-sans">
-                      Parliamentary Starred Reply #482 Draft Compiled
-                    </span>
-                    <span className="text-[#9BA5A8] text-[11px]">
-                      Grounded citation synthesis generated with 6 verified page citations
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="amber" size="sm">INSIGHT GENERATED</Badge>
-                  <span className="text-[10px] text-[#9BA5A8]">1 hr ago</span>
-                </div>
-              </div>
+                  return (
+                    <Link
+                      key={doc.id}
+                      href={`/documents/${doc.id}`}
+                      className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#242C30]/50 rounded-lg transition-colors text-xs group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-[#242C30] border border-[#30383D] text-[#C58B3A] group-hover:border-[#C58B3A]/40 shrink-0">
+                          <FileText className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <span
+                            className="font-bold text-[#E8ECEB] group-hover:text-[#C58B3A] transition-colors block font-sans truncate max-w-xs sm:max-w-md"
+                            title={doc.filename}
+                          >
+                            {doc.filename}
+                          </span>
+                          <span className="text-[#9BA5A8] text-[11px] font-mono truncate block">
+                            {doc.total_pages || 1} Pages • {doc.file_type || 'PDF'} • SHA-256:{' '}
+                            {doc.file_hash ? doc.file_hash.substring(0, 12) : 'N/A'}... • {doc.subsidiary || 'CIL HQ'}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge variant={statusVariant} size="sm" className="shrink-0 self-start sm:self-center">
+                        {doc.status}
+                      </Badge>
+                    </Link>
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>

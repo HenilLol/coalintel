@@ -79,12 +79,12 @@ export default function AnalyticsPage() {
 
                   <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[#30383D] text-xs font-mono">
                     <div className="p-3 bg-[#242C30] rounded-lg border border-[#30383D]">
-                      <span className="text-[#9BA5A8] block text-[10px]">Tagged Mines</span>
+                      <span className="text-[#9BA5A8] block text-[10px]">Reference Mine Coverage</span>
                       <span className="text-lg font-bold text-[#C58B3A] mt-1 block">48 Mines</span>
                     </div>
 
                     <div className="p-3 bg-[#242C30] rounded-lg border border-[#30383D]">
-                      <span className="text-[#9BA5A8] block text-[10px]">Subsidiary Tags</span>
+                      <span className="text-[#9BA5A8] block text-[10px]">Reference Subsidiary Coverage</span>
                       <span className="text-lg font-bold text-[#4F8A62] mt-1 block">8 Subsidiaries</span>
                     </div>
                   </div>

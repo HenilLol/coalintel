@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { IntelligentBackground } from './IntelligentBackground';
 import { UserRole } from '@/types/auth';
+import { apiClient } from '@/lib/api/client';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -31,12 +32,33 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     return { username: 'analyst', role: 'Analyst', subsidiary: 'CMPDI' };
   });
 
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('coalintel_token');
-      localStorage.removeItem('coalintel_user');
+  // Lock body scroll when mobile drawer is open
+  React.useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
     }
-    router.push('/login');
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
+  const handleLogout = () => {
+    // Issue #65: ask the server to clear the httpOnly session cookie and
+    // log the audit event; also clear legacy localStorage remnants.
+    apiClient
+      .post('/auth/logout')
+      .catch(() => {
+        /* server unreachable: cookie expiry is the fallback; still redirect */
+      })
+      .finally(() => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('coalintel_token');
+          localStorage.removeItem('coalintel_user');
+        }
+        router.push('/login');
+      });
   };
 
   return (
@@ -75,6 +97,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           userName={user?.username || 'CMPDI Analyst'}
           userSubsidiary={user?.subsidiary || 'CMPDI'}
           onLogout={handleLogout}
+          onNavigate={() => setMobileOpen(false)}
         />
       </div>
 
@@ -87,7 +110,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           showLogoOnDesktop={collapsed}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 animate-page-enter">
+        <main className="flex-1 p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl 2xl:max-w-[1720px] w-full mx-auto space-y-6 animate-page-enter">
           {children}
         </main>
 

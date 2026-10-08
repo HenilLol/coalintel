@@ -93,11 +93,12 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label })
 };
 
 export const ProductionChart: React.FC<ProductionChartProps> = ({
-  data = defaultData,
+  data = [],
   loading = false,
   isApiConnected = false,
 }) => {
-  const chartSeries = data && data.length > 0 ? data : defaultData;
+  const hasData = data && data.length > 0 && data.some((d) => (d.actual || 0) > 0 || (d.target || 0) > 0);
+  const chartSeries = data && data.length > 0 ? data : [];
 
   return (
     <Card className="col-span-1 lg:col-span-2 bg-[#1C2226] border-[#30383D]">
@@ -119,6 +120,14 @@ export const ProductionChart: React.FC<ProductionChartProps> = ({
       <CardContent>
         {loading ? (
           <div className="h-72 w-full animate-pulse rounded-lg bg-[#242C30]" />
+        ) : chartSeries.length === 0 ? (
+          <div className="h-72 w-full flex flex-col items-center justify-center p-6 text-center text-xs font-mono text-[#9BA5A8] border border-dashed border-[#30383D] rounded-lg bg-[#151A1D]">
+            <BarChart3 className="h-8 w-8 text-[#9BA5A8]/50 mb-2" />
+            <span className="text-[#E8ECEB] font-semibold">No Production Data Available</span>
+            <span className="text-[11px] mt-1 max-w-sm">
+              No verified production metrics were found for the selected subsidiary scope and fiscal year. Ingest documents to view live analytics.
+            </span>
+          </div>
         ) : (
           <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">

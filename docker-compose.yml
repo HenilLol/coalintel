@@ -30,7 +30,9 @@ services:
     environment:
       - PROJECT_NAME=${PROJECT_NAME:-COALINTEL}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      - SECRET_KEY=${SECRET_KEY:-coalintel-super-secret-jwt-signing-key-change-in-production}
+      # SECURITY (Issue #54): no fallback for SECRET_KEY — a missing value must
+      # fail loudly at startup instead of silently signing JWTs with a public string.
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set (generate: python -c "import secrets; print(secrets.token_urlsafe(48))")}
       - ALGORITHM=${ALGORITHM:-HS256}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       - POSTGRES_HOST=postgres
@@ -44,7 +46,7 @@ services:
       - REPORT_DIR=/storage/generated_reports
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-gemini-1.5-flash}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-gemini-3.6-flash}
       - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-10.0}
     ports:
       - "8000:8000"

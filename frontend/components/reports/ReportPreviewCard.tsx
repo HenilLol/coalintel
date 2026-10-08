@@ -19,6 +19,21 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
   isApproving = false,
 }) => {
   const [isDownloading, setIsDownloading] = React.useState(false);
+  const [canApprove, setCanApprove] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('coalintel_user');
+      if (stored) {
+        try {
+          const user = JSON.parse(stored);
+          setCanApprove(['Admin', 'Reviewer'].includes(user?.role));
+        } catch {
+          setCanApprove(false);
+        }
+      }
+    }
+  }, []);
 
   if (!report) {
     return (
@@ -104,6 +119,8 @@ export const ReportPreviewCard: React.FC<ReportPreviewCardProps> = ({
               size="md"
               onClick={onApprove}
               isLoading={isApproving}
+              disabled={!canApprove}
+              title={!canApprove ? 'Approval restricted to Admin and Reviewer roles' : undefined}
               leftIcon={<CheckCircle2 className="h-4 w-4" />}
             >
               Approve Report

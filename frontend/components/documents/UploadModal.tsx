@@ -15,7 +15,7 @@ interface UploadModalProps {
   onUploadSuccess?: (doc: DocumentItem) => void;
 }
 
-const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.csv'];
 
 export const UploadModal: React.FC<UploadModalProps> = ({
@@ -57,7 +57,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setErrorMessage(`File size (${sizeMb} MB) exceeds maximum allowed limit of 100 MB.`);
+      setErrorMessage(`File size (${sizeMb} MB) exceeds maximum allowed limit of 50 MB.`);
       return false;
     }
 
@@ -178,7 +178,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-[#E8ECEB]">Ingest Mining Document</h3>
-              <p className="text-xs text-[#9BA5A8]">PDF, DOCX, XLSX, CSV up to 100 MB</p>
+              <p className="text-xs text-[#9BA5A8]">PDF, DOCX, XLSX, CSV up to 50 MB</p>
             </div>
           </div>
 
@@ -255,7 +255,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   <span className="font-semibold text-[#C58B3A]">Click to browse</span> or drag and drop document here
                 </div>
                 <span className="text-[10px] text-[#9BA5A8] font-mono uppercase tracking-wider">
-                  Supported formats: PDF, DOCX, XLSX, CSV (Max 100 MB)
+                  Supported formats: PDF, DOCX, XLSX, CSV (Max 50 MB)
                 </span>
               </div>
             )}

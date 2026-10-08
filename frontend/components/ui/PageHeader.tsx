@@ -31,7 +31,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             </h1>
             {badge}
           </div>
-          {description && <p className="text-xs lg:text-sm text-[#9BA5A8] max-w-3xl font-normal leading-relaxed">{description}</p>}
+          {description && <p className="text-xs lg:text-sm text-[#9BA5A8] max-w-4xl 2xl:max-w-5xl font-normal leading-relaxed">{description}</p>}
         </div>
 
         {actions && <div className="flex items-center gap-2.5 shrink-0">{actions}</div>}
