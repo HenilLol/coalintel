@@ -1,0 +1,57 @@
+name: Frontend Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      # Guard: committed build artifacts (PR #53 carried 76 MB of .next
+      # webpack cache into the repo). Fail the build if any appear.
+      - name: Guard against committed build artifacts
+        run: |
+          artifacts=$(git ls-tree -r HEAD --name-only | grep -E '^frontend/(\.next|dist|build)/' || true)
+          if [ -n "$artifacts" ]; then
+            echo "ERROR: build artifacts are committed to git:"
+            echo "$artifacts" | head -20
+            exit 1
+          fi
+          echo "OK: no committed build artifacts"
+
+      - name: Type check
+        working-directory: frontend
+        run: bunx tsc --noEmit
+
+      - name: Build (Next.js production)
+        working-directory: frontend
+        run: bun run build
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build-logs
+          retention-days: 7
