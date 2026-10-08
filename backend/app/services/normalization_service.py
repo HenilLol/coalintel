@@ -149,12 +149,19 @@ def classify_document_authority(filename: str) -> str:
     """
     if not filename:
         return "UNKNOWN"
-    f_lower = filename.lower()
+    # Issue #79: normalize separators so 'coal_directory', 'coal-directory' and
+    # 'coal directory' all classify identically (real filenames vary by source).
+    f_lower = filename.lower().replace("_", " ").replace("-", " ").replace(".", " ")
     if any(t in f_lower for t in ["test", "demo", "synthetic", "mock"]):
         return "SYNTHETIC_TEST"
     if any(o in f_lower for o in [
         "annual_report", "annual report", "annualreport", "chap", "moc", "ministry",
-        "audit", "srn-", "secl", "ecl", "bccl", "cmpdi", "cil", "wcl", "mcl", "ccl", "ncl"
+        "audit", "srn-", "secl", "ecl", "bccl", "cmpdi", "cil", "wcl", "mcl", "ccl", "ncl",
+        # Issue #79: real government publications — Coal Controller's Organisation
+        # directories, PIB releases, provincial statistics publications
+        "cco", "coal directory", "coal controller",
+        "pib", "provisional coal statistics", "parliamentary", "gazette", "gov in", "govt",
+        "statistics", "statistical"
     ]):
         return "OFFICIAL"
     return "INTERNAL"
@@ -649,18 +656,30 @@ def chunk_has_metric_for_entity(
     chunk_text: str,
     target_mines: Optional[List[str]] = None,
     metric_domain: Optional[Dict[str, Any]] = None,
-    target_metric: Optional[str] = None
+    target_metric: Optional[str] = None,
+    target_entities: Optional[List[str]] = None
 ) -> bool:
     """
     Evaluates whether a text chunk provides semantic evidence specifically linking
     the queried entity/mine with the requested metric domain.
     Prevents unrelated official metrics (e.g. Coal Production 59.11 MT) from satisfying
     a distinct metric query (e.g. Overburden Removal) merely because they appear in the same document/chunk.
+
+    Issue #79: `target_entities` carries non-mine entities (states, sectors like
+    'Coking Coal'/'Power (Utility)') that real government tables report at
+    aggregate level. Presence in the chunk satisfies the entity requirement the
+    same way a mine name does.
     """
     if not chunk_text:
         return False
 
     chunk_lower = chunk_text.lower()
+
+    # Issue #79: normalize entity requirement — with geographies/sectors present
+    # but no mines, the entity check below must still run (previously a
+    # no-mine query bypassed entity checks entirely, letting wrong-entity
+    # chunks pass; and entity-bearing queries were refused entirely).
+    entity_terms = [e.lower() for e in (target_entities or []) if e]
 
     # Determine metric keywords and patterns
     domain_terms: List[str] = []
@@ -673,9 +692,9 @@ def chunk_has_metric_for_entity(
     elif target_metric:
         domain_terms.append(target_metric.lower())
 
-    # If no metric constraint, only check mine presence (if any)
+    # If no metric constraint, only check entity presence (mines, geographies, sectors)
     if not domain_terms and not domain_patterns:
-        if not target_mines:
+        if not target_mines and not entity_terms:
             return True
         for tm in target_mines:
             if tm.lower() in chunk_lower:
@@ -685,6 +704,10 @@ def chunk_has_metric_for_entity(
             for variant in mine_name_variants(tm):
                 if len(variant) >= 3 and variant.lower() in chunk_lower:
                     return True
+        # Issue #79: geographic/sector entities
+        for et in entity_terms:
+            if et in chunk_lower:
+                return True
         return False
 
     # Check for structured extraction format:
@@ -704,7 +727,16 @@ def chunk_has_metric_for_entity(
                 return False
 
             if not target_mines:
-                return True
+                # Issue #79: entity terms (states/sectors) may still gate
+                if not entity_terms:
+                    return True
+                if s_mine:
+                    s_mine_lower_79 = s_mine.lower()
+                    if any(et in s_mine_lower_79 for et in entity_terms):
+                        return True
+                if any(et in chunk_lower for et in entity_terms):
+                    return True
+                return False
 
             if s_mine:
                 s_mine_lower = s_mine.lower()
@@ -718,9 +750,15 @@ def chunk_has_metric_for_entity(
     # Unstructured text evaluation:
     # If no target mines specified (e.g. broad CIL metric query):
     if not target_mines:
-        return any(dt in chunk_lower for dt in domain_terms) or any(
+        metric_ok = any(dt in chunk_lower for dt in domain_terms) or any(
             re.search(pat, chunk_text, re.IGNORECASE) for pat in domain_patterns
         )
+        if not metric_ok:
+            return False
+        # Issue #79: entity gating for state/sector queries
+        if entity_terms:
+            return any(et in chunk_lower for et in entity_terms)
+        return True
 
     # Specific target mine(s) queried:
     mine_terms = []
@@ -1059,3 +1097,232 @@ def extract_entity_tuples_from_tables(
                     })
 
     return extracted_metrics
+
+
+# ---------------------------------------------------------------------------
+# Issue #79: Year-series columnar table extraction (real government layout)
+#
+# Government statistical tables (CCO Coal Directory, CIL annual reports, PIB
+# releases) lay data out as:
+#     Item | Unit | 2019-20 | 2020-21 | ... | 2023-24
+# with the unit stated once and bare numbers under fiscal-year columns. The
+# narrative extractor (inline "42.50 Lakh Tonnes") and the monthly/cumulative
+# column-role extractor both miss this layout entirely. This pass reads the
+# fiscal-year columns directly and emits one metric tuple per (row item, FY).
+# ---------------------------------------------------------------------------
+
+INDIAN_COAL_STATES = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+    "Jharkhand", "Madhya Pradesh", "Maharashtra", "Odisha", "Punjab",
+    "Rajasthan", "Tamil Nadu", "Telangana", "Uttar Pradesh", "West Bengal",
+    "Chattisgarh", "Orissa", "Tamilnadu", "Uttarakhand",
+]
+
+_FY_COLUMN_RE = re.compile(r"^(?:FY\s*)?(20\d{2})\s*[-/]\s*(\d{2,4})$")
+
+
+def _parse_fy_header(cell: str) -> Optional[str]:
+    """Parses a fiscal-year column header ('2023-24', 'FY 2023-24', '2023/24') into 'YYYY-YY'."""
+    if not cell:
+        return None
+    m = _FY_COLUMN_RE.match(str(cell).strip())
+    if not m:
+        return None
+    start = m.group(1)
+    end = m.group(2)
+    if len(end) == 4:
+        end = end[-2:]
+    return f"{start}-{end}"
+
+
+def _classify_year_series_metric(item_text: str, unit_hint: str) -> Optional[str]:
+    """Classifies a row item from a year-series table into a canonical metric name."""
+    t = (item_text or "").lower()
+    if "obr" in t or "overburden" in t or "stripping" in t:
+        return "Overburden Removal"
+    if "despatch" in t or "dispatch" in t or "off-take" in t or "offtake" in t:
+        return "Coal Despatch"
+    if "import" in t:
+        return "Coal Import"
+    if "export" in t:
+        return "Coal Export"
+    if "reserve" in t or "resource" in t:
+        return "Coal Reserves"
+    if "opening stock" in t:
+        return "Opening Stock"
+    if "closing stock" in t:
+        return "Closing Stock"
+    if "stock" in t:
+        return "Coal Stock"
+    if "production" in t or "output" in t or "produced" in t:
+        if "coking" in t:
+            return "Coking Coal Production"
+        if "non" in t and "coking" in t:
+            return "Non-Coking Coal Production"
+        if "lignite" in t:
+            return "Lignite Production"
+        return "Coal Production"
+    if "lignite" in t and unit_hint and ("tonne" in unit_hint.lower() or "mt" in unit_hint.lower()):
+        return "Lignite Production"
+    if "coking coal" in t:
+        return "Coking Coal Production"
+    return None
+
+
+def _year_series_entity_label(item_text: str, table_title: str) -> Tuple[str, Optional[str]]:
+    """
+    Resolves (entity_label, subsidiary) for a year-series row item.
+    Recognizes states, CIL subsidiaries, parent companies and sector buckets —
+    no hardcoded mine names.
+    """
+    t = (item_text or "").strip()
+    t_lower = t.lower()
+
+    for state in INDIAN_COAL_STATES:
+        if state.lower() in t_lower:
+            return state, None
+
+    for sub in ["ECL", "BCCL", "CCL", "NCL", "WCL", "SECL", "MCL", "NEC", "SCCL", "NLCIL", "NLC"]:
+        if re.search(r"\b" + sub + r"\b", t, re.IGNORECASE):
+            return t, sub
+
+    if "coal india" in t_lower or re.search(r"\bCIL\b", t):
+        return "Coal India Limited", "CIL"
+    if "singareni" in t_lower:
+        return "Singareni Collieries (SCCL)", "SCCL"
+    if "captive" in t_lower or "commercial" in t_lower:
+        return "Captive & Commercial Blocks", None
+    return t, None
+
+
+def extract_year_series_metrics_from_tables(
+    tables: List[Dict[str, Any]],
+    page_number: int,
+    page_text: str = "",
+    default_subsidiary: Optional[str] = "CIL HQ",
+    default_year: Optional[str] = "2023-24",
+) -> List[Dict[str, Any]]:
+    """
+    Extracts metrics from year-series columnar tables (Item | Unit | FY columns).
+    One metric tuple per (row item, fiscal-year column) pair. Runs additively
+    alongside the existing extractors; duplicate suppression happens in the
+    processing pipeline as today (table metrics take precedence).
+    """
+    if not tables:
+        return []
+
+    extracted: List[Dict[str, Any]] = []
+
+    for tab_info in tables:
+        raw_rows = tab_info.get("raw_rows", []) or []
+        if len(raw_rows) < 3:
+            continue
+
+        # Find a header row containing >= 2 fiscal-year cells
+        header_idx = None
+        fy_cols: Dict[int, str] = {}
+        unit_col_idx = None
+        item_col_idx = None
+        for h_idx in range(min(4, len(raw_rows))):
+            row = raw_rows[h_idx]
+            cells = [str(c).strip().replace("\n", " ") if c is not None else "" for c in row]
+            fy_map = {}
+            for c_idx, cell in enumerate(cells):
+                fy = _parse_fy_header(cell)
+                if fy:
+                    fy_map[c_idx] = fy
+            if len(fy_map) >= 2:
+                header_idx = h_idx
+                fy_cols = fy_map
+                # unit column: header cell containing 'Unit'
+                for c_idx, cell in enumerate(cells):
+                    cl = cell.lower()
+                    if not unit_col_idx and cl == "unit":
+                        unit_col_idx = c_idx
+                    if not item_col_idx and cl in ("item", "particulars", "state", "company", "item/particulars"):
+                        item_col_idx = c_idx
+                break
+
+        if header_idx is None:
+            continue
+
+        if item_col_idx is None:
+            item_col_idx = 0
+            # skip 'Sl. No.' style first column when a second text column exists
+            if len(raw_rows[header_idx]) > 1:
+                second = str(raw_rows[header_idx][1]).strip().lower() if raw_rows[header_idx][1] else ""
+                if second in ("item", "particulars", "state", "company", "entity") or second:
+                    item_col_idx = 1
+
+        # Table title for provenance snippets
+        title_m = re.search(r"\bTable\s*[\d\.]+\s*:?\s*[^\n]{0,100}", page_text, re.IGNORECASE)
+        table_title = title_m.group(0).strip() if title_m else "Year-series table"
+
+        # Header-inherited unit (e.g. 'Million Tonnes' cell under 'Unit')
+        header_unit = None
+        if unit_col_idx is not None:
+            for r_idx in range(header_idx + 1, min(header_idx + 4, len(raw_rows))):
+                pass  # units live per-row; resolved below
+
+        # Iterate data rows
+        current_item = ""
+        for r_idx in range(header_idx + 1, len(raw_rows)):
+            row = raw_rows[r_idx]
+            if not row:
+                continue
+            cells = [str(c).strip().replace("\n", " ") if c is not None else "" for c in row]
+
+            raw_item = cells[item_col_idx] if item_col_idx < len(cells) else ""
+            # Section rows like '3 Production :' have no numbers — carry context forward
+            has_fy_number = any(
+                c_idx in fy_cols and parse_numeric_cell(c)
+                for c_idx, c in enumerate(cells)
+            )
+            if raw_item and not has_fy_number:
+                # Section header row (e.g. '2 Opening Stock', '3 Production :') —
+                # remember it as context for the indented rows below
+                current_item = re.sub(r"\s*[:$]\s*$", "", raw_item)
+                continue
+
+            if not raw_item:
+                continue
+
+            # Row-level unit cell
+            row_unit = cells[unit_col_idx] if (unit_col_idx is not None and unit_col_idx < len(cells)) else None
+            # Some rows inherit the unit from the first data row in the section
+            if not row_unit:
+                row_unit = header_unit
+
+            full_item = f"{current_item} - {raw_item}" if current_item and raw_item != current_item else raw_item
+
+            metric_name = _classify_year_series_metric(full_item, row_unit or "")
+            if not metric_name:
+                continue
+
+            entity_label, subsidiary = _year_series_entity_label(full_item, table_title)
+
+            for c_idx, fy in fy_cols.items():
+                val = parse_numeric_cell(cells[c_idx]) if c_idx < len(cells) else None
+                if val is None:
+                    continue
+                std_val, std_unit = normalize_unit_to_mt(val, row_unit or "MT")
+                raw_snip = (
+                    f"{table_title} | {full_item} | FY {fy}: {val} {row_unit or 'MT'} "
+                    f"(standardized {std_val} {std_unit}) | Page {page_number}"
+                )
+                extracted.append({
+                    "mine_name": entity_label,
+                    "subsidiary": subsidiary if subsidiary else default_subsidiary,
+                    "metric_name": metric_name,
+                    "numeric_value": val,
+                    "unit": row_unit or "MT",
+                    "standard_value": std_val,
+                    "standard_unit": std_unit,
+                    "fiscal_year": fy,
+                    "page_number": page_number,
+                    "confidence_score": 0.98,
+                    "validation_status": "VALIDATED",
+                    "raw_snippet": raw_snip,
+                })
+
+    return extracted
