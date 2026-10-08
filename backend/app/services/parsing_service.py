@@ -23,6 +23,54 @@ except ImportError:
     logger.warning("pytesseract or PIL is not installed. OCR fallback will be disabled.")
 
 
+def _resolve_tesseract_cmd() -> Optional[str]:
+    """Locate the Tesseract binary across platforms (Issue #83).
+
+    pytesseract's default PATH lookup silently fails on default Windows
+    installs (the winget installer puts tesseract.exe in
+    %ProgramFiles%/Tesseract-OCR, which is NOT added to PATH), disabling the
+    OCR fallback for every scanned page without any visible error.
+
+    Resolution order:
+      1. TESSERACT_CMD environment variable (explicit override)
+      2. `tesseract` on PATH (shutil.which)
+      3. Well-known install locations (Windows)
+    Returns None when no binary can be found.
+    """
+    import shutil
+    candidates: List[str] = []
+    env_cmd = os.environ.get("TESSERACT_CMD")
+    if env_cmd:
+        candidates.append(env_cmd)
+    which = shutil.which("tesseract")
+    if which:
+        candidates.append(which)
+    if os.name == "nt":
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+        local_appdata = os.environ.get("LOCALAPPDATA", "")
+        candidates += [
+            os.path.join(program_files, "Tesseract-OCR", "tesseract.exe"),
+            os.path.join(program_files_x86, "Tesseract-OCR", "tesseract.exe"),
+            os.path.join(local_appdata, "Programs", "Tesseract-OCR", "tesseract.exe"),
+        ]
+    for cand in candidates:
+        if cand and os.path.isfile(cand):
+            return cand
+    return None
+
+
+if HAS_PYTESSERACT:
+    _TESSERACT_CMD = _resolve_tesseract_cmd()
+    if _TESSERACT_CMD:
+        pytesseract.pytesseract.tesseract_cmd = _TESSERACT_CMD
+    else:
+        logger.warning(
+            "Tesseract binary not found (PATH / TESSERACT_CMD / default install "
+            "locations). OCR fallback will attempt per-page and degrade to native text."
+        )
+
+
 class DocumentParsingError(Exception):
     """
     Raised when a document cannot be parsed (corrupt file, unsupported encoding, etc.).
@@ -70,11 +118,48 @@ def parse_pdf_document(file_path: str, file_bytes: Optional[bytes] = None) -> Li
             is_ocr = False
             final_text = native_text
 
-            # If page text length is < 100 chars, trigger Tesseract OCR fallback
-            if len(native_text) < 100 and HAS_PYTESSERACT:
+            # Trigger Tesseract OCR fallback when the page is likely scanned
+            # (Issue #83). Two conditions, both found live on the CCO Coal
+            # Directory 2023-24:
+            #   (a) low native text (< 100 chars) — fully scanned page
+            #   (b) thin native text (< 500 chars) AND embedded images cover
+            #       >= 30% of the page area — HYBRID page: a ~120-char native
+            #       running header ("Coal Controller Organisation, ... /
+            #       Coal Directory of India 2023-24") sits on top of a fully
+            #       scanned table body. The old <100-char rule never fired
+            #       for these pages, silently dropping every mine-wise table.
+            trigger_ocr = False
+            if HAS_PYTESSERACT:
+                if len(native_text) < 100:
+                    trigger_ocr = True
+                elif len(native_text) < 500:
+                    try:
+                        page_rect = page.rect
+                        page_area = max(page_rect.get_area(), 1.0)
+                        img_area = 0.0
+                        seen_xrefs = set()
+                        for img_info in page.get_images(full=True):
+                            xref = img_info[0]
+                            if xref in seen_xrefs:
+                                continue
+                            seen_xrefs.add(xref)
+                            try:
+                                for r in page.get_image_rects(xref):
+                                    img_area += r.get_area()
+                            except Exception:
+                                pass
+                        if min(img_area / page_area, 1.0) >= 0.30:
+                            trigger_ocr = True
+                    except Exception:
+                        pass
+
+            if trigger_ocr:
                 try:
-                    logger.info(f"Page {page_num} contains low native text ({len(native_text)} chars). Triggering Tesseract OCR...")
-                    pix = page.get_pixmap(dpi=150)
+                    logger.info(f"Page {page_num} looks scanned (native text {len(native_text)} chars). Triggering Tesseract OCR...")
+                    # 200 dpi: 150 was too low for dense government tables
+                    # (digits misread); 200 was verified live on Coal
+                    # Directory table pages.
+                    pix = page.get_pixmap(dpi=200)
                     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                     ocr_text = pytesseract.image_to_string(img).strip()
                     if len(ocr_text) > len(native_text):
