@@ -149,12 +149,19 @@ def classify_document_authority(filename: str) -> str:
     """
     if not filename:
         return "UNKNOWN"
-    f_lower = filename.lower()
+    # Issue #79: normalize separators so 'coal_directory', 'coal-directory' and
+    # 'coal directory' all classify identically (real filenames vary by source).
+    f_lower = filename.lower().replace("_", " ").replace("-", " ").replace(".", " ")
     if any(t in f_lower for t in ["test", "demo", "synthetic", "mock"]):
         return "SYNTHETIC_TEST"
     if any(o in f_lower for o in [
         "annual_report", "annual report", "annualreport", "chap", "moc", "ministry",
-        "audit", "srn-", "secl", "ecl", "bccl", "cmpdi", "cil", "wcl", "mcl", "ccl", "ncl"
+        "audit", "srn-", "secl", "ecl", "bccl", "cmpdi", "cil", "wcl", "mcl", "ccl", "ncl",
+        # Issue #79: real government publications — Coal Controller's Organisation
+        # directories, PIB releases, provincial statistics publications
+        "cco", "coal directory", "coal controller",
+        "pib", "provisional coal statistics", "parliamentary", "gazette", "gov in", "govt",
+        "statistics", "statistical"
     ]):
         return "OFFICIAL"
     return "INTERNAL"

@@ -22,6 +22,7 @@ if backend_dir not in sys.path:
 from app.services.normalization_service import (
     extract_year_series_metrics_from_tables,
     chunk_has_metric_for_entity,
+    classify_document_authority,
 )
 from app.services.hybrid_search_service import detect_query_entities
 
@@ -209,3 +210,33 @@ class TestChunkEntityMetricGate:
         assert chunk_has_metric_for_entity(
             chunk, target_mines=["Kusmunda"], target_metric="Coal Production",
         ) is False
+
+
+class TestDocumentAuthorityClassification:
+    """Issue #79: real government publications must classify as OFFICIAL.
+
+    Found live: the CCO Coal Directory upload classified as INTERNAL because
+    the authority list predated real government documents, so the authority
+    gate refused every query about it.
+    """
+
+    def test_cco_coal_directory_is_official(self):
+        assert classify_document_authority(
+            "CCO_Coal_Directory_2023-24_part1_pp1-40.pdf") == "OFFICIAL"
+
+    def test_common_government_publications_are_official(self):
+        for fname in [
+            "coal_directory_2022-23.pdf",
+            "Provisional_Coal_Statistics_2022-23.pdf",
+            "PIB_coal_production_release.pdf",
+            "Ministry_of_Coal_annual_report.pdf",
+        ]:
+            assert classify_document_authority(fname) == "OFFICIAL", fname
+
+    def test_synthetic_documents_still_rejected(self):
+        assert classify_document_authority("synthetic_test_upload.pdf") == "SYNTHETIC_TEST"
+        assert classify_document_authority("demo_mine_data.pdf") == "SYNTHETIC_TEST"
+
+    def test_unknown_documents_still_internal(self):
+        assert classify_document_authority("random_notes.pdf") == "INTERNAL"
+        assert classify_document_authority("") == "UNKNOWN"
