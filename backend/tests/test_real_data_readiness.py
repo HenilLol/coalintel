@@ -20,6 +20,7 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from app.services.normalization_service import (
+    extract_entity_tuples_from_text,
     extract_year_series_metrics_from_tables,
     chunk_has_metric_for_entity,
     classify_document_authority,
@@ -240,3 +241,84 @@ class TestDocumentAuthorityClassification:
     def test_unknown_documents_still_internal(self):
         assert classify_document_authority("random_notes.pdf") == "INTERNAL"
         assert classify_document_authority("") == "UNKNOWN"
+
+
+class TestAggregateEntityAttribution:
+    """Issue #80: narrative text about state/national/sector aggregates must
+    attribute to the aggregate entity, not the 'Unspecified Mine' bucket.
+
+    Found live: 105 of 144 metrics extracted from the Ministry of Coal
+    Provisional Coal Statistics 2022-23 landed in 'Unspecified Mine' because
+    the narrative extractor only recognized mine-shaped entities — silently
+    defeating cross-document conflict detection.
+    """
+
+    def test_all_india_narrative_attributes_to_all_india(self):
+        text = ("Production of Raw Coal in the country during 2022-23 was "
+                "893.190 Million Tonnes")
+        tuples = extract_entity_tuples_from_text(text, page_number=27)
+        assert tuples, "narrative extraction must fire on the All India line"
+        assert any(t["mine_name"] == "All India" for t in tuples)
+
+    def test_state_narrative_attributes_to_state(self):
+        text = "Odisha produced 154.200 Million Tonnes of coal during 2022-23"
+        tuples = extract_entity_tuples_from_text(text, page_number=27)
+        assert any(t["mine_name"] == "Odisha" for t in tuples)
+
+    def test_sector_narrative_attributes_to_sector(self):
+        text = "Production from public sector mines was 853.861 Million Tonnes"
+        tuples = extract_entity_tuples_from_text(text, page_number=27)
+        assert any(t["mine_name"] == "Public Sector" for t in tuples)
+
+    def test_mine_narrative_still_attributes_to_mine(self):
+        text = "Gevra OpenCast produced 52.50 Million Tonnes during 2023-24"
+        tuples = extract_entity_tuples_from_text(text, page_number=42)
+        assert tuples and tuples[0]["mine_name"] != "Unspecified Mine"
+        assert "gevra" in tuples[0]["mine_name"].lower()
+
+    def test_unattributable_values_stay_unspecified(self):
+        # no mine, no state, no sector — must remain the honest fallback
+        text = "The annual target for the period was set at 12.5 Million Tonnes"
+        tuples = extract_entity_tuples_from_text(text, page_number=9)
+        if tuples:
+            assert all(t["mine_name"] == "Unspecified Mine" for t in tuples)
+
+    def test_aggregates_flow_into_conflict_engine(self):
+        """Aggregate entity names must pass the conflict engine's generic-name
+        exclusion so cross-source discrepancies at state/national level can be
+        detected between two real documents."""
+        from app.services.conflict_service import is_generic_mine_name
+        for name in ["All India", "Odisha", "Public Sector", "Captive & Commercial Blocks"]:
+            assert is_generic_mine_name(name) is False, name
+        assert is_generic_mine_name("Unspecified Mine") is True
+
+
+class TestProximityAggregateAttribution:
+    """Issue #80 follow-up: proximity-aware aggregate attribution, using the
+    EXACT narrative phrasings from the Ministry of Coal Provisional Coal
+    Statistics 2022-23 (found live during ingestion)."""
+
+    def test_national_figure_in_india_phrasing(self):
+        text = ("In the year 2022-23, total production of raw coal in India was "
+                "893.190 MT whereas it was 778.210 MT in 2021-22")
+        tuples = extract_entity_tuples_from_text(text, page_number=27)
+        assert tuples
+        assert all(t["mine_name"] == "All India" for t in tuples)
+
+    def test_state_ranking_sentence_attributes_each_value_correctly(self):
+        text = ("In the year 2022-23, Odisha registered highest coal production "
+                "of 218.981 MT (24.52%), followed by Chhattisgarh 184.895 MT "
+                "(20.70%), Jharkhand 156.445 MT (17.52%)")
+        tuples = extract_entity_tuples_from_text(text, page_number=27)
+        by_value = {t["numeric_value"]: t["mine_name"] for t in tuples}
+        assert by_value.get(218.981) == "Odisha"
+        assert by_value.get(184.895) == "Chhattisgarh"
+        assert by_value.get(156.445) == "Jharkhand"
+
+    def test_table_label_cannot_steal_narrative_state_figure(self):
+        # 'All India' appears in a table ABOVE the line; the value belongs to Odisha
+        text = ("All India 60.760 832.430 893.190\n"
+                "In the year 2022-23, Odisha registered highest coal production of 218.981 MT")
+        tuples = extract_entity_tuples_from_text(text, page_number=27)
+        by_value = {t["numeric_value"]: t["mine_name"] for t in tuples}
+        assert by_value.get(218.981) == "Odisha", "line-proximity must beat table label 180 chars away"

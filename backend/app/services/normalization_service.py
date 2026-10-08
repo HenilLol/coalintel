@@ -445,6 +445,55 @@ def extract_entity_tuples_from_text(
         # Step 2: Entity & Mine Extraction (Line-proximity first, specific over generic)
         detected_mine = None
 
+        # Issue #80: geographic / sector / national aggregate attribution.
+        # Real government narrative text ("All India production of raw coal was
+        # 893.190 MT", "Odisha registered highest coal production of 218.981 MT")
+        # attributes to aggregate entities, not mines. Attribution is
+        # PROXIMITY-AWARE and line-first: the candidate nearest the numeric
+        # value wins, so a table's 'All India' label 180 chars earlier cannot
+        # steal a state's narrative figure on the current line.
+        detected_aggregate = None
+
+        _AGG_CANDIDATE_PATTERNS = (
+            ("All India", re.compile(r"\ball\s+india\b", re.IGNORECASE)),
+            ("All India", re.compile(r"\b(?:in|of|for)\s+the\s+country\b", re.IGNORECASE)),
+            ("All India", re.compile(r"\b(?:in|of)\s+india\b", re.IGNORECASE)),
+        ) + tuple(
+            (state, re.compile(r"\b" + re.escape(state) + r"\b", re.IGNORECASE))
+            for state in INDIAN_COAL_STATES
+        ) + (
+            ("Public Sector", re.compile(r"\bpublic\s+sector\b", re.IGNORECASE)),
+            ("Private Sector", re.compile(r"\bprivate\s+sector\b", re.IGNORECASE)),
+            ("Captive & Commercial Blocks", re.compile(r"\bcaptive\s*(?:&|and)\s*commercial\b", re.IGNORECASE)),
+        )
+
+        def _nearest_aggregate(haystack: str, value_offset_in_hay: int):
+            """Returns the candidate aggregate whose mention is closest to the
+            numeric value (preceding mentions win ties)."""
+            best = None
+            best_dist = float("inf")
+            for label, pattern in _AGG_CANDIDATE_PATTERNS:
+                for m in pattern.finditer(haystack):
+                    # preceding mentions: distance from mention END to value;
+                    # following mentions: distance from value to mention START
+                    dist = (value_offset_in_hay - m.end()) if m.end() <= value_offset_in_hay \
+                        else (m.start() - value_offset_in_hay) + 10_000  # deprioritize following
+                    if dist < best_dist:
+                        best_dist = dist
+                        best = label
+            return best
+
+        value_offset_in_line = match.start() - line_start
+        detected_aggregate = _nearest_aggregate(current_line, value_offset_in_line)
+        if not detected_aggregate and line_start > 0:
+            _pl_start = text.rfind("\n", 0, line_start - 1)
+            _pl_start = 0 if _pl_start == -1 else _pl_start + 1
+            _prev_line_txt = text[_pl_start:line_start - 1].strip() if line_start > 0 else ""
+            if _prev_line_txt:
+                detected_aggregate = _nearest_aggregate(_prev_line_txt, len(_prev_line_txt))
+        if not detected_aggregate:
+            detected_aggregate = _nearest_aggregate(snippet, 180)  # snippet centers the value
+
         # Check for specific known mines on current line (full name first)
         for km in KNOWN_MINES:
             if re.search(r"\b" + re.escape(km) + r"\b", current_line, re.IGNORECASE):
@@ -548,7 +597,10 @@ def extract_entity_tuples_from_text(
 
         # Safe non-misleading fallback for mine name (NO synthetic "CIL Mine" or "ECL Mine")
         if not detected_mine or detected_mine.lower() in GENERIC_MINE_PHRASES:
-            mine_name = "Unspecified Mine"
+            # Issue #80: aggregate entity (state / All India / sector) is a more
+            # accurate attribution than the "Unspecified Mine" bucket when the
+            # text clearly reports an aggregate figure
+            mine_name = detected_aggregate or "Unspecified Mine"
         else:
             mine_name = detected_mine
 
