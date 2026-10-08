@@ -1,8 +1,19 @@
 'use client';
 
 import React from 'react';
+import {
+  FileText,
+  Database,
+  Pickaxe,
+  AlertTriangle,
+  Sparkles,
+  FileSpreadsheet,
+  TrendingUp,
+  ShieldCheck,
+  CheckCircle2,
+  Layers,
+} from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
-import { Pickaxe, Layers, FileText, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { DashboardKpis } from '@/types/dashboard';
 
 interface KpiGridProps {

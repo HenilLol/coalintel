@@ -9,6 +9,7 @@ import { Logo } from '@/components/ui/Logo';
 import { useScope } from '@/context/ScopeContext';
 import { CIL_SUBSIDIARIES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
+import { GlobalSearchModal } from '@/components/layout/GlobalSearchModal';
 
 interface HeaderProps {
   onMobileMenuToggle?: () => void;
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   const router = useRouter();
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear } = useScope();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -105,6 +107,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right User & System Status */}
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        {/* Mobile Search Toggle Button */}
+        <button
+          onClick={() => setIsSearchOpen(true)}
+          className="p-2 rounded-lg bg-[#1C2226] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] lg:hidden transition-colors"
+          aria-label="Open search"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+
         {/* System Health / Status Indicator */}
         <div className="hidden 2xl:flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#242C30]/50 border border-[#30383D] text-[11px] font-mono text-[#9BA5A8]">
           <span className="relative flex h-2 w-2">
@@ -140,6 +151,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+      {/* Global Search Modal */}
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
   );
 };

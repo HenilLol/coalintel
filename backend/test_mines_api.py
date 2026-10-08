@@ -1,17 +1,17 @@
 from fastapi.testclient import TestClient
 from main import app
 
+client = TestClient(app)
 
-def test_enhanced_government_mines_api():
-    client = TestClient(app)
-
+def test_legacy_government_mines_api():
     print("--- TESTING ENHANCED GOVERNMENT MINES API (PHASE 6) ---")
 
     # 1. /api/v1/mines
-    r_mines = client.get("/api/v1/mines")
+    r_mines = client.get("/api/v1/mines?limit=100")
     print("GET /api/v1/mines status:", r_mines.status_code)
     assert r_mines.status_code == 200
-    mines = r_mines.json()
+    res_json = r_mines.json()
+    mines = res_json["data"] if isinstance(res_json, dict) and "data" in res_json else res_json
     print(f"Total canonical mines returned: {len(mines)}")
     assert len(mines) >= 60, f"Expected at least 60 mines, got {len(mines)}"
     assert "X-Total-Count" in r_mines.headers
@@ -84,24 +84,28 @@ def test_enhanced_government_mines_api():
 
     # 8. Filtered queries
     # Lignite filter
-    r_lig = client.get("/api/v1/mines?coal_or_lignite=Lignite")
+    r_lig = client.get("/api/v1/mines?coal_or_lignite=Lignite&limit=100")
     assert r_lig.status_code == 200
-    assert len(r_lig.json()) >= 10
+    lig_data = r_lig.json()["data"] if "data" in r_lig.json() else r_lig.json()
+    assert len(lig_data) >= 10
 
     # Mixed type filter
-    r_mixed = client.get("/api/v1/mines?mine_type=Mixed")
+    r_mixed = client.get("/api/v1/mines?mine_type=Mixed&limit=100")
     assert r_mixed.status_code == 200
-    assert len(r_mixed.json()) >= 4
+    mixed_data = r_mixed.json()["data"] if "data" in r_mixed.json() else r_mixed.json()
+    assert len(mixed_data) >= 4
 
     # Operational status filter
-    r_dev = client.get("/api/v1/mines?status=UNDER_DEVELOPMENT")
+    r_dev = client.get("/api/v1/mines?status=UNDER_DEVELOPMENT&limit=100")
     assert r_dev.status_code == 200
-    assert len(r_dev.json()) >= 3
+    dev_data = r_dev.json()["data"] if "data" in r_dev.json() else r_dev.json()
+    assert len(dev_data) >= 3
 
     # Sorting by production desc
-    r_sort = client.get("/api/v1/mines?sort_by=production&sort_order=desc")
+    r_sort = client.get("/api/v1/mines?sort_by=production&sort_order=desc&limit=100")
     assert r_sort.status_code == 200
-    top_mine = r_sort.json()[0]
+    sort_data = r_sort.json()["data"] if "data" in r_sort.json() else r_sort.json()
+    top_mine = sort_data[0]
     print(f"\nTop producing mine: {top_mine['mine_name']} with {top_mine['production_fy25_26']} MT")
     assert top_mine["production_fy25_26"] is not None and top_mine["production_fy25_26"] > 50
 
@@ -110,8 +114,10 @@ def test_enhanced_government_mines_api():
     r_det = client.get(f"/api/v1/mines/{sample_id}")
     assert r_det.status_code == 200
     det = r_det.json()
-    print(f"Mine detail for {det['mine_name']}: {len(det['yearly_metrics'])} yearly metrics")
-    assert len(det["yearly_metrics"]) == 3
+    mine_obj = det["mine"] if "mine" in det else det
+    hist_metrics = det.get("historical_metrics", det.get("yearly_metrics", []))
+    print(f"Mine detail for {mine_obj['mine_name']}: {len(hist_metrics)} yearly metrics")
+    assert len(hist_metrics) >= 3
 
     # 10. Backward-compatible alias /mines-summary-stats
     r_alias = client.get("/api/v1/mines-summary-stats")
@@ -121,4 +127,4 @@ def test_enhanced_government_mines_api():
 
 
 if __name__ == "__main__":
-    test_enhanced_government_mines_api()
+    test_legacy_government_mines_api()

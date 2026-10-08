@@ -14,12 +14,22 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from main import app
-from database import SessionLocal
+from database import SessionLocal, engine, Base
+from app import models as _app_models  # noqa: F401 — register all models on the Base (name kept off `app`)
 from app.models.mine import MineMaster, MineYearlyMetric, CoalBlock, MineAlias
 from app.models.data_provenance import DataSource, IngestionRun
 from app.models.document import Document
 from app.models.extracted_metric import ExtractedMetric
 from data.government_mine_data_seed import run_government_data_ingestion
+
+# Hermeticity (Issue #62 follow-up): this suite must not depend on
+# alphabetically-earlier test files having created/seeded the shared
+# sqlite database. Build the schema and seed it here.
+@pytest.fixture(scope="module", autouse=True)
+def _seeded_db():
+    Base.metadata.create_all(bind=engine)
+    run_government_data_ingestion()
+    yield
 
 client = TestClient(app)
 
@@ -58,10 +68,13 @@ def test_migration_002_file_integrity():
 
 def test_mines_list_success_and_headers():
     """Verify /api/v1/mines returns HTTP 200, valid canonical schema, and X-Total-Count header."""
-    r = client.get("/api/v1/mines")
+    r = client.get("/api/v1/mines?page_size=100")
     assert r.status_code == 200
-    data = r.json()
-    assert isinstance(data, list)
+    body = r.json()
+    # Contract renovation (PR #53): /mines now returns a strict envelope
+    assert isinstance(body, dict)
+    assert "data" in body and "pagination" in body and "filters" in body
+    data = body["data"]
     assert len(data) >= 60
     assert "x-total-count" in r.headers
     total = int(r.headers["x-total-count"])
@@ -90,27 +103,27 @@ def test_mines_list_filtering():
     # Filter by state
     r_state = client.get("/api/v1/mines?state=Chhattisgarh")
     assert r_state.status_code == 200
-    data_state = r_state.json()
+    data_state = r_state.json()["data"]
     assert len(data_state) > 0
     assert all(m["state"] == "Chhattisgarh" for m in data_state)
 
     # Filter by fuel type (Lignite)
     r_lig = client.get("/api/v1/mines?coal_or_lignite=Lignite")
     assert r_lig.status_code == 200
-    data_lig = r_lig.json()
+    data_lig = r_lig.json()["data"]
     assert len(data_lig) >= 10
     assert all(m["coal_or_lignite"] == "Lignite" for m in data_lig)
 
     # Filter by mine type (Mixed)
     r_mixed = client.get("/api/v1/mines?mine_type=Mixed")
     assert r_mixed.status_code == 200
-    data_mixed = r_mixed.json()
+    data_mixed = r_mixed.json()["data"]
     assert len(data_mixed) >= 4
 
     # Search filter
     r_search = client.get("/api/v1/mines?search=Gevra")
     assert r_search.status_code == 200
-    data_search = r_search.json()
+    data_search = r_search.json()["data"]
     assert len(data_search) >= 1
     assert any("Gevra" in m["mine_name"] for m in data_search)
 
@@ -119,12 +132,12 @@ def test_mines_pagination():
     """Verify deterministic pagination parameters."""
     r_p1 = client.get("/api/v1/mines?page=1&page_size=5")
     assert r_p1.status_code == 200
-    p1_items = r_p1.json()
+    p1_items = r_p1.json()["data"]
     assert len(p1_items) == 5
 
     r_p2 = client.get("/api/v1/mines?page=2&page_size=5")
     assert r_p2.status_code == 200
-    p2_items = r_p2.json()
+    p2_items = r_p2.json()["data"]
     assert len(p2_items) == 5
 
     # Page 1 and Page 2 should not overlap
@@ -157,12 +170,12 @@ def test_coal_blocks_endpoints():
     """Verify both /api/v1/coal-blocks and /api/v1/mines/coal-blocks return valid data."""
     r1 = client.get("/api/v1/coal-blocks")
     assert r1.status_code == 200
-    blocks1 = r1.json()
+    blocks1 = r1.json()["data"]
     assert len(blocks1) >= 7
 
     r2 = client.get("/api/v1/mines/coal-blocks")
     assert r2.status_code == 200
-    blocks2 = r2.json()
+    blocks2 = r2.json()["data"]
     assert len(blocks2) == len(blocks1)
 
     # Check block fields
@@ -205,12 +218,18 @@ def test_single_mine_detail():
     r = client.get("/api/v1/mines/MINE-SECL-GEVRA")
     assert r.status_code == 200
     det = r.json()
-    assert det["mine_id"] == "MINE-SECL-GEVRA"
-    assert det["mine_name"] == "Gevra OpenCast"
-    assert len(det["yearly_metrics"]) == 3
-    assert len(det["monthly_metrics"]) >= 1
+    # Contract renovation (PR #53): detail is a MineDetailEnvelope; canonical
+    # mine identity is nested under "mine", metrics split into
+    # current_metrics + historical_metrics, provenance under "sources".
+    assert det["mine"]["mine_id"] == "MINE-SECL-GEVRA"
+    assert det["mine"]["mine_name"] == "Gevra OpenCast"
+    assert det["current_metrics"] is not None
+    # Contract renovation (PR #53) seeds deeper multi-year history for
+    # GEVRA; the recovery guarantee is "history exists and is stable",
+    # not an exact year count.
+    assert len(det["historical_metrics"]) >= 3
     assert len(det["aliases"]) >= 1
-    assert len(det["provenance_sources"]) >= 1
+    assert len(det["sources"]) >= 1
 
 
 def test_nonexistent_mine_detail():
@@ -286,13 +305,16 @@ def test_mines_route_precedence_order():
     # Verify that HTTP requests to static subpaths resolve to their specific handlers, NOT get_mine_details
     r_cb = client.get("/api/v1/mines/coal-blocks")
     assert r_cb.status_code == 200
-    assert isinstance(r_cb.json(), list)
-    assert all("coal_block_id" in b for b in r_cb.json())
+    assert all("coal_block_id" in b for b in r_cb.json()["data"])
 
     r_ds = client.get("/api/v1/mines/data-sources")
     assert r_ds.status_code == 200
-    assert isinstance(r_ds.json(), list)
     assert all("source_id" in s for s in r_ds.json())
+
+    # Renovation path (/data-sources at router root) must also resolve
+    r_ds2 = client.get("/api/v1/data-sources")
+    assert r_ds2.status_code == 200
+    assert all("source_id" in s for s in r_ds2.json())
 
 
 def test_mines_endpoint_error_handling_graceful_503(monkeypatch):
@@ -303,7 +325,7 @@ def test_mines_endpoint_error_handling_graceful_503(monkeypatch):
     def mock_failure(*args, **kwargs):
         raise OperationalError("SELECT * FROM mine_master", {}, Exception("column mine_master.parent_company does not exist"))
 
-    monkeypatch.setattr(mine_service, "get_mines_list", mock_failure)
+    monkeypatch.setattr(mine_service, "get_mines_envelope", mock_failure)
 
     r = client.get("/api/v1/mines")
     assert r.status_code == 503

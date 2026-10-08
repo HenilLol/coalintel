@@ -10,17 +10,34 @@ import { FilterBar } from '@/components/dashboard/FilterBar';
 import { KpiGrid } from '@/components/dashboard/KpiGrid';
 import { ProductionChart } from '@/components/dashboard/ProductionChart';
 import { ValidationFeedWidget } from '@/components/dashboard/ValidationFeedWidget';
+import { DataPipeline3D } from '@/components/3d/DataPipeline3D';
+import { GeologicalCrossSection3D } from '@/components/3d/GeologicalCrossSection3D';
 import { dashboardApi } from '@/lib/api/dashboardApi';
 import { documentApi } from '@/lib/api/documentApi';
 import { DashboardKpis, ProductionSeriesItem, ValidationFeedItem } from '@/types/dashboard';
 import { DocumentItem } from '@/types/document';
 import { useScope } from '@/context/ScopeContext';
-import { Upload, FileText, Activity, ArrowRight, Database, Mountain } from 'lucide-react';
+import {
+  Upload,
+  FileText,
+  Activity,
+  ArrowRight,
+  Database,
+  Mountain,
+  Sparkles,
+  BarChart3,
+  Layers,
+  GitCompare,
+  ShieldCheck,
+  Clock,
+  ExternalLink,
+} from 'lucide-react';
 
 export default function DashboardPage() {
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear, setSelectedFiscalYear } = useScope();
   const [isLoading, setIsLoading] = useState(false);
   const [isApiConnected, setIsApiConnected] = useState(false);
+  const [activeCenterView, setActiveCenterView] = useState<'analytics' | 'geology'>('analytics');
 
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [productionData, setProductionData] = useState<ProductionSeriesItem[]>([]);
@@ -76,10 +93,10 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
-        title="Executive Mining Intelligence Dashboard"
-        description="Unified operational insights, unit-normalized production metrics, arithmetic validation, and cross-document discrepancy tracking across CIL subsidiaries and canonical Government of India mines."
-        breadcrumbs={[{ label: 'Executive Dashboard' }]}
-        badge={<Badge variant="gold">Government Verified Data</Badge>}
+        title="COALINTEL INTELLIGENCE CENTER"
+        description="Unified operational telemetry, unit-normalized production intelligence, deterministic arithmetic verification, and real-time cross-document discrepancy tracking across CIL subsidiaries."
+        breadcrumbs={[{ label: 'Intelligence Center' }]}
+        badge={<Badge variant="amber">SIH26023 Live Command</Badge>}
         actions={
           <div className="flex items-center gap-2">
             <Link href="/mines">
@@ -106,40 +123,88 @@ export default function DashboardPage() {
         isLoading={isLoading}
       />
 
-      {/* KPI Overview Grid with visual hierarchy */}
+      {/* Top-Level 6 Intelligence Telemetry Cards */}
       <section aria-label="Key Performance Indicators">
         <KpiGrid kpis={kpis} loading={isLoading} isApiConnected={isApiConnected} />
       </section>
 
-      {/* Charts & Validation Feed Grid */}
-      <section aria-label="Production Charts and Validation Feed" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        <ProductionChart
-          data={productionData}
-          loading={isLoading}
-          isApiConnected={isApiConnected}
-        />
-        <ValidationFeedWidget items={validationItems} loading={isLoading} />
+      {/* 3D Intelligence Flow Pipeline */}
+      <section aria-label="3D Intelligence Lifecycle Pipeline">
+        <DataPipeline3D />
       </section>
 
-      {/* Recent Ingestion & Evidence Activity Stream */}
-      <section aria-label="Recent Ingestion Stream">
+      {/* Center View Selector & Analytics/Geology Workspace */}
+      <div className="flex items-center justify-between border-b border-[#30383D] pb-2 pt-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveCenterView('analytics')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-colors ${
+              activeCenterView === 'analytics'
+                ? 'bg-[#C58B3A]/20 border border-[#C58B3A] text-[#E8ECEB] font-bold shadow-glow-amber'
+                : 'text-[#9BA5A8] hover:text-[#E8ECEB] bg-[#1C2226]'
+            }`}
+          >
+            <BarChart3 className="h-4 w-4 text-[#C58B3A]" />
+            <span>Production & Despatch Analytics</span>
+          </button>
+
+          <button
+            onClick={() => setActiveCenterView('geology')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-colors ${
+              activeCenterView === 'geology'
+                ? 'bg-[#14B8A6]/20 border border-[#14B8A6] text-[#E8ECEB] font-bold shadow-glow-teal'
+                : 'text-[#9BA5A8] hover:text-[#E8ECEB] bg-[#1C2226]'
+            }`}
+          >
+            <Mountain className="h-4 w-4 text-[#14B8A6]" />
+            <span>3D Geological Strata Model</span>
+          </button>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-[#9BA5A8]">
+          <Clock className="h-3.5 w-3.5 text-[#C58B3A]" />
+          <span>Real-Time Stream Active</span>
+        </div>
+      </div>
+
+      {/* Main Workspace: Active Center View + Validation Feed Widget */}
+      <section aria-label="Analytics and Validation Center" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <div className="lg:col-span-2">
+          {activeCenterView === 'analytics' ? (
+            <ProductionChart
+              data={productionData}
+              loading={isLoading}
+              isApiConnected={isApiConnected}
+            />
+          ) : (
+            <GeologicalCrossSection3D />
+          )}
+        </div>
+
+        <div className="lg:col-span-1">
+          <ValidationFeedWidget items={validationItems} loading={isLoading} />
+        </div>
+      </section>
+
+      {/* LIVE INTELLIGENCE FEED TIMELINE */}
+      <section aria-label="Live Intelligence Feed Stream">
         <Card className="border-[#30383D] bg-[#1C2226]">
-          <CardHeader>
+          <CardHeader className="py-3.5 px-4 bg-[#151A1D] border-b border-[#30383D]">
             <div className="flex items-center justify-between">
-              <CardTitle>
-                <Activity className="h-5 w-5 text-[#C58B3A]" />
-                <span>Recent Ingestion & Evidence Traceability Stream</span>
+              <CardTitle className="text-sm font-bold text-[#E8ECEB] flex items-center gap-2">
+                <Activity className="h-4 w-4 text-[#C58B3A] animate-pulse" />
+                <span>Live Intelligence Feed & Event Ledger</span>
               </CardTitle>
               <Link
                 href="/documents"
                 className="text-xs text-[#C58B3A] hover:text-[#D6A052] font-mono flex items-center gap-1 transition-colors"
               >
-                <span>View Full Repository</span>
+                <span>View Full Catalog</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
-            <CardDescription>
-              Audit stream of recently ingested documents, parsed vector chunks, and extracted mining metrics across CIL subsidiaries.
+            <CardDescription className="text-xs text-[#9BA5A8]">
+              Automated operational timeline tracking newly parsed vector chunks, arithmetic audits, and cross-document discrepancy flags.
             </CardDescription>
           </CardHeader>
 

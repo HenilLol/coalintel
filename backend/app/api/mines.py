@@ -1,7 +1,7 @@
-import logging
 from typing import List, Optional, Any, Dict
-from fastapi import APIRouter, Depends, Query, HTTPException, Response
-from starlette import status as http_status
+import logging
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
+from fastapi import status as http_status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
@@ -13,70 +13,93 @@ from app.schemas.mine import (
     DataSourceResponse,
     DataConflictRecordResponse,
     DataValidationResultResponse,
-    DimensionCountResponse
+    DimensionCountResponse,
+)
+from app.schemas.contracts import (
+    MineListEnvelope,
+    MineDetailEnvelope,
+    MineHistoryEnvelope,
+    MineFiltersOptionsResponse,
+    MineYearsResponse,
+    MineAnalyticsResponse,
+    MineAnalyticsTrendResponse,
+    CoalBlocksEnvelope,
+    CoalBlockSummaryResponse,
+    CoalBlockTrendResponse,
+    SourcesResponse,
+    CoverageResponse,
+    CoverageSourceResponse,
+    ReconciliationResponse,
+    ReconciliationSummaryResponse,
 )
 from app.services import mine_service
 
-logger = logging.getLogger("COALINTEL-MINES-API")
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["Government Mine Intelligence"])
 
 
-@router.get("/mines", response_model=List[MineSummaryResponse])
+# -------------------------------------------------------------------------
+# Exact Contract: /mines with envelope
+# -------------------------------------------------------------------------
+@router.get("/mines", response_model=MineListEnvelope)
 def get_mines(
     response: Response,
-    fiscal_year: Optional[str] = Query(None, description="Fiscal year filter, e.g. '2024-25', '2025-26', '2026-27'"),
-    subsidiary: Optional[str] = Query(None, description="Subsidiary filter, e.g. 'SECL', 'MCL', 'NCL'"),
-    company: Optional[str] = Query(None, description="Company filter, e.g. 'Coal India Limited', 'NTPC'"),
-    state: Optional[str] = Query(None, description="State filter, e.g. 'Chhattisgarh', 'Odisha', 'Tamil Nadu'"),
-    district: Optional[str] = Query(None, description="District filter"),
-    mine_type: Optional[str] = Query(None, description="Mine type, e.g. 'OC', 'UG', 'Mixed'"),
-    sector: Optional[str] = Query(None, description="Sector/Ownership filter, e.g. 'CIL', 'Captive', 'Commercial'"),
-    ownership: Optional[str] = Query(None, description="Ownership filter"),
-    coal_or_lignite: Optional[str] = Query(None, description="Fuel filter, e.g. 'Coal', 'Lignite'"),
-    status: Optional[str] = Query(None, description="Operational status, e.g. 'PRODUCING', 'UNDER_DEVELOPMENT'"),
-    search: Optional[str] = Query(None, description="Search term for mine name, ID, state, district, or company"),
+    financial_year: Optional[str] = Query("2024-25", description="Financial year strictly in YYYY-YY format, e.g. '2024-25', '2025-26', '2026-27'"),
+    fiscal_year: Optional[str] = Query(None, description="Alias for financial_year"),
+    state: Optional[str] = Query(None, description="State filter, e.g. 'Chhattisgarh', 'Odisha'"),
+    ownership_type: Optional[str] = Query(None, description="Ownership filter, e.g. 'CIL', 'Captive', 'Commercial'"),
+    sector: Optional[str] = Query(None, description="Sector filter"),
+    commodity: Optional[str] = Query(None, description="Commodity filter, e.g. 'coal', 'lignite'"),
+    operational_status: Optional[str] = Query(None, description="Operational status, e.g. 'operational', 'under_development'"),
+    captive_or_commercial: Optional[str] = Query(None, description="Captive vs Commercial filter"),
+    company: Optional[str] = Query(None, description="Company filter"),
+    subsidiary: Optional[str] = Query(None, description="Subsidiary filter"),
+    coal_or_lignite: Optional[str] = Query(None, description="Fuel filter"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Status filter"),
+    search: Optional[str] = Query(None, description="Search across mine name, ID, state, district, or company"),
+    page: int = Query(1, ge=1, description="1-indexed page number"),
+    page_size: int = Query(25, ge=1, le=500, description="Items per page"),
     sort_by: Optional[str] = Query("name", description="Sort by 'name', 'production', 'state', 'subsidiary', 'type', 'status'"),
     sort_order: Optional[str] = Query("asc", description="Sort order 'asc' or 'desc'"),
-    page: Optional[int] = Query(None, ge=1, description="1-indexed page number"),
-    page_size: Optional[int] = Query(None, ge=1, le=500, description="Items per page"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    skip: Optional[int] = Query(None, ge=0),
+    limit: Optional[int] = Query(None, ge=1, le=500),
     db: Session = Depends(get_db)
 ):
     """
-    Returns authentic Government of India canonical mines data.
-    Supports search, multi-field filtering, sorting, and pagination.
-    Emits X-Total-Count header for pagination awareness.
+    Returns authentic Government of India canonical mines data in strict contract envelope:
+    { "data": [...], "pagination": { "page", "page_size", "total_records", "total_pages" }, "filters": { ... } }
     """
-    actual_skip = skip
-    actual_limit = limit
-    if page is not None and page_size is not None:
-        actual_skip = (page - 1) * page_size
-        actual_limit = page_size
-    elif page_size is not None:
-        actual_limit = page_size
+    fy = fiscal_year or financial_year or "2024-25"
+    actual_page = page
+    actual_size = page_size
+    if skip is not None and limit is not None:
+        actual_page = (skip // limit) + 1
+        actual_size = limit
+    elif limit is not None:
+        actual_size = limit
 
+    # Production recovery handling (from main): operational DB failures must
+    # surface as controlled 503, not unhandled 500.
     try:
-        items, total_count = mine_service.get_mines_list(
+        envelope = mine_service.get_mines_envelope(
             db=db,
-            fiscal_year=fiscal_year,
-            subsidiary=subsidiary,
-            company=company,
+            financial_year=fy,
             state=state,
-            district=district,
-            mine_type=mine_type,
+            ownership_type=ownership_type,
             sector=sector,
-            ownership=ownership,
+            commodity=commodity,
+            operational_status=operational_status or status_filter,
+            captive_or_commercial=captive_or_commercial,
+            company=company,
+            subsidiary=subsidiary,
             coal_or_lignite=coal_or_lignite,
-            status=status,
             search=search,
+            page=actual_page,
+            page_size=actual_size,
             sort_by=sort_by,
             sort_order=sort_order,
-            skip=actual_skip,
-            limit=actual_limit
         )
-        response.headers["X-Total-Count"] = str(total_count)
-        return items
     except (OperationalError, ProgrammingError) as db_err:
         logger.error(f"Database error in get_mines: {db_err}")
         raise HTTPException(
@@ -84,213 +107,271 @@ def get_mines(
             detail="Mine Intelligence registry is temporarily unavailable. Database migration or synchronization in progress."
         )
 
+    response.headers["X-Total-Count"] = str(envelope.pagination.total_records)
+    return envelope
+
+
+# -------------------------------------------------------------------------
+# Static Sub-routes for /mines/... (MUST precede /{mine_id})
+# -------------------------------------------------------------------------
+@router.get("/mines/filters", response_model=MineFiltersOptionsResponse)
+def get_mine_filters(
+    financial_year: Optional[str] = Query(None, description="Selected financial year"),
+    db: Session = Depends(get_db)
+):
+    """Returns available dynamic filter options for canonical mines."""
+    return mine_service.get_mine_filters_options(db=db, financial_year=financial_year)
+
+
+@router.get("/mines/years", response_model=MineYearsResponse)
+def get_mine_years(db: Session = Depends(get_db)):
+    """Returns available financial years strictly formatted as YYYY-YY."""
+    return mine_service.get_mine_years(db=db)
+
+
+@router.get("/mines/analytics", response_model=MineAnalyticsResponse)
+def get_mine_analytics(
+    financial_year: Optional[str] = Query("2024-25", description="Financial year in YYYY-YY format"),
+    db: Session = Depends(get_db)
+):
+    """Returns aggregated analytics for canonical mines for a specified financial year."""
+    return mine_service.get_mine_analytics(db=db, financial_year=financial_year)
+
+
+@router.get("/mines/analytics/trend", response_model=MineAnalyticsTrendResponse)
+def get_mine_analytics_trend(db: Session = Depends(get_db)):
+    """Returns multi-year production and achievement trend across financial years."""
+    return mine_service.get_mine_analytics_trend(db=db)
+
 
 @router.get("/mines/stats")
 def get_mines_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """
-    Returns comprehensive summary statistics and dimensional breakdowns
-    across canonical mines, fuel types, mine types, states, and sectors.
-    """
-    try:
-        return mine_service.get_mines_stats_data(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mines_stats: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine Intelligence statistics service is temporarily unavailable."
-        )
-
-
-@router.get("/mines-summary-stats")
-def get_mines_summary_stats_alias(db: Session = Depends(get_db)):
-    """Backward-compatible alias for /mines/stats."""
-    try:
-        return mine_service.get_mines_stats_data(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mines_summary_stats_alias: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine Intelligence statistics service is temporarily unavailable."
-        )
+    """Returns comprehensive summary statistics and dimensional breakdowns."""
+    return mine_service.get_mines_stats_data(db=db)
 
 
 @router.get("/mines/states", response_model=List[DimensionCountResponse])
 def get_mines_states(db: Session = Depends(get_db)):
     """Returns dynamic list of all represented states with canonical mine counts."""
-    try:
-        return mine_service.get_states_list(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mines_states: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine Intelligence states service is temporarily unavailable."
-        )
+    return mine_service.get_states_list(db=db)
 
 
 @router.get("/mines/subsidiaries", response_model=List[DimensionCountResponse])
 def get_mines_subsidiaries(db: Session = Depends(get_db)):
     """Returns dynamic list of all operating subsidiaries with canonical mine counts."""
-    try:
-        return mine_service.get_subsidiaries_list(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mines_subsidiaries: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine Intelligence subsidiaries service is temporarily unavailable."
-        )
+    return mine_service.get_subsidiaries_list(db=db)
 
 
 @router.get("/mines/sectors", response_model=List[DimensionCountResponse])
 def get_mines_sectors(db: Session = Depends(get_db)):
     """Returns dynamic list of ownership sectors with canonical mine counts."""
-    try:
-        return mine_service.get_sectors_list(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mines_sectors: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine Intelligence sectors service is temporarily unavailable."
-        )
+    return mine_service.get_sectors_list(db=db)
 
 
 @router.get("/mines/types", response_model=List[DimensionCountResponse])
-@router.get("/mines/mine-types", response_model=List[DimensionCountResponse])
 def get_mines_types(db: Session = Depends(get_db)):
     """Returns dynamic list of mine types (OC, UG, Mixed) with canonical mine counts."""
-    try:
-        return mine_service.get_mine_types_list(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mines_types: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine Intelligence mine types service is temporarily unavailable."
-        )
+    return mine_service.get_mine_types_list(db=db)
 
 
 @router.get("/mines/companies", response_model=List[DimensionCountResponse])
 def get_mines_companies(db: Session = Depends(get_db)):
     """Returns dynamic list of operating companies with canonical mine counts."""
-    try:
-        return mine_service.get_companies_list(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mines_companies: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine Intelligence companies service is temporarily unavailable."
-        )
+    return mine_service.get_companies_list(db=db)
 
 
-@router.get("/coal-blocks", response_model=List[CoalBlockResponse])
-@router.get("/mines/coal-blocks", response_model=List[CoalBlockResponse])
-def get_coal_blocks(
+@router.get("/mines-summary-stats")
+def get_mines_summary_stats_alias(db: Session = Depends(get_db)):
+    """Backward-compatible alias for /mines/stats."""
+    return mine_service.get_mines_stats_data(db=db)
+
+
+# -------------------------------------------------------------------------
+# Dynamic /mines/{mine_id} Sub-routes
+# -------------------------------------------------------------------------
+# Route-precedence alias (production fix on main): the static
+# /mines/coal-blocks path must be declared BEFORE /mines/{mine_id}, or the
+# parametrized route shadows it and the alias 404s ("coal-blocks" parsed as a
+# mine_id). Kept the renovated envelope response_model (PR #53).
+@router.get("/mines/coal-blocks", response_model=CoalBlocksEnvelope)
+def get_coal_blocks_alias(
     search: Optional[str] = Query(None, description="Search term for block name, allottee, or coalfield"),
     state: Optional[str] = Query(None, description="State filter"),
     allocation_status: Optional[str] = Query(None, description="Allocation status, e.g. 'Operational', 'Under Development'"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """
-    Returns captive and commercial coal blocks allocated by the Nominated Authority, Ministry of Coal.
-    Supported under both /coal-blocks and /mines/coal-blocks.
-    """
-    try:
-        return mine_service.get_coal_blocks_list(
-            db=db,
-            search=search,
-            state=state,
-            allocation_status=allocation_status,
-            skip=skip,
-            limit=limit
-        )
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_coal_blocks: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Coal blocks registry service is temporarily unavailable."
-        )
+    return mine_service.get_coal_blocks_envelope(
+        db=db, search=search, state=state,
+        operational_status=allocation_status, page=page, page_size=page_size,
+    )
 
 
-@router.get("/data-sources", response_model=List[DataSourceResponse])
+# Legacy alias (production fix on main): must be registered BEFORE
+# /mines/{mine_id}, otherwise "data-sources" is captured as a mine_id.
+# The main branch's canonical path is /mines/data-sources; the renovation
+# renamed it to /data-sources. Keep both to preserve API compatibility.
 @router.get("/mines/data-sources", response_model=List[DataSourceResponse])
-def get_data_sources(db: Session = Depends(get_db)):
-    """
-    Returns the authoritative Government of India data source catalog (Tiers 1-6)
-    with publication dates, document titles, reference numbers, and verification statuses.
-    Supported under both /data-sources and /mines/data-sources.
-    """
-    try:
-        return mine_service.get_data_sources_list(db=db)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_data_sources: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Data sources catalog is temporarily unavailable."
-        )
+def get_data_sources_main_alias(db: Session = Depends(get_db)):
+    """Legacy endpoint (main-branch path) returning list of authoritative data sources."""
+    return mine_service.get_data_sources_list(db=db)
 
 
-@router.get("/data-conflicts", response_model=List[DataConflictRecordResponse])
-@router.get("/mines/conflicts", response_model=List[DataConflictRecordResponse])
-@router.get("/mines/data-conflicts", response_model=List[DataConflictRecordResponse])
-def get_data_conflicts(
-    resolution_status: Optional[str] = Query(None, description="Filter by resolution status, e.g. 'RESOLVED', 'OPEN'"),
+@router.get("/mines/{mine_id}/history", response_model=MineHistoryEnvelope)
+def get_mine_history(
+    mine_id: str,
     db: Session = Depends(get_db)
 ):
-    """
-    Returns cross-document discrepancy records identified between official publications.
-    """
-    try:
-        return mine_service.get_data_conflicts_list(db=db, resolution_status=resolution_status)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_data_conflicts: {db_err}")
+    """Returns complete multi-year production and dispatch history for a single mine."""
+    history_env = mine_service.get_mine_history_envelope(db=db, mine_id=mine_id)
+    if not history_env:
         raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Data conflicts service is temporarily unavailable."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Mine with ID '{mine_id}' not found in canonical registry."
         )
+    return history_env
 
 
-@router.get("/data-validations", response_model=List[DataValidationResultResponse])
-@router.get("/mines/validations", response_model=List[DataValidationResultResponse])
-@router.get("/mines/data-validations", response_model=List[DataValidationResultResponse])
-def get_data_validations(
-    status_filter: Optional[str] = Query(None, description="Filter by status, e.g. 'VERIFIED_EXACT', 'WITHIN_TOLERANCE', 'DISCREPANCY_NOTED'"),
-    db: Session = Depends(get_db)
-):
-    """
-    Returns arithmetic verification checks (sum of mines vs company/state/national benchmarks).
-    """
-    try:
-        return mine_service.get_data_validations_list(db=db, status_filter=status_filter)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_data_validations: {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Data validations service is temporarily unavailable."
-        )
-
-
-# IMPORTANT: Parameterized route /{mine_id} placed AFTER all specific static subpaths
-@router.get("/mines/{mine_id}", response_model=MineDetailResponse)
+@router.get("/mines/{mine_id}", response_model=MineDetailEnvelope)
 def get_mine_details(
     mine_id: str,
+    financial_year: Optional[str] = Query(None, description="Optional financial year filter for current_metrics"),
     db: Session = Depends(get_db)
 ):
     """
     Retrieves full canonical details, yearly metrics, monthly metrics, aliases,
-    and authoritative source citations for a single mine.
+    authoritative sources, and discrepancy records for a single mine.
     """
-    try:
-        mine = mine_service.get_mine_detail(db=db, mine_id=mine_id)
-    except (OperationalError, ProgrammingError) as db_err:
-        logger.error(f"Database error in get_mine_details for '{mine_id}': {db_err}")
-        raise HTTPException(
-            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mine registry service is temporarily unavailable."
-        )
-
+    mine = mine_service.get_mine_detail_envelope(db=db, mine_id=mine_id, financial_year=financial_year)
     if not mine:
         raise HTTPException(
-            status_code=http_status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Mine with ID '{mine_id}' not found in canonical registry."
         )
     return mine
+
+
+# -------------------------------------------------------------------------
+# Coal Blocks Routes
+# -------------------------------------------------------------------------
+@router.get("/coal-blocks/summary", response_model=CoalBlockSummaryResponse)
+def get_coal_blocks_summary(
+    financial_year: Optional[str] = Query("2024-25", description="Financial year strictly in YYYY-YY format"),
+    db: Session = Depends(get_db)
+):
+    """Returns official Nominated Authority summary benchmarks for captive & commercial coal blocks."""
+    return mine_service.get_coal_blocks_summary(db=db, financial_year=financial_year)
+
+
+@router.get("/coal-blocks/trend", response_model=CoalBlockTrendResponse)
+def get_coal_blocks_trend(db: Session = Depends(get_db)):
+    """Returns Nominated Authority historical trend series from 2015-16 to 2026-27 YTD."""
+    return mine_service.get_coal_blocks_trend(db=db)
+
+
+@router.get("/coal-blocks", response_model=CoalBlocksEnvelope)
+def get_coal_blocks(
+    financial_year: Optional[str] = Query("2024-25", description="Financial year in YYYY-YY format"),
+    search: Optional[str] = Query(None, description="Search term for block name, allottee, or company"),
+    state: Optional[str] = Query(None, description="State filter"),
+    allocation_method: Optional[str] = Query(None, description="Allocation method, e.g. 'Auction', 'Allotment'"),
+    allocation_status: Optional[str] = Query(None, description="Allocation / operational status"),
+    operational_status: Optional[str] = Query(None, description="Operational status filter"),
+    page: int = Query(1, ge=1, description="1-indexed page number"),
+    page_size: int = Query(25, ge=1, le=500, description="Items per page"),
+    skip: Optional[int] = Query(None, ge=0),
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    db: Session = Depends(get_db)
+):
+    """Returns captive and commercial coal blocks allocated by the Nominated Authority."""
+    actual_page = page
+    actual_size = page_size
+    if skip is not None and limit is not None:
+        actual_page = (skip // limit) + 1
+        actual_size = limit
+    elif limit is not None:
+        actual_size = limit
+
+    return mine_service.get_coal_blocks_envelope(
+        db=db,
+        financial_year=financial_year,
+        state=state,
+        allocation_method=allocation_method,
+        operational_status=operational_status or allocation_status,
+        search=search,
+        page=actual_page,
+        page_size=actual_size,
+    )
+
+
+# -------------------------------------------------------------------------
+# Sources, Coverage & Reconciliation Routes
+# -------------------------------------------------------------------------
+@router.get("/sources", response_model=SourcesResponse)
+def get_sources(db: Session = Depends(get_db)):
+    """Returns the authoritative Government of India data source catalog envelope."""
+    return mine_service.get_sources_envelope(db=db)
+
+
+@router.get("/data-sources", response_model=List[DataSourceResponse])
+def get_data_sources_legacy(db: Session = Depends(get_db)):
+    """Legacy endpoint returning list of authoritative data sources."""
+    return mine_service.get_data_sources_list(db=db)
+
+
+@router.get("/coverage/source/{source_id}", response_model=CoverageSourceResponse)
+def get_coverage_by_source(source_id: str, db: Session = Depends(get_db)):
+    """Returns coverage and observation breakdown for a specific source ID."""
+    cov = mine_service.get_coverage_source_detail(db=db, source_id=source_id)
+    if not cov:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Source with ID '{source_id}' not found."
+        )
+    return cov
+
+
+@router.get("/coverage", response_model=CoverageResponse)
+def get_coverage(
+    financial_year: Optional[str] = Query("2024-25", description="Financial year in YYYY-YY format"),
+    db: Session = Depends(get_db)
+):
+    """Returns coverage benchmarks and source observation counts for the specified financial year."""
+    return mine_service.get_coverage_envelope(db=db, financial_year=financial_year)
+
+
+@router.get("/reconciliation/summary", response_model=ReconciliationSummaryResponse)
+def get_reconciliation_summary(
+    financial_year: Optional[str] = Query("2024-25", description="Financial year in YYYY-YY format"),
+    db: Session = Depends(get_db)
+):
+    """Returns validation pass/fail summary and open discrepancy count."""
+    return mine_service.get_reconciliation_summary(db=db, financial_year=financial_year)
+
+
+@router.get("/reconciliation", response_model=ReconciliationResponse)
+def get_reconciliation(
+    financial_year: Optional[str] = Query("2024-25", description="Financial year in YYYY-YY format"),
+    db: Session = Depends(get_db)
+):
+    """Returns arithmetic verification checks and cross-document discrepancy records."""
+    return mine_service.get_reconciliation_envelope(db=db, financial_year=financial_year)
+
+
+@router.get("/data-conflicts", response_model=List[DataConflictRecordResponse])
+def get_data_conflicts_legacy(
+    resolution_status: Optional[str] = Query(None, description="Filter by resolution status, e.g. 'RESOLVED', 'OPEN'"),
+    db: Session = Depends(get_db)
+):
+    """Legacy endpoint returning cross-document discrepancy records."""
+    return mine_service.get_data_conflicts_list(db=db, resolution_status=resolution_status)
+
+
+@router.get("/data-validations", response_model=List[DataValidationResultResponse])
+def get_data_validations_legacy(
+    status_filter: Optional[str] = Query(None, description="Filter by status, e.g. 'PASSED', 'WARNING', 'FAILED'"),
+    db: Session = Depends(get_db)
+):
+    """Legacy endpoint returning arithmetic verification checks."""
+    return mine_service.get_data_validations_list(db=db, status_filter=status_filter)

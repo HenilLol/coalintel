@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ReportWizardForm } from '@/components/reports/ReportWizardForm';
+import { ReportStudioStepper } from '@/components/reports/ReportStudioStepper';
 import { ReportPreviewCard } from '@/components/reports/ReportPreviewCard';
 import { ReportHistoryTable } from '@/components/reports/ReportHistoryTable';
 import { reportApi, ReportItem } from '@/lib/api/reportApi';
@@ -54,10 +55,23 @@ export default function ReportsPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
-        title="Institutional Report Assembly Wizard"
-        description="Automated compilation of Parliamentary Inquiry Replies, Annual Summaries, and Production Audits rendered via Python ReportLab engine."
-        breadcrumbs={[{ label: 'Report Wizard' }]}
+        title="REPORT STUDIO: Institutional Assembly Workspace"
+        description="Multi-step workspace compiling Parliamentary Inquiry Replies, Annual Summaries, and Production Audits rendered via Python ReportLab engine."
+        breadcrumbs={[{ label: 'Report Studio' }]}
         badge={<Badge variant="amber">ReportLab Engine</Badge>}
+      />
+
+      {/* 9-Stage Report Studio Stepper */}
+      <ReportStudioStepper
+        onTriggerGenerate={() =>
+          generateMutation.mutate({
+            report_type: 'PARLIAMENTARY_REPLY',
+            subsidiary: selectedSubsidiary,
+            fiscal_year: '2024-25',
+            title: `Parliamentary Starred Inquiry Briefing (${selectedSubsidiary})`,
+          })
+        }
+        isGenerating={generateMutation.isPending}
       />
 
       {/* Error Alert */}

@@ -1653,12 +1653,25 @@ def run_government_data_ingestion(db: Optional[Session] = None):
         db.commit()
         logger.info(f"Ingestion run completed successfully. {records_inserted} records inserted.")
 
-        # Execute Canonical Mines Expansion (Phases 3 & 4)
+        # Execute Canonical Mines Expansion (Phases 3 & 4) FIRST — it creates
+        # the expansion mines (e.g. MINE-NLCIL-BARSINGSAR) that the contract
+        # historical seed then backfills multi-year metrics for. Ordering the
+        # contract seed before expansion breaks idempotency: run 1 would skip
+        # the not-yet-existing mines, run 2 would insert their history (+2 rows).
         try:
             from data.canonical_expansion_seed import run_canonical_expansion
             run_canonical_expansion(db=db)
         except Exception as exp_err:
             logger.warning(f"Canonical expansion note: {exp_err}")
+
+        # Contract renovation additions (PR #53):
+        # backfill ExtractedMetrics powering the existing endpoints
+        # and seed contract historical aggregates.
+        try:
+            from data.contract_historical_seed import run_contract_seed
+            run_contract_seed()
+        except Exception as cont_err:
+            logger.warning(f"Contract seed note: {cont_err}")
 
         return {
             "status": "COMPLETED",

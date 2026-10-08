@@ -11,6 +11,7 @@ from app.models.data_provenance import (
     DataConflictRecord,
     DataValidationResult,
     IngestionRun,
+    GovernmentYearlyAggregate,
 )
 from app.models.mine import (
     MineMaster,
@@ -18,6 +19,7 @@ from app.models.mine import (
     MineYearlyMetric,
     MineMonthlyMetric,
     CoalBlock,
+    CoalBlockYearlyMetric,
     StarRating,
 )
 from app.models.parliamentary_qa import ParliamentaryQA
@@ -35,11 +37,13 @@ __all__ = [
     "DataConflictRecord",
     "DataValidationResult",
     "IngestionRun",
+    "GovernmentYearlyAggregate",
     "MineMaster",
     "MineAlias",
     "MineYearlyMetric",
     "MineMonthlyMetric",
     "CoalBlock",
+    "CoalBlockYearlyMetric",
     "StarRating",
     "ParliamentaryQA",
 ]

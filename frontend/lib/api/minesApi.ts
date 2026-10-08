@@ -1,5 +1,12 @@
 import { apiClient } from './client';
 
+export interface PaginationInfo {
+  page: number;
+  page_size: number;
+  total_records: number;
+  total_pages: number;
+}
+
 export interface MineSummary {
   mine_id: string;
   mine_name: string;
@@ -12,6 +19,7 @@ export interface MineSummary {
   block?: string;
   coalfield?: string;
   coal_or_lignite?: string;
+  commodity?: string;
   mine_type?: string;
   mining_method?: string;
   sector?: string;
@@ -22,6 +30,9 @@ export interface MineSummary {
   financial_year?: string;
   verification_status?: string;
   data_origin: string;
+  production_mt?: number;
+  target_mt?: number;
+  achievement_percent?: number;
   latest_production_mt?: number;
   latest_target_mt?: number;
   latest_achievement_percent?: number;
@@ -29,12 +40,19 @@ export interface MineSummary {
   period_type?: string;
   data_status?: string;
   star_rating?: number;
+  source_id?: string;
   source_document?: string;
   source_url?: string;
   production_fy24_25?: number;
   production_fy25_26?: number;
   production_fy26_27_ytd?: number;
   yoy_growth_percent?: number;
+}
+
+export interface MineListEnvelope {
+  data: MineSummary[];
+  pagination: PaginationInfo;
+  filters: Record<string, any>;
 }
 
 export interface DimensionCountItem {
@@ -44,7 +62,7 @@ export interface DimensionCountItem {
 }
 
 export interface MineYearlyMetric {
-  id: number;
+  id?: number;
   mine_id: string;
   financial_year: string;
   period_type: string;
@@ -55,9 +73,17 @@ export interface MineYearlyMetric {
   dispatch_mt?: number;
   dispatch_target_mt?: number;
   dispatch_achievement_percent?: number;
+  coal_grade?: string;
+  mine_type?: string;
+  mining_method?: string;
+  operational_status?: string;
+  production_status?: string;
   star_rating?: number;
+  star_rating_category?: string;
   obr_mcum?: number;
   manpower?: number;
+  employment?: number;
+  as_of_date?: string;
   source_id: string;
   source_document?: string;
   source_url?: string;
@@ -65,12 +91,12 @@ export interface MineYearlyMetric {
   source_table?: string;
   source_published_date?: string;
   verification_status: string;
-  quality_status: string;
+  quality_status?: string;
   data_origin: string;
 }
 
 export interface MineMonthlyMetric {
-  id: number;
+  id?: number;
   mine_id: string;
   financial_year: string;
   month: string;
@@ -113,8 +139,10 @@ export interface MineDetail {
   state: string;
   district?: string;
   block?: string;
+  block_name?: string;
   coalfield?: string;
   coal_or_lignite: string;
+  commodity?: string;
   mine_type?: string;
   mining_method?: string;
   sector?: string;
@@ -143,24 +171,144 @@ export interface MineDetail {
   provenance_sources: DataSourceItem[];
 }
 
+export interface MineDetailEnvelope {
+  mine: MineDetail;
+  current_metrics?: MineYearlyMetric;
+  historical_metrics: MineYearlyMetric[];
+  aliases: string[];
+  sources: DataSourceItem[];
+  conflicts: DataConflictRecordItem[];
+}
+
+export interface MineHistoryEnvelope {
+  mine_id: string;
+  history: MineYearlyMetric[];
+}
+
+export interface MineFiltersOptionsResponse {
+  financial_year: string;
+  states: string[];
+  ownership_types: string[];
+  sectors: string[];
+  commodities: string[];
+  operational_statuses: string[];
+  companies: string[];
+}
+
+export interface MineYearsResponse {
+  available_years: string[];
+  default_year: string;
+  current_reporting_year: string;
+}
+
+export interface MineAnalyticsResponse {
+  financial_year: string;
+  total_mines: number;
+  total_production_mt: number;
+  total_target_mt?: number;
+  achievement_percent?: number;
+  by_ownership: Record<string, number>;
+  by_state: Record<string, number>;
+  by_sector: Record<string, number>;
+  star_rating_distribution: Record<string, number>;
+}
+
+export interface MineTrendPoint {
+  financial_year: string;
+  total_mines: number;
+  production_mt: number;
+  target_mt?: number;
+  achievement_percent?: number;
+  growth_percent?: number;
+}
+
+export interface MineAnalyticsTrendResponse {
+  series: MineTrendPoint[];
+}
 
 export interface CoalBlockItem {
   coal_block_id: string;
   coal_block_name: string;
+  normalized_name?: string;
   mine_name?: string;
   mine_id?: string;
   allottee: string;
   company: string;
+  company_name?: string;
   state: string;
   district?: string;
   allocation_method?: string;
+  allocation_date?: string;
   end_use?: string;
   sale_of_coal?: string;
   production_status?: string;
+  operational_status?: string;
+  captive_or_commercial?: string;
   production_mt?: number;
   target_production_mt?: number;
   peak_rated_capacity_mtpa?: number;
+  financial_year?: string;
   source_id: string;
+}
+
+export interface CoalBlockSummaryResponse {
+  financial_year: string;
+  total_allocated_blocks: number;
+  operational_blocks: number;
+  total_production_mt: number;
+  target_production_mt?: number;
+  auctioned_blocks: number;
+  allotted_blocks: number;
+}
+
+export interface CoalBlocksEnvelope {
+  data: CoalBlockItem[];
+  pagination: PaginationInfo;
+  summary: CoalBlockSummaryResponse;
+  filters: Record<string, any>;
+}
+
+export interface CoalBlockTrendPoint {
+  financial_year: string;
+  operational_blocks: number;
+  production_mt: number;
+  target_mt?: number;
+  growth_percent?: number;
+  period_type: string;
+  data_status: string;
+  source_document: string;
+}
+
+export interface CoalBlockTrendResponse {
+  trend: CoalBlockTrendPoint[];
+}
+
+export interface SourcesResponse {
+  total_sources: number;
+  sources: DataSourceItem[];
+}
+
+export interface CoverageItem {
+  source_id: string;
+  organization: string;
+  document_title: string;
+  financial_year: string;
+  observation_count: number;
+  granularity: string;
+  metrics: string[];
+}
+
+export interface CoverageResponse {
+  financial_year: string;
+  national_benchmarks: Record<string, any>;
+  source_coverage: CoverageItem[];
+}
+
+export interface CoverageSourceResponse {
+  source: DataSourceItem;
+  total_observations: number;
+  metrics_covered: string[];
+  entities_count: number;
 }
 
 export interface DataConflictRecordItem {
@@ -192,6 +340,21 @@ export interface DataValidationResultItem {
   variance_percent: number;
   status: string;
   notes?: string;
+}
+
+export interface ReconciliationResponse {
+  financial_year: string;
+  results: DataValidationResultItem[];
+  conflicts: DataConflictRecordItem[];
+}
+
+export interface ReconciliationSummaryResponse {
+  financial_year: string;
+  passed: number;
+  warning: number;
+  failed: number;
+  open_conflicts: number;
+  resolved_conflicts: number;
 }
 
 export interface MinesSummaryStats {
@@ -238,6 +401,7 @@ export interface MinesSummaryStats {
 }
 
 export interface MineFilterParams {
+  financial_year?: string;
   fiscal_year?: string;
   subsidiary?: string;
   company?: string;
@@ -245,9 +409,13 @@ export interface MineFilterParams {
   district?: string;
   mine_type?: string;
   sector?: string;
+  ownership_type?: string;
   ownership?: string;
+  commodity?: string;
   coal_or_lignite?: string;
   status?: string;
+  operational_status?: string;
+  captive_or_commercial?: string;
   search?: string;
   sort_by?: string;
   sort_order?: string;
@@ -263,19 +431,147 @@ export interface MinesListResult {
 }
 
 export const minesApi = {
-  getMines: async (params?: MineFilterParams): Promise<MineSummary[]> => {
-    const res = await apiClient.get<MineSummary[]>('/mines', { params });
+  // Contract Envelope for /mines
+  getMinesEnvelope: async (params?: MineFilterParams): Promise<MineListEnvelope> => {
+    const res = await apiClient.get<MineListEnvelope>('/mines', { params });
     return res.data;
   },
 
-  getMinesWithCount: async (params?: MineFilterParams): Promise<MinesListResult> => {
-    const res = await apiClient.get<MineSummary[]>('/mines', { params });
-    const total = parseInt(res.headers['x-total-count'] || '0', 10) || res.data.length;
-    return { items: res.data, total };
+  // Legacy/Flexible getMines
+  getMines: async (params?: MineFilterParams): Promise<MineSummary[]> => {
+    const res = await apiClient.get<any>('/mines', { params });
+    if (res.data && Array.isArray(res.data.data)) {
+      return res.data.data;
+    }
+    return Array.isArray(res.data) ? res.data : [];
   },
 
-  getMineDetails: async (mineId: string): Promise<MineDetail> => {
-    const res = await apiClient.get<MineDetail>(`/mines/${encodeURIComponent(mineId)}`);
+  getMinesWithCount: async (params?: MineFilterParams): Promise<MinesListResult> => {
+    const res = await apiClient.get<any>('/mines', { params });
+    if (res.data && Array.isArray(res.data.data)) {
+      return {
+        items: res.data.data,
+        total: res.data.pagination?.total_records ?? res.data.data.length,
+      };
+    }
+    const total = parseInt(res.headers['x-total-count'] || '0', 10) || (Array.isArray(res.data) ? res.data.length : 0);
+    return { items: Array.isArray(res.data) ? res.data : [], total };
+  },
+
+  getMineYears: async (): Promise<MineYearsResponse> => {
+    const res = await apiClient.get<MineYearsResponse>('/mines/years');
+    return res.data;
+  },
+
+  getMineFilters: async (financialYear?: string): Promise<MineFiltersOptionsResponse> => {
+    const res = await apiClient.get<MineFiltersOptionsResponse>('/mines/filters', {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
+    return res.data;
+  },
+
+  getMineAnalytics: async (financialYear?: string): Promise<MineAnalyticsResponse> => {
+    const res = await apiClient.get<MineAnalyticsResponse>('/mines/analytics', {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
+    return res.data;
+  },
+
+  getMineAnalyticsTrend: async (): Promise<MineAnalyticsTrendResponse> => {
+    const res = await apiClient.get<MineAnalyticsTrendResponse>('/mines/analytics/trend');
+    return res.data;
+  },
+
+  getMineDetails: async (mineId: string, financialYear?: string): Promise<MineDetail> => {
+    const res = await apiClient.get<any>(`/mines/${encodeURIComponent(mineId)}`, {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
+    if (res.data && res.data.mine) {
+      return {
+        ...res.data.mine,
+        yearly_metrics: res.data.historical_metrics || [],
+        monthly_metrics: [],
+        aliases: res.data.aliases || [],
+        provenance_sources: res.data.sources || [],
+      };
+    }
+    return res.data;
+  },
+
+  getMineDetailEnvelope: async (mineId: string, financialYear?: string): Promise<MineDetailEnvelope> => {
+    const res = await apiClient.get<MineDetailEnvelope>(`/mines/${encodeURIComponent(mineId)}`, {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
+    return res.data;
+  },
+
+  getMineHistory: async (mineId: string): Promise<MineHistoryEnvelope> => {
+    const res = await apiClient.get<MineHistoryEnvelope>(`/mines/${encodeURIComponent(mineId)}/history`);
+    return res.data;
+  },
+
+  getCoalBlocksEnvelope: async (params?: any): Promise<CoalBlocksEnvelope> => {
+    const res = await apiClient.get<CoalBlocksEnvelope>('/coal-blocks', { params });
+    return res.data;
+  },
+
+  getCoalBlocksSummary: async (financialYear?: string): Promise<CoalBlockSummaryResponse> => {
+    const res = await apiClient.get<CoalBlockSummaryResponse>('/coal-blocks/summary', {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
+    return res.data;
+  },
+
+  getCoalBlocksTrend: async (): Promise<CoalBlockTrendResponse> => {
+    const res = await apiClient.get<CoalBlockTrendResponse>('/coal-blocks/trend');
+    return res.data;
+  },
+
+  getCoalBlocks: async (params?: { search?: string; state?: string; allocation_status?: string; financial_year?: string }): Promise<CoalBlockItem[]> => {
+    const res = await apiClient.get<any>('/coal-blocks', { params });
+    if (res.data && Array.isArray(res.data.data)) {
+      return res.data.data;
+    }
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
+  getSources: async (): Promise<SourcesResponse> => {
+    const res = await apiClient.get<SourcesResponse>('/sources');
+    return res.data;
+  },
+
+  getDataSources: async (): Promise<DataSourceItem[]> => {
+    const res = await apiClient.get<any>('/sources');
+    if (res.data && Array.isArray(res.data.sources)) {
+      return res.data.sources;
+    }
+    const legacyRes = await apiClient.get<DataSourceItem[]>('/data-sources');
+    return legacyRes.data;
+  },
+
+  getCoverage: async (financialYear?: string): Promise<CoverageResponse> => {
+    const res = await apiClient.get<CoverageResponse>('/coverage', {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
+    return res.data;
+  },
+
+  getCoverageSource: async (sourceId: string): Promise<CoverageSourceResponse> => {
+    const res = await apiClient.get<CoverageSourceResponse>(`/coverage/source/${encodeURIComponent(sourceId)}`);
+    return res.data;
+  },
+
+  getReconciliation: async (financialYear?: string): Promise<ReconciliationResponse> => {
+    const res = await apiClient.get<ReconciliationResponse>('/reconciliation', {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
+    return res.data;
+  },
+
+  getReconciliationSummary: async (financialYear?: string): Promise<ReconciliationSummaryResponse> => {
+    const res = await apiClient.get<ReconciliationSummaryResponse>('/reconciliation/summary', {
+      params: financialYear ? { financial_year: financialYear } : undefined,
+    });
     return res.data;
   },
 
@@ -306,16 +602,6 @@ export const minesApi = {
 
   getCompanies: async (): Promise<DimensionCountItem[]> => {
     const res = await apiClient.get<DimensionCountItem[]>('/mines/companies');
-    return res.data;
-  },
-
-  getCoalBlocks: async (params?: { search?: string; state?: string; allocation_status?: string }): Promise<CoalBlockItem[]> => {
-    const res = await apiClient.get<CoalBlockItem[]>('/coal-blocks', { params });
-    return res.data;
-  },
-
-  getDataSources: async (): Promise<DataSourceItem[]> => {
-    const res = await apiClient.get<DataSourceItem[]>('/data-sources');
     return res.data;
   },
 

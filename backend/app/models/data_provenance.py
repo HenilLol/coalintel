@@ -116,3 +116,29 @@ class IngestionRun(Base):
 
     def __repr__(self):
         return f"<IngestionRun(id='{self.run_id}', status='{self.status}', inserted={self.records_inserted})>"
+
+
+class GovernmentYearlyAggregate(Base):
+    __tablename__ = "government_yearly_aggregates"
+
+    aggregate_id = Column(String(100), primary_key=True, index=True)
+    financial_year = Column(String(20), nullable=False, index=True)
+    metric = Column(String(100), nullable=False, index=True)  # 'production_mt', 'dispatch_mt', 'target_mt', etc.
+    value = Column(Numeric(18, 6), nullable=False)
+    unit = Column(String(30), default="MT", nullable=False)
+    granularity = Column(String(30), nullable=False, index=True)  # 'national', 'state', 'company', 'sector'
+    entity_name = Column(String(150), nullable=False, index=True)  # e.g., 'India', 'Coal India Limited', 'Odisha', 'Captive'
+    data_status = Column(String(30), default="final", nullable=False)  # 'provisional', 'final', 'provisional_actual', 'estimated'
+    data_origin = Column(String(30), default="government", nullable=False)
+    verification_status = Column(String(30), default="verified", nullable=False)
+    as_of_date = Column(String(30), nullable=True)
+    source_id = Column(String(100), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index("ix_govt_agg_fy_granularity", "financial_year", "granularity"),
+        Index("ix_govt_agg_entity_metric", "entity_name", "metric", "financial_year"),
+    )
+
+    def __repr__(self):
+        return f"<GovernmentYearlyAggregate(id='{self.aggregate_id}', entity='{self.entity_name}', metric='{self.metric}', fy='{self.financial_year}', val={self.value})>"
