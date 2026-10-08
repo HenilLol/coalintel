@@ -322,3 +322,68 @@ class TestProximityAggregateAttribution:
         tuples = extract_entity_tuples_from_text(text, page_number=27)
         by_value = {t["numeric_value"]: t["mine_name"] for t in tuples}
         assert by_value.get(218.981) == "Odisha", "line-proximity must beat table label 180 chars away"
+
+
+class TestCrossSeamAttribution:
+    """Issue #85: OCR'd scanned pages hard-wrap mid-sentence, putting values
+    at the START of their line with the entity label ending the PREVIOUS
+    line. Found live on Coal Directory p.4 (geological resources) where every
+    state figure shifted to the NEXT state, and paragraph-level national
+    totals inherited the previous paragraph's last state."""
+
+    def test_seam_value_gets_prev_line_label(self):
+        # exact OCR layout from the real document: "Jharkhand\n91811.57 MT"
+        text = ("Out of the total geological resources in the country, 377012.11 (96.81%)\n"
+                "million Tonnes (MT) are shared by seven states, Odisha 99203.83\n"
+                "(25.47%), Jharkhand\n"
+                "91811.57 MT (23.58%), Chhattisgarh 82666.36 MT (21.23%)")
+        tuples = extract_entity_tuples_from_text(text, page_number=4)
+        by_value = {t["numeric_value"]: t["mine_name"] for t in tuples}
+        assert by_value.get(91811.57) == "Jharkhand"
+        assert by_value.get(82666.36) == "Chhattisgarh"
+
+    def test_same_line_label_still_wins_over_prev_line(self):
+        # when the label precedes the value on the SAME line, it wins
+        text = "Odisha registered highest coal production of 218.981 MT (24.52%)"
+        tuples = extract_entity_tuples_from_text(text, page_number=27)
+        by_value = {t["numeric_value"]: t["mine_name"] for t in tuples}
+        assert by_value.get(218.981) == "Odisha"
+
+    def test_paragraph_boundary_blocks_stale_mention(self):
+        # national total in a NEW paragraph must not inherit the previous
+        # paragraph's trailing state (observed live: 389421.34 -> West Bengal)
+        text = ("... and Maharashtra 13351.63 MT (3.43%).\n\n"
+                "Out of the total resource of 389421.34 MT as on 1 April 2024,\n"
+                "the share of proved, indicated and inferred resources are\n"
+                "212207.16 MT (54.49%), 148716.53 MT (38.19%)")
+        tuples = extract_entity_tuples_from_text(text, page_number=4)
+        by_value = {t["numeric_value"]: t["mine_name"] for t in tuples}
+        assert by_value.get(389421.34) == "All India"
+        assert by_value.get(212207.16) == "All India"
+        assert by_value.get(148716.53) == "All India"
+        # 13351.63 belongs to Maharashtra (same sentence); the national
+        # figures in the NEXT paragraph must NOT inherit it
+        assert by_value.get(13351.63) == "Maharashtra"
+        assert "West Bengal" not in by_value.values()
+
+    def test_split_state_name_repaired_across_break(self):
+        # "Madhya\nPradesh" split by OCR hard-wrap
+        text = ("seven states, Telangana 23205.52 MT (5.96%), Madhya\n"
+                "Pradesh 32815.13 MT (8.43%) and others")
+        tuples = extract_entity_tuples_from_text(text, page_number=4)
+        by_value = {t["numeric_value"]: t["mine_name"] for t in tuples}
+        assert by_value.get(32815.13) == "Madhya Pradesh"
+
+    def test_geological_resources_metric_classification(self):
+        text = ("Out of the total geological resources in the country,\n"
+                "377012.11 (96.81%) million Tonnes (MT) are shared by seven states")
+        tuples = extract_entity_tuples_from_text(text, page_number=4)
+        assert tuples
+        assert all(t["metric_name"] == "Geological Resources" for t in tuples)
+
+    def test_proved_indicated_inferred_classified(self):
+        text = ("the share of proved, indicated and inferred resources are\n"
+                "212207.16 MT (54.49%), 148716.53 MT (38.19%) and 28497.65 MT (7.32%)")
+        tuples = extract_entity_tuples_from_text(text, page_number=4)
+        assert tuples
+        assert all(t["metric_name"] == "Geological Resources" for t in tuples)

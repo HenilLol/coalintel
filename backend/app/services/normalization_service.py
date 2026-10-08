@@ -395,8 +395,13 @@ def extract_entity_tuples_from_text(
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
     # Match numeric values with mining units (e.g., "42.50 Lakh Tonnes" or "120.40 M.Cu.M")
+    # Issue #85: government publications interleave a parenthetical share
+    # between value and unit ("377012.11 (96.81%) million Tonnes"); allow
+    # one such parenthetical between them. The inner percentage itself
+    # never matches (a lone "%" cannot be followed by a unit in the same
+    # sentence without an intervening value).
     value_unit_pattern = re.compile(
-        r"([\d\.,]+)\s*"
+        r"([\d\.,]+)(?:\s*\([^)]*\))?\s*"
         r"(Lakh\s+Tonnes|Million\s+Tonnes|Thousand\s+Tonnes|MT|M\.Cu\.M|MCuM|Tonnes)",
         re.IGNORECASE
     )
@@ -432,6 +437,12 @@ def extract_entity_tuples_from_text(
             # Check if production keywords exist in local snippet
             if re.search(r"\b(?:production|output|produced)\b", snippet, re.IGNORECASE):
                 metric_name = "Coal Production"
+            elif re.search(r"\b(?:geological\s+resources?|total\s+resources?|proved,?\s+indicated|indicated\s+and\s+inferred|resources\s+are)\b", snippet, re.IGNORECASE):
+                # Issue #85: geological-resource statements in the Coal
+                # Directory ("total geological resources ... 377012.11",
+                # "share of proved, indicated and inferred resources are
+                # 212207.16 ...") must not degrade to Unclassified
+                metric_name = "Geological Resources"
             else:
                 metric_name = "Mining Metric (Unclassified)"
 
@@ -458,6 +469,7 @@ def extract_entity_tuples_from_text(
             ("All India", re.compile(r"\ball\s+india\b", re.IGNORECASE)),
             ("All India", re.compile(r"\b(?:in|of|for)\s+the\s+country\b", re.IGNORECASE)),
             ("All India", re.compile(r"\b(?:in|of)\s+india\b", re.IGNORECASE)),
+            ("All India", re.compile(r"\btotal\s+(?:geological\s+)?resources?\s+of\b", re.IGNORECASE)),
         ) + tuple(
             (state, re.compile(r"\b" + re.escape(state) + r"\b", re.IGNORECASE))
             for state in INDIAN_COAL_STATES
@@ -484,15 +496,88 @@ def extract_entity_tuples_from_text(
             return best
 
         value_offset_in_line = match.start() - line_start
-        detected_aggregate = _nearest_aggregate(current_line, value_offset_in_line)
-        if not detected_aggregate and line_start > 0:
-            _pl_start = text.rfind("\n", 0, line_start - 1)
-            _pl_start = 0 if _pl_start == -1 else _pl_start + 1
-            _prev_line_txt = text[_pl_start:line_start - 1].strip() if line_start > 0 else ""
-            if _prev_line_txt:
-                detected_aggregate = _nearest_aggregate(_prev_line_txt, len(_prev_line_txt))
+        _pl_start = text.rfind("\n", 0, max(line_start - 1, 0))
+        _pl_start = 0 if _pl_start == -1 else _pl_start + 1
+        _prev_line_txt = text[_pl_start:line_start].strip() if line_start > 0 else ""
+
+        def _nearest_with_dist(haystack: str, value_offset_in_hay: int):
+            """Nearest candidate + its distance (following mentions carry the
+            +10,000 deprioritization so callers can tell them apart)."""
+            best = None
+            best_dist = float("inf")
+            for label, pattern in _AGG_CANDIDATE_PATTERNS:
+                for m in pattern.finditer(haystack):
+                    dist = (value_offset_in_hay - m.end()) if m.end() <= value_offset_in_hay \
+                        else (m.start() - value_offset_in_hay) + 10_000
+                    if dist < best_dist:
+                        best_dist = dist
+                        best = label
+            return best, best_dist
+
+        detected_aggregate, _cur_dist = _nearest_with_dist(current_line, value_offset_in_line)
+
+        # Issue #85: OCR'd scanned pages hard-wrap mid-sentence, putting the
+        # value at the START of its line while its entity label ends the
+        # PREVIOUS line ("... Jharkhand\n91811.57 MT"). The current line then
+        # contains only the NEXT entity's label, a FOLLOWING mention that
+        # wins by default and shifts every attribution by one. When the
+        # current-line winner is a following mention AND the value sits near
+        # the line start, join the seam (prev-line tail + current line) and
+        # re-pick. This also repairs multi-word states split across the
+        # break ("Madhya\nPradesh" -> joined "Madhya Pradesh").
+        _SEAM_VALUE_OFFSET = 40   # value this close to the line start = continued sentence
+        _TAIL_GUARD = 24          # prev-line mention must trail this close to its line end
+        if (
+            detected_aggregate is not None
+            and _cur_dist >= 10_000              # winner on the line is a FOLLOWING mention
+            and value_offset_in_line <= _SEAM_VALUE_OFFSET
+            and _prev_line_txt
+        ):
+            _tail = _prev_line_txt[-80:]
+            _joined = _tail + " " + current_line[:80]
+            _joined_off = len(_tail) + 1 + min(value_offset_in_line, 80)
+            _seam_agg, _seam_dist = _nearest_with_dist(_joined, _joined_off)
+            if _seam_agg is not None and _seam_dist < 10_000:
+                detected_aggregate = _seam_agg
+
+        if not detected_aggregate and _prev_line_txt:
+            # Prev-line fallback WITH tail guard: the winning mention must end
+            # near the prev line's end (the label trails directly into the
+            # value across the break). Without the guard, a fresh paragraph
+            # inherits whatever state the previous paragraph ended with
+            # (observed live: the national resource total picking up
+            # 'Maharashtra' from the previous sentence's tail).
+            # The search haystack JOINS the prev-line tail with the current
+            # line's head so multi-word entity names split by the OCR hard-wrap
+            # ("Madhya\nPradesh") still match as a whole.
+            _join_hay = _prev_line_txt + " " + current_line
+            _join_off = len(_prev_line_txt) + 1 + min(value_offset_in_line, 80)
+            _agg, _d = _nearest_with_dist(_join_hay, _join_off)
+            if _agg is not None and _d < 10_000:
+                _lbl_pat = re.compile(r"\b" + re.escape(_agg) + r"\b", re.IGNORECASE)
+                _last_m = None
+                for _m in _lbl_pat.finditer(_join_hay):
+                    _last_m = _m
+                # guard: winner must end within _TAIL_GUARD of the seam
+                if _last_m is not None and _last_m.end() >= len(_prev_line_txt) - _TAIL_GUARD:
+                    detected_aggregate = _agg
+
         if not detected_aggregate:
-            detected_aggregate = _nearest_aggregate(snippet, 180)  # snippet centers the value
+            # Snippet fallback, tight radius: entity labels live within ~60
+            # chars of their figures in government narrative ("Odisha
+            # registered highest coal production of 218.981 MT"). The old 180
+            # radius let stale mentions from the previous paragraph steal
+            # paragraph-level national figures (observed live on p34).
+            _snip_val_off = 180 if match.start() >= 180 else match.start()
+            _para_break = snippet.rfind("\n\n", 0, _snip_val_off)
+            if _para_break != -1:
+                # paragraph boundary inside the window: never look across it —
+                # the previous paragraph's last mention cannot steal this value
+                _trimmed = snippet[_para_break + 2:]
+                _trimmed_off = _snip_val_off - _para_break - 2
+                detected_aggregate = _nearest_aggregate(_trimmed, _trimmed_off)
+            else:
+                detected_aggregate = _nearest_aggregate(snippet, _snip_val_off)
 
         # Check for specific known mines on current line (full name first)
         for km in KNOWN_MINES:
