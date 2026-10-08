@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { QueryInput } from '@/components/query/QueryInput';
 import { RagPipelineVisualizer } from '@/components/query/RagPipelineVisualizer';
 import { StructuredInsightCard } from '@/components/query/StructuredInsightCard';

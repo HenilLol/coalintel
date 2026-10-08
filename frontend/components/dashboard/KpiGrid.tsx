@@ -11,7 +11,9 @@ import {
   TrendingUp,
   ShieldCheck,
   CheckCircle2,
+  Layers,
 } from 'lucide-react';
+import { StatCard } from '@/components/ui/StatCard';
 import { DashboardKpis } from '@/types/dashboard';
 
 interface KpiGridProps {

@@ -1,6 +1,9 @@
 from typing import List, Optional, Any, Dict
+import logging
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
+from fastapi import status as http_status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from database import get_db
 from app.schemas.mine import (
@@ -30,6 +33,8 @@ from app.schemas.contracts import (
     ReconciliationSummaryResponse,
 )
 from app.services import mine_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Government Mine Intelligence"])
 
@@ -74,24 +79,33 @@ def get_mines(
     elif limit is not None:
         actual_size = limit
 
-    envelope = mine_service.get_mines_envelope(
-        db=db,
-        financial_year=fy,
-        state=state,
-        ownership_type=ownership_type,
-        sector=sector,
-        commodity=commodity,
-        operational_status=operational_status or status_filter,
-        captive_or_commercial=captive_or_commercial,
-        company=company,
-        subsidiary=subsidiary,
-        coal_or_lignite=coal_or_lignite,
-        search=search,
-        page=actual_page,
-        page_size=actual_size,
-        sort_by=sort_by,
-        sort_order=sort_order,
-    )
+    # Production recovery handling (from main): operational DB failures must
+    # surface as controlled 503, not unhandled 500.
+    try:
+        envelope = mine_service.get_mines_envelope(
+            db=db,
+            financial_year=fy,
+            state=state,
+            ownership_type=ownership_type,
+            sector=sector,
+            commodity=commodity,
+            operational_status=operational_status or status_filter,
+            captive_or_commercial=captive_or_commercial,
+            company=company,
+            subsidiary=subsidiary,
+            coal_or_lignite=coal_or_lignite,
+            search=search,
+            page=actual_page,
+            page_size=actual_size,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+    except (OperationalError, ProgrammingError) as db_err:
+        logger.error(f"Database error in get_mines: {db_err}")
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Mine Intelligence registry is temporarily unavailable. Database migration or synchronization in progress."
+        )
 
     response.headers["X-Total-Count"] = str(envelope.pagination.total_records)
     return envelope
@@ -175,6 +189,35 @@ def get_mines_summary_stats_alias(db: Session = Depends(get_db)):
 # -------------------------------------------------------------------------
 # Dynamic /mines/{mine_id} Sub-routes
 # -------------------------------------------------------------------------
+# Route-precedence alias (production fix on main): the static
+# /mines/coal-blocks path must be declared BEFORE /mines/{mine_id}, or the
+# parametrized route shadows it and the alias 404s ("coal-blocks" parsed as a
+# mine_id). Kept the renovated envelope response_model (PR #53).
+@router.get("/mines/coal-blocks", response_model=CoalBlocksEnvelope)
+def get_coal_blocks_alias(
+    search: Optional[str] = Query(None, description="Search term for block name, allottee, or coalfield"),
+    state: Optional[str] = Query(None, description="State filter"),
+    allocation_status: Optional[str] = Query(None, description="Allocation status, e.g. 'Operational', 'Under Development'"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    return mine_service.get_coal_blocks_envelope(
+        db=db, search=search, state=state,
+        operational_status=allocation_status, page=page, page_size=page_size,
+    )
+
+
+# Legacy alias (production fix on main): must be registered BEFORE
+# /mines/{mine_id}, otherwise "data-sources" is captured as a mine_id.
+# The main branch's canonical path is /mines/data-sources; the renovation
+# renamed it to /data-sources. Keep both to preserve API compatibility.
+@router.get("/mines/data-sources", response_model=List[DataSourceResponse])
+def get_data_sources_main_alias(db: Session = Depends(get_db)):
+    """Legacy endpoint (main-branch path) returning list of authoritative data sources."""
+    return mine_service.get_data_sources_list(db=db)
+
+
 @router.get("/mines/{mine_id}/history", response_model=MineHistoryEnvelope)
 def get_mine_history(
     mine_id: str,

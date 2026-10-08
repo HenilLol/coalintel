@@ -100,7 +100,7 @@ class MineYearlyMetric(Base):
     mining_method = Column(String(100), nullable=True)
     operational_status = Column(String(50), nullable=True)
     production_status = Column(String(50), nullable=True)
-    mine_opening_permission = Column(Boolean, nullable=True)
+    mine_opening_permission = Column(String(50), nullable=True)
     captive_or_commercial = Column(String(50), nullable=True)
     
     # Star Rating & Environment
@@ -188,8 +188,8 @@ class CoalBlock(Base):
     allocation_method = Column(String(50), nullable=True)  # 'Auction', 'Allotment'
     allocation_date = Column(String(50), nullable=True)
     end_use = Column(String(100), nullable=True)
-    sale_of_coal = Column(Boolean, nullable=True)
-    mine_opening_permission = Column(Boolean, nullable=True)
+    sale_of_coal = Column(String(100), nullable=True)
+    mine_opening_permission = Column(String(50), nullable=True)
     operational_status = Column(String(50), nullable=True, default="operational")
     production_status = Column(String(50), nullable=True, index=True)  # 'producing', 'non_producing', 'not_available'
     captive_or_commercial = Column(String(50), nullable=True)
@@ -218,7 +218,7 @@ class CoalBlockYearlyMetric(Base):
     operational = Column(Boolean, nullable=True)
     production_mt = Column(Numeric(18, 6), nullable=True)
     production_target_mt = Column(Numeric(18, 6), nullable=True)
-    mine_opening_permission = Column(Boolean, nullable=True)
+    mine_opening_permission = Column(String(50), nullable=True)
     data_status = Column(String(30), default="reported", nullable=False)
     data_origin = Column(String(30), default="government", nullable=False)
     verification_status = Column(String(30), default="verified", nullable=False)

@@ -254,8 +254,8 @@ class CoalBlockItem(BaseModel):
     allocation_method: Optional[str] = None
     allocation_date: Optional[str] = None
     end_use: Optional[str] = None
-    sale_of_coal: Optional[bool] = None
-    mine_opening_permission: Optional[bool] = None
+    sale_of_coal: Optional[str] = None
+    mine_opening_permission: Optional[str] = None
     operational_status: Optional[str] = None
     production_status: Optional[str] = None
     captive_or_commercial: Optional[str] = None

@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear, setSelectedFiscalYear } = useScope();
   const [isLoading, setIsLoading] = useState(false);
   const [isApiConnected, setIsApiConnected] = useState(false);
+  const [activeCenterView, setActiveCenterView] = useState<'analytics' | 'geology'>('analytics');
 
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [productionData, setProductionData] = useState<ProductionSeriesItem[]>([]);

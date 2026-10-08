@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu, Bell, Shield, Database, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { Logo } from '@/components/ui/Logo';
 import { useScope } from '@/context/ScopeContext';
 import { CIL_SUBSIDIARIES } from '@/lib/constants';
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   const router = useRouter();
   const { selectedSubsidiary, setSelectedSubsidiary, selectedFiscalYear } = useScope();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -38,6 +40,55 @@ export const Header: React.FC<HeaderProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    router.push(`/query?q=${encodeURIComponent(searchQuery.trim())}`);
+  };
+
+  return (
+    <header className="sticky top-0 z-20 h-16 bg-[#151A1D] border-b border-[#30383D] px-3 sm:px-4 lg:px-6 flex items-center justify-between shadow-sm gap-2 sm:gap-4">
+      {/* Left: Mobile Toggle, Header Branding & Context Indicator */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {onMobileMenuToggle && (
+          <button
+            onClick={onMobileMenuToggle}
+            className="p-2 rounded-lg bg-[#1C2226] border border-[#30383D] text-[#9BA5A8] hover:text-[#E8ECEB] lg:hidden transition-colors shrink-0"
+            aria-label="Open mobile navigation"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+
+        {/* Header Branding */}
+        <div className={cn('flex items-center min-w-0 shrink-0', !showLogoOnDesktop && 'lg:hidden')}>
+          <Logo size="sm" showText={true} />
+        </div>
+
+        {/* Global Operational Context Badge */}
+        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-[#1C2226] border border-[#30383D] text-[11px] sm:text-xs font-mono shadow-sm shrink-0">
+          <Database className="h-3.5 w-3.5 text-[#C58B3A] shrink-0" />
+          <span className="text-[#9BA5A8] hidden xs:inline">Scope:</span>
+          <select
+            value={selectedSubsidiary}
+            onChange={(e) => setSelectedSubsidiary(e.target.value)}
+            className="bg-[#151A1D] border border-[#30383D] text-[#E8ECEB] font-bold rounded-md px-1 sm:px-1.5 py-0.5 focus:outline-none focus:border-[#C58B3A] text-[11px] sm:text-xs transition-colors cursor-pointer max-w-[110px] sm:max-w-none truncate"
+            aria-label="Select Subsidiary Scope"
+          >
+            <option value="ALL CIL">ALL CIL (Corporate)</option>
+            {CIL_SUBSIDIARIES.filter((s) => s.value !== 'ALL').map((sub) => (
+              <option key={sub.value} value={sub.value}>
+                {sub.value}
+              </option>
+            ))}
+          </select>
+          <span className="text-[#30383D] hidden md:inline">|</span>
+          <span className="text-[#C58B3A] font-semibold hidden md:inline">{selectedFiscalYear}</span>
+        </div>
+      </div>
+
+      {/* Center Search Affordance */}
       <form onSubmit={handleSearchSubmit} className="hidden lg:flex w-56 xl:w-80 relative items-center">
         <Input
           ref={searchInputRef}
@@ -100,7 +151,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
-
       {/* Global Search Modal */}
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
