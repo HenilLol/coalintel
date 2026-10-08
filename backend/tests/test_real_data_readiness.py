@@ -387,3 +387,88 @@ class TestCrossSeamAttribution:
         tuples = extract_entity_tuples_from_text(text, page_number=4)
         assert tuples
         assert all(t["metric_name"] == "Geological Resources" for t in tuples)
+
+
+class TestCountColumnEntityBug:
+    """Issue #88: 'No. of Mines' is a count column, not the entity column.
+
+    Found live on the SCCL Performance Report 2024-25: the area/region-wise
+    production table leads with a mine-count column, and the substring match
+    on 'mine' selected it as the entity column — producing mine_name='1',
+    '0', '4' (row counts) while the real 'Area/ Region' labels (KGM/YLD/MNG)
+    were ignored."""
+
+    def _sccl_table(self):
+        # exact layout from the live document (p.2, area/region-wise production)
+        return [{
+            "table_index": 0,
+            "bbox": [],
+            "row_count": 6,
+            "col_count": 6,
+            "header_names": [],
+            "raw_rows": [
+                ["No. of Mines", "Area/ Region", "March, 2025", "March, 2024", "Increase/ Decrease", "Increase %"],
+                ["1", "KGM", "0.17", "4.97", "3.70", "3.63"],
+                ["1", "YLD", "0.99", "2.24", "0.11", "3.34"],
+                ["3", "MNG", "1.08", "3.43", "0.00", "0.48"],
+                ["2", "RMHP", "0.52", "1.16", "0.23", "3.90"],
+                ["5", "Total", "2.76", "11.80", "4.04", "11.35"],
+            ],
+        }]
+
+    def test_count_column_not_entity_column(self):
+        from app.services.normalization_service import extract_entity_tuples_from_tables
+        metrics = extract_entity_tuples_from_tables(
+            tables=self._sccl_table(),
+            page_number=2,
+            page_text="Chapter-I PRODUCTION a) Area/ Region-wise production (In lakh tonnes)",
+            default_subsidiary="SCCL",
+            default_year="2024-25",
+        )
+        assert metrics, "table extraction must fire on the SCCL layout"
+        names = {m["mine_name"] for m in metrics}
+        # the area codes are the entities — count digits must NEVER appear
+        assert "KGM" in names and "YLD" in names and "MNG" in names
+        assert not any(n.strip().isdigit() for n in names), f"digit entities leaked: {names}"
+
+    def test_numeric_cells_never_become_entities(self):
+        # live failure: SCCL contact tables produced 10-digit phone numbers
+        # and mine-count digits as mine_name
+        from app.services.normalization_service import extract_entity_tuples_from_tables
+        table = [{
+            "table_index": 0, "bbox": [], "row_count": 5, "col_count": 3,
+            "header_names": [],
+            "raw_rows": [
+                ["No. of Mines", "Area/ Region", "Production during Mar FY 25"],
+                ["7915212138", "KGM", "0.17"],
+                ["2", "YLD", "0.99"],
+            ],
+        }]
+        metrics = extract_entity_tuples_from_tables(
+            tables=table, page_number=9,
+            page_text="production (In lakh tonnes)",
+            default_subsidiary="SCCL", default_year="2024-25")
+        names = {m["mine_name"] for m in metrics}
+        assert not any(n.strip().isdigit() for n in names if n), f"digit entity leaked: {names}"
+
+    def test_normal_mine_column_still_detected(self):
+        # the pre-existing 'subsidiary/mine' header path must keep working
+        from app.services.normalization_service import extract_entity_tuples_from_tables
+        table = [{
+            "table_index": 0,
+            "bbox": [],
+            "row_count": 4,
+            "col_count": 3,
+            "header_names": [],
+            "raw_rows": [
+                ["Mine", "Production Mar FY 25", "Production upto Mar FY 25"],
+                ["Gevra OC", "5.10", "52.50"],
+                ["Kusmunda OC", "4.20", "48.10"],
+            ],
+        }]
+        metrics = extract_entity_tuples_from_tables(
+            tables=table, page_number=10, page_text="",
+            default_subsidiary="SECL", default_year="2024-25")
+        assert metrics
+        names = {m["mine_name"] for m in metrics}
+        assert "Gevra OC" in names or "Gevra" in str(names)
