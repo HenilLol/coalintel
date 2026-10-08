@@ -1058,9 +1058,15 @@ def extract_entity_tuples_from_tables(
 
         for c_idx, h in enumerate(col_headers):
             h_lower = h.lower()
+            # Issue #88: 'No. of Mines' is a COUNT column, not an entity
+            # column — the substring 'mine' must not select it (live failure:
+            # SCCL area/region tables produced mine_name='1', '0', '4' from
+            # the mine-count digits while the real entity column
+            # 'Area/ Region' was ignored).
+            _is_count_col = bool(re.match(r"^(?:no\.?/?\s*of\s+)?(?:no\.?|number)?\s*(?:of\s+)?mines?$", h_lower.strip())) or "no. of mines" in h_lower
             if entity_col_idx is None and any(w in h_lower for w in ["subs", "company", "entity"]):
                 entity_col_idx = c_idx
-            elif entity_col_idx is None and "mine" in h_lower:
+            elif entity_col_idx is None and "mine" in h_lower and not _is_count_col:
                 entity_col_idx = c_idx
 
             # Monthly production column (e.g. 'Production during Mar FY 25')
@@ -1086,12 +1092,33 @@ def extract_entity_tuples_from_tables(
             if col_count > 1 and "sl" in col_headers[0].lower():
                 entity_col_idx = 1
             else:
+                # Issue #88: prefer the first column whose header is NOT a
+                # count column ('No. of Mines', 'No.', 'Sl No') and NOT purely
+                # numeric/percentage headers; scanning left-to-right mirrors
+                # how these tables are laid out (count first, entity second).
                 entity_col_idx = 0
+                for c_idx, h in enumerate(col_headers[:4]):
+                    h_lower = h.lower().strip()
+                    _is_count = (
+                        "no. of mines" in h_lower
+                        or re.match(r"^(?:sl\.?\s*)?no\.?$", h_lower)
+                        or re.match(r"^(?:no\.?|number)\.?$", h_lower)
+                    )
+                    if h_lower and not _is_count and not re.match(r"^[\d.%\s]+$", h_lower):
+                        entity_col_idx = c_idx
+                        break
 
         # Check if table semantically pertains to coal production vs other metric families (OBR, Despatch, etc.)
         combined_title_headers = f"{table_title} " + " ".join(col_headers)
+        # Issue #88: the production keyword often lives in the page/nearby text
+        # ("Chapter-I PRODUCTION a) Area/Region-wise production") rather than
+        # in the column headers themselves — include the local page context in
+        # the semantic check.
+        _page_ctx = page_text[:400] if page_text else ""
         is_other_family = bool(re.search(r"\b(?:overburden|obr|despatch|offtake|exploration|safety)\b", combined_title_headers, re.IGNORECASE))
-        has_production_keyword = bool(re.search(r"\b(?:production|prod)\b", combined_title_headers, re.IGNORECASE))
+        has_production_keyword = bool(
+            re.search(r"\b(?:production|prod)\b", combined_title_headers + " " + _page_ctx, re.IGNORECASE)
+        )
         is_production_table = has_production_keyword and not is_other_family
 
         # Fallback for monthly production: Col 3 (ONLY if table is clearly a production table)
@@ -1132,6 +1159,14 @@ def extract_entity_tuples_from_tables(
             if not clean_entity or clean_entity in ["-", "--", "Sl No", "Total"]:
                 if row[0] and "total" in str(row[0]).lower():
                     clean_entity = str(row[0]).strip()
+
+            # Issue #88 (follow-up): cells that are pure numbers are COUNTS or
+            # identifiers (mine-count digits, 10-digit phone numbers found
+            # live in SCCL contact tables), never entity names. A numeric
+            # entity label is worse than Unspecified — it fabricates an
+            # attribution. Reject and fall back to the honest bucket.
+            if clean_entity and re.fullmatch(r"[\d\s\-()\.]+", clean_entity):
+                clean_entity = ""
 
             ent_upper = clean_entity.upper()
 
